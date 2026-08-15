@@ -1,26 +1,327 @@
 @import "tailwindcss";
 
+/* =========================================================
+   CURA — Global Design System
+   ========================================================= */
+
 :root {
+  /* Base */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #071b3a;
+
+  /* CURA Brand Colors */
+  --cura-navy: #071b3a;
+  --cura-navy-light: #0b2b52;
+  --cura-blue: #145d8f;
+  --cura-blue-light: #1b79aa;
+  --cura-cyan: #24b8ed;
+  --cura-red: #e21d2f;
+
+  /* Supporting Colors */
+  --cura-white: #ffffff;
+  --cura-light: #f5f8fb;
+  --cura-border: #dfe7ef;
+  --cura-muted: #66758a;
+  --cura-text-light: #8fa1b5;
 }
 
+/* =========================================================
+   Tailwind Theme
+   ========================================================= */
+
 @theme inline {
+  /* Base */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* CURA */
+  --color-cura-navy: var(--cura-navy);
+  --color-cura-navy-light: var(--cura-navy-light);
+  --color-cura-blue: var(--cura-blue);
+  --color-cura-blue-light: var(--cura-blue-light);
+  --color-cura-cyan: var(--cura-cyan);
+  --color-cura-red: var(--cura-red);
+
+  /* Supporting */
+  --color-cura-white: var(--cura-white);
+  --color-cura-light: var(--cura-light);
+  --color-cura-border: var(--cura-border);
+  --color-cura-muted: var(--cura-muted);
+  --color-cura-text-light: var(--cura-text-light);
+
+  /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* =========================================================
+   Global HTML
+   ========================================================= */
+
+html {
+  background: #ffffff;
+  scroll-behavior: smooth;
 }
 
+/* =========================================================
+   Body
+   ========================================================= */
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  margin: 0;
+  padding: 0;
+
+  background: #ffffff;
+  color: var(--cura-navy);
+
   font-family: Arial, Helvetica, sans-serif;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =========================================================
+   Links
+   ========================================================= */
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* =========================================================
+   Selection
+   ========================================================= */
+
+::selection {
+  background: var(--cura-cyan);
+  color: var(--cura-navy);
+}
+
+/* =========================================================
+   CURA Gradient
+   ========================================================= */
+
+.cura-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--cura-navy) 0%,
+    var(--cura-navy-light) 50%,
+    var(--cura-blue) 100%
+  );
+}
+
+/* =========================================================
+   CURA Hero Gradient
+   ========================================================= */
+
+.cura-hero {
+  background: linear-gradient(
+    120deg,
+    #071b3a 0%,
+    #0b2b52 48%,
+    #145d8f 100%
+  );
+}
+
+/* =========================================================
+   CURA Card
+   ========================================================= */
+
+.cura-card {
+  background: #ffffff;
+  border: 1px solid var(--cura-border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(7, 27, 58, 0.08);
+}
+
+/* =========================================================
+   CURA Button — Primary
+   ========================================================= */
+
+.cura-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--cura-navy);
+  color: #ffffff;
+
+  border: 1px solid var(--cura-navy);
+  border-radius: 6px;
+
+  padding: 0.75rem 1.25rem;
+
+  font-weight: 600;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.cura-button-primary:hover {
+  background: var(--cura-navy-light);
+  border-color: var(--cura-navy-light);
+}
+
+/* =========================================================
+   CURA Button — Secondary
+   ========================================================= */
+
+.cura-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #ffffff;
+  color: var(--cura-navy);
+
+  border: 1px solid var(--cura-navy);
+  border-radius: 6px;
+
+  padding: 0.75rem 1.25rem;
+
+  font-weight: 600;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.cura-button-secondary:hover {
+  background: var(--cura-light);
+}
+
+/* =========================================================
+   CURA Cyan Accent
+   ========================================================= */
+
+.cura-accent {
+  color: var(--cura-cyan);
+}
+
+/* =========================================================
+   CURA Red Accent
+   ========================================================= */
+
+.cura-red {
+  color: var(--cura-red);
+}
+
+/* =========================================================
+   Light Section Background
+   ========================================================= */
+
+.cura-section-light {
+  background: var(--cura-light);
+}
+
+/* =========================================================
+   Subtle Border
+   ========================================================= */
+
+.cura-border {
+  border-color: var(--cura-border);
+}
+
+/* =========================================================
+   Muted Text
+   ========================================================= */
+
+.cura-muted {
+  color: var(--cura-muted);
+}
+
+/* =========================================================
+   Tables
+   ========================================================= */
+
+.cura-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.cura-table thead {
+  background: var(--cura-navy);
+  color: #ffffff;
+}
+
+.cura-table th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.cura-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--cura-border);
+  color: var(--cura-navy);
+}
+
+.cura-table tbody tr:hover {
+  background: var(--cura-light);
+}
+
+/* =========================================================
+   Focus States
+   ========================================================= */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--cura-cyan);
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   Form Inputs
+   ========================================================= */
+
+.cura-input {
+  width: 100%;
+
+  background: #ffffff;
+  color: var(--cura-navy);
+
+  border: 1px solid var(--cura-border);
+  border-radius: 6px;
+
+  padding: 0.75rem 0.875rem;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.cura-input:focus {
+  border-color: var(--cura-blue);
+  box-shadow: 0 0 0 3px rgba(36, 184, 237, 0.15);
+  outline: none;
+}
+
+/* =========================================================
+   Scrollbar
+   ========================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f8fb;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b8c6d5;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cura-blue);
 }

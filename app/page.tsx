@@ -1,3 +1,5 @@
+import CuraHeader from "@/components/CuraHeader"
+import CuraFooter from "@/components/CuraFooter"
 const taxInsights = [
   {
     tag: "TAX UPDATE",
@@ -63,80 +65,20 @@ const services = [
     description:
       "Learning resources to strengthen your professional knowledge.",
   },
+  {
+  number: "06",
+  title: "Exchange Rates",
+  description:
+    "Published MVR / USD exchange rates from authorized money exchangers in the Maldives.",
+},
 ]
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-white text-[#071B49]">
 
-      {/* NAVIGATION */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-
-          <a href="/" className="shrink-0">
-            <img
-              src="/cura-logo.png"
-              alt="CURA - Audit Tax Advisory"
-              className="h-24 w-auto object-contain"
-            />
-          </a>
-
-          <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
-            <a
-              href="/"
-              className="border-b-2 border-[#D71920] pb-1 text-[#071B49]"
-            >
-              Home
-            </a>
-
-            <a
-              href="#knowledge"
-              className="text-slate-600 transition hover:text-[#071B49]"
-            >
-              Knowledge
-            </a>
-
-            <a
-              href="#cases"
-              className="text-slate-600 transition hover:text-[#071B49]"
-            >
-              Legal Cases
-            </a>
-
-            <a
-              href="#updates"
-              className="text-slate-600 transition hover:text-[#071B49]"
-            >
-              Tax Updates
-            </a>
-
-            <a
-              href="#education"
-              className="text-slate-600 transition hover:text-[#071B49]"
-            >
-              Education
-            </a>
-
-            <a
-              href="#about"
-              className="text-slate-600 transition hover:text-[#071B49]"
-            >
-              About
-            </a>
-
-            <a
-              href="#contact"
-              className="rounded-md bg-[#071B49] px-5 py-2.5 text-white transition hover:bg-[#0B2A69]"
-            >
-              Contact
-            </a>
-          </nav>
-
-          <button className="rounded-md border border-slate-300 px-3 py-2 text-sm md:hidden">
-            Menu
-          </button>
-        </div>
-      </header>
+      {/* SHARED CURA HEADER */}
+<CuraHeader />
 
       {/* HERO */}
       <section className="relative overflow-hidden bg-[#061936]">
@@ -183,7 +125,7 @@ export default function Home() {
 
               <a
                 href="#cases"
-                className="rounded-md border border-white/40 px-7 py-3.5 text-center text-sm font-semibold text-white transition hover:bg-white/10"
+                className="rounded-md bg-white px-7 py-3.5 text-center text-sm font-semibold text-[#071B49] transition hover:bg-slate-100"
               >
                 Browse Legal Cases →
               </a>
@@ -226,12 +168,12 @@ export default function Home() {
 
       {/* SERVICE STRIP */}
       <section className="relative z-10 -mt-8 px-6">
-        <div className="mx-auto grid max-w-7xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl md:grid-cols-5">
+        <div className="mx-auto grid max-w-7xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl md:grid-cols-6">
 
           {services.map((service, index) => (
             <a
               key={service.title}
-              href="/articles"
+              href={service.title === "Exchange Rates" ? "/exchange-rate" : "/articles"}
               className={`group p-7 transition hover:bg-slate-50 ${
                 index !== services.length - 1
                   ? "border-b border-slate-200 md:border-b-0 md:border-r"
@@ -244,12 +186,14 @@ export default function Home() {
               </div>
 
               <h3
-                className={`mt-5 text-lg font-semibold ${
-                  service.title === "Law"
-                    ? "text-[#D71920]"
-                    : "text-[#071B49]"
-                }`}
-              >
+  className={`mt-5 text-lg font-semibold ${
+    service.title === "Law"
+      ? "text-[#D71920]"
+      : service.title === "Exchange Rates"
+        ? "text-[#168BC4]"
+        : "text-[#071B49]"
+  }`}
+>
                 {service.title}
               </h3>
 
@@ -508,7 +452,7 @@ export default function Home() {
 
             <a
               href="mailto:info@cura.mv"
-              className="rounded-md bg-[#071B49] px-7 py-3.5 text-center text-sm font-semibold text-white hover:bg-[#0B2A69]"
+              className="rounded-md bg-[#071B49] px-7 py-3.5 text-center text-sm font-semibold !text-white hover:bg-[#0B2A69]"
             >
               Contact CURA →
             </a>
@@ -575,17 +519,36 @@ export default function Home() {
 
               <div className="mt-4 space-y-3 text-sm text-slate-400">
 
-                <a href="#about" className="block hover:text-white">
-                  About
-                </a>
+  <a href="#about" className="block hover:text-white">
+    About CURA
+  </a>
 
-                <a href="#contact" className="block hover:text-white">
-                  Contact
-                </a>
+  <a href="#knowledge" className="block hover:text-white">
+    Knowledge
+  </a>
 
-                <p>Maldives</p>
+  <a href="#updates" className="block hover:text-white">
+    Tax Updates
+  </a>
 
-              </div>
+  <a href="#education" className="block hover:text-white">
+    Education
+  </a>
+
+  <a
+    href="/exchange-rate"
+    className="block hover:text-white"
+  >
+    Exchange Rates
+  </a>
+
+  <a href="#contact" className="block hover:text-white">
+    Contact
+  </a>
+
+  <p>Maldives</p>
+
+</div>
 
             </div>
 
