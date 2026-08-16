@@ -64,6 +64,15 @@ type TimelineEvent = {
   sort_order: number | null
 }
 
+type CaseSource = {
+  id: string
+  case_id: string
+  title: string
+  url: string | null
+  source_type: string | null
+  sort_order: number | null
+}
+
 function formatDate(date: string | null) {
   if (!date) return null
 
@@ -77,12 +86,12 @@ function formatDate(date: string | null) {
 function courtLabel(court: string | null) {
   if (!court) return "Legal Proceeding"
 
-  const value = court.toLowerCase()
+  const value = court.trim().toLowerCase()
 
   if (
     value.includes("tax appeal tribunal") ||
-    value.includes("tribunal") ||
-    value === "tat"
+    value === "tat" ||
+    value.includes("appeal tribunal")
   ) {
     return "Tax Appeal Tribunal"
   }
@@ -98,21 +107,29 @@ function courtLabel(court: string | null) {
   return court
 }
 
-function courtShortLabel(court: string | null) {
+function courtTag(court: string | null) {
   const label = courtLabel(court)
 
-  if (label === "Tax Appeal Tribunal") return "TAX APPEAL TRIBUNAL"
-  if (label === "High Court") return "HIGH COURT"
-  if (label === "Supreme Court") return "SUPREME COURT"
+  if (label === "Tax Appeal Tribunal") {
+    return "TAT"
+  }
+
+  if (label === "High Court") {
+    return "HIGH COURT"
+  }
+
+  if (label === "Supreme Court") {
+    return "SUPREME COURT"
+  }
 
   return label.toUpperCase()
 }
 
-function courtColor(court: string | null) {
+function courtTagClass(court: string | null) {
   const label = courtLabel(court)
 
   if (label === "Tax Appeal Tribunal") {
-    return "bg-[#E8F6FC] text-[#168BC4]"
+    return "bg-[#EAF7FC] text-[#168BC4]"
   }
 
   if (label === "High Court") {
@@ -126,52 +143,41 @@ function courtColor(court: string | null) {
   return "bg-slate-100 text-slate-600"
 }
 
-function proceedingDate(proceeding: Proceeding) {
+function getProceedingDate(proceeding: Proceeding) {
   return (
-    proceeding.filed_date ||
     proceeding.judgment_date ||
+    proceeding.filed_date ||
     null
   )
 }
 
-function compareProceedings(a: Proceeding, b: Proceeding) {
-  const dateA = proceedingDate(a)
-  const dateB = proceedingDate(b)
+function compareProceedings(
+  a: Proceeding,
+  b: Proceeding,
+) {
+  const dateA = getProceedingDate(a)
+  const dateB = getProceedingDate(b)
 
   if (dateA && dateB) {
     const comparison =
       new Date(dateA).getTime() -
       new Date(dateB).getTime()
 
-    if (comparison !== 0) return comparison
+    if (comparison !== 0) {
+      return comparison
+    }
   }
 
   if (dateA && !dateB) return -1
   if (!dateA && dateB) return 1
 
-  const courtRank = (court: string) => {
-    const label = courtLabel(court)
-
-    if (label === "Tax Appeal Tribunal") return 1
-    if (label === "High Court") return 2
-    if (label === "Supreme Court") return 3
-
-    return 4
-  }
-
-  const courtComparison =
-    courtRank(a.court) - courtRank(b.court)
-
-  if (courtComparison !== 0) {
-    return courtComparison
-  }
-
-  return (a.case_number || "").localeCompare(
-    b.case_number || "",
-  )
+  return (a.sort_order ?? 999) -
+    (b.sort_order ?? 999)
 }
 
-function uniqueProceedings(proceedings: Proceeding[]) {
+function uniqueProceedings(
+  proceedings: Proceeding[],
+) {
   const seen = new Set<string>()
   const result: Proceeding[] = []
 
@@ -180,13 +186,130 @@ function uniqueProceedings(proceedings: Proceeding[]) {
       proceeding.court,
     )}|${proceeding.case_number || proceeding.id}`
 
-    if (seen.has(key)) continue
+    if (seen.has(key)) {
+      continue
+    }
 
     seen.add(key)
     result.push(proceeding)
   }
 
   return result.sort(compareProceedings)
+}
+
+function createDerivedTimeline(
+  proceedings: Proceeding[],
+): TimelineEvent[] {
+  const events: TimelineEvent[] = []
+
+  proceedings.forEach((proceeding) => {
+    if (proceeding.filed_date) {
+      events.push({
+        id: `${proceeding.id}-filed`,
+        case_id: proceeding.case_id,
+        event_date: proceeding.filed_date,
+        year: new Date(
+          proceeding.filed_date,
+        ).getFullYear().toString(),
+        court: proceeding.court,
+        description: proceeding.case_number
+          ? `Proceeding filed as ${proceeding.case_number}.`
+          : "Proceeding filed.",
+        sort_order: 0,
+      })
+    }
+
+    if (proceeding.judgment_date) {
+      events.push({
+        id: `${proceeding.id}-judgment`,
+        case_id: proceeding.case_id,
+        event_date: proceeding.judgment_date,
+        year: new Date(
+          proceeding.judgment_date,
+        ).getFullYear().toString(),
+        court: proceeding.court,
+        description:
+          proceeding.outcome ||
+          proceeding.status ||
+          "Judgment passed.",
+        sort_order: 1,
+      })
+    }
+  })
+
+  return events.sort((a, b) => {
+    if (!a.event_date && !b.event_date) {
+      return 0
+    }
+
+    if (!a.event_date) return 1
+    if (!b.event_date) return -1
+
+    return (
+      new Date(a.event_date).getTime() -
+      new Date(b.event_date).getTime()
+    )
+  })
+}
+
+function mergeTimeline(
+  explicitTimeline: TimelineEvent[],
+  proceedings: Proceeding[],
+) {
+  if (explicitTimeline.length > 0) {
+    return explicitTimeline
+      .filter((item) => item.event_date)
+      .sort((a, b) => {
+        return (
+          new Date(a.event_date!).getTime() -
+          new Date(b.event_date!).getTime()
+        )
+      })
+  }
+
+  return createDerivedTimeline(proceedings)
+}
+
+function uniqueSources(
+  sources: CaseSource[],
+  proceedings: Proceeding[],
+) {
+  const result: CaseSource[] = []
+  const seen = new Set<string>()
+
+  for (const source of sources) {
+    if (!source.url) continue
+
+    if (seen.has(source.url)) continue
+
+    seen.add(source.url)
+    result.push(source)
+  }
+
+  for (const proceeding of proceedings) {
+    if (!proceeding.source_url) continue
+
+    if (seen.has(proceeding.source_url)) continue
+
+    seen.add(proceeding.source_url)
+
+    result.push({
+      id: `proceeding-${proceeding.id}`,
+      case_id: proceeding.case_id,
+      title:
+        proceeding.source_title ||
+        `${courtLabel(proceeding.court)} — ${
+          proceeding.case_number || "Case document"
+        }`,
+      url: proceeding.source_url,
+      source_type:
+        proceeding.source_type ||
+        "Official source",
+      sort_order: result.length + 1,
+    })
+  }
+
+  return result
 }
 
 export default async function CasePage({
@@ -222,18 +345,8 @@ export default async function CasePage({
    * ============================================================
    * CASE FAMILY
    *
-   * A legal matter can contain several separate legal_cases
-   * representing different court proceedings.
-   *
-   * Example:
-   *
-   * TAT
-   *   ↓
-   * High Court
-   *   ↓
-   * Supreme Court
-   *
-   * This allows all proceedings to appear together.
+   * All proceedings belonging to the same legal matter
+   * are treated as one connected case history.
    * ============================================================
    */
 
@@ -250,7 +363,7 @@ export default async function CasePage({
         typedCase.legal_matter_id,
       )
 
-    if (familyCases && familyCases.length > 0) {
+    if (familyCases?.length) {
       familyCaseIds = familyCases.map(
         (item) => item.id,
       )
@@ -259,7 +372,7 @@ export default async function CasePage({
 
   /*
    * ============================================================
-   * LOAD PROCEEDINGS / ISSUES / TIMELINE
+   * LOAD EVERYTHING
    * ============================================================
    */
 
@@ -267,6 +380,7 @@ export default async function CasePage({
     proceedingsResult,
     issuesResult,
     timelineResult,
+    sourcesResult,
   ] = await Promise.all([
     supabase
       .from("case_proceedings")
@@ -299,6 +413,11 @@ export default async function CasePage({
         ascending: true,
       }),
 
+    /*
+     * IMPORTANT:
+     * Load timeline records from the whole legal matter,
+     * not just the current legal_cases row.
+     */
     supabase
       .from("case_timeline")
       .select(`
@@ -310,7 +429,22 @@ export default async function CasePage({
         description,
         sort_order
       `)
-      .eq("case_id", typedCase.id)
+      .in("case_id", familyCaseIds)
+      .order("event_date", {
+        ascending: true,
+      }),
+
+    supabase
+      .from("case_sources")
+      .select(`
+        id,
+        case_id,
+        title,
+        url,
+        source_type,
+        sort_order
+      `)
+      .in("case_id", familyCaseIds)
       .order("sort_order", {
         ascending: true,
       }),
@@ -331,21 +465,46 @@ export default async function CasePage({
   const issues =
     (issuesResult.data || []) as CaseIssue[]
 
-  const timeline =
+  const explicitTimeline =
     (timelineResult.data || []) as TimelineEvent[]
+
+  const timeline = mergeTimeline(
+    explicitTimeline,
+    proceedings,
+  )
+
+  const databaseSources =
+    (sourcesResult.data || []) as CaseSource[]
+
+  const sources = uniqueSources(
+    databaseSources,
+    proceedings,
+  )
+
+  /*
+   * Compact court-stage tags.
+   *
+   * These are deliberately small and displayed
+   * in a 2-column grid.
+   */
+
+  const stageTags = Array.from(
+    new Map(
+      proceedings.map((item) => [
+        courtLabel(item.court),
+        item.court,
+      ]),
+    ).keys(),
+  )
 
   /*
    * ============================================================
-   * RENDER
+   * PAGE
    * ============================================================
    */
 
   return (
     <main className="min-h-screen bg-white text-[#071B49]">
-
-      {/* ======================================================
-          SHARED HEADER
-      ====================================================== */}
 
       <CuraHeader />
 
@@ -361,64 +520,49 @@ export default async function CasePage({
 
           <div className="absolute -right-32 -top-32 h-[600px] w-[600px] rounded-full bg-[#168BC4] opacity-20 blur-3xl" />
 
-          <div className="absolute bottom-0 right-1/4 h-64 w-64 rounded-full bg-[#0C73A8] opacity-20 blur-3xl" />
-
         </div>
 
         <div className="relative mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-24">
 
           <div className="max-w-5xl">
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
 
-              <span className="rounded-full bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#D71920]">
-                Tax Legal Case
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-[#62C4EA]">
+                TAX LEGAL CASE
               </span>
 
-              <span className="text-sm text-slate-300">
+              <span className="text-xs text-slate-400">
                 Maldives
               </span>
 
             </div>
 
-            <h1 className="mt-7 max-w-5xl text-4xl font-semibold leading-tight tracking-tight text-white md:text-5xl lg:text-6xl">
+            <h1 className="mt-6 max-w-5xl text-4xl font-semibold leading-tight tracking-tight text-white md:text-5xl lg:text-6xl">
               {typedCase.title}
             </h1>
 
             {typedCase.description && (
-              <p className="mt-6 max-w-3xl text-base leading-8 text-slate-300 md:text-lg">
+              <p className="mt-6 max-w-3xl text-base leading-8 text-slate-300">
                 {typedCase.description}
               </p>
             )}
 
-            {proceedings.length > 0 && (
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+            {/* SMALL 2-COLUMN TAG GRID */}
 
-                <span className="text-sm font-medium text-slate-400">
-                  {proceedings.length}{" "}
-                  {proceedings.length === 1
-                    ? "proceeding"
-                    : "proceedings"}
-                </span>
+            {stageTags.length > 0 && (
+              <div className="mt-8 grid max-w-md grid-cols-2 gap-2">
 
-                <span className="text-slate-600">
-                  •
-                </span>
-
-                {Array.from(
-                  new Set(
-                    proceedings.map((item) =>
-                      courtShortLabel(item.court),
-                    ),
+                {stageTags.slice(0, 4).map(
+                  (stage) => (
+                    <span
+                      key={stage}
+                      className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-300"
+                    >
+                      {stage}
+                    </span>
                   ),
-                ).map((court) => (
-                  <span
-                    key={court}
-                    className="text-xs font-semibold uppercase tracking-[0.12em] text-[#62C4EA]"
-                  >
-                    {court}
-                  </span>
-                ))}
+                )}
 
               </div>
             )}
@@ -430,36 +574,36 @@ export default async function CasePage({
       </section>
 
       {/* ======================================================
-          PROCEEDING HISTORY
+          CASE HISTORY
       ====================================================== */}
 
-      {proceedings.length > 0 && (
-        <section className="bg-[#F5F8FC]">
+      <section className="bg-[#F5F8FC]">
 
-          <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
 
-            <div className="max-w-3xl">
+          <div className="max-w-3xl">
 
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D71920]">
-                Case History
-              </p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#D71920]">
+              CASE HISTORY
+            </p>
 
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-                All Proceedings
-              </h2>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
+              All Proceedings
+            </h2>
 
-              <p className="mt-4 text-base leading-7 text-slate-600">
-                The proceedings below are presented in
-                chronological order to show how the matter
-                progressed through the Maldivian tax dispute
-                resolution and court system.
-              </p>
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              The proceedings below are presented in
+              chronological order to show how the matter
+              progressed through the Maldivian tax dispute
+              resolution and court system.
+            </p>
 
-            </div>
+          </div>
 
+          {proceedings.length > 0 ? (
             <div className="relative mt-10">
 
-              {/* Vertical timeline line */}
+              {/* Timeline connector */}
 
               <div className="absolute left-[18px] top-5 hidden h-[calc(100%-40px)] w-px bg-slate-300 md:block" />
 
@@ -468,20 +612,23 @@ export default async function CasePage({
                 {proceedings.map(
                   (proceeding, index) => {
 
-                    const date =
-                      proceedingDate(proceeding)
+                    const filedDate =
+                      proceeding.filed_date
+
+                    const judgmentDate =
+                      proceeding.judgment_date
 
                     return (
                       <article
                         key={proceeding.id}
-                        className="relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:ml-0 md:p-6"
+                        className="relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6"
                       >
 
-                        <div className="flex flex-col gap-5 md:flex-row md:items-start">
+                        <div className="flex gap-5">
 
                           {/* NUMBER */}
 
-                          <div className="hidden md:flex md:w-10 md:flex-shrink-0 md:justify-center">
+                          <div className="hidden flex-shrink-0 md:block">
 
                             <div className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[#071B49] text-xs font-bold text-white">
                               {index + 1}
@@ -493,52 +640,75 @@ export default async function CasePage({
 
                           <div className="min-w-0 flex-1">
 
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 
                               <div>
 
+                                {/* SMALL COURT TAG */}
+
                                 <span
-                                  className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${courtColor(
+                                  className={`inline-flex rounded px-2 py-1 text-[8px] font-bold uppercase tracking-[0.14em] ${courtTagClass(
                                     proceeding.court,
                                   )}`}
                                 >
-                                  {courtShortLabel(
+                                  {courtTag(
                                     proceeding.court,
                                   )}
                                 </span>
 
-                                {proceeding.case_number && (
-                                  <h3 className="mt-3 text-lg font-semibold text-[#071B49] md:text-xl">
-                                    {proceeding.case_number}
-                                  </h3>
+                                <h3 className="mt-3 text-lg font-semibold text-[#071B49] md:text-xl">
+                                  {proceeding.case_number ||
+                                    "Case number unavailable"}
+                                </h3>
+
+                              </div>
+
+                              {/* DATES */}
+
+                              <div className="flex flex-wrap gap-6 sm:justify-end">
+
+                                {filedDate && (
+                                  <div className="sm:text-right">
+
+                                    <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                                      Filed
+                                    </p>
+
+                                    <p className="mt-1 text-sm text-slate-700">
+                                      {formatDate(
+                                        filedDate,
+                                      )}
+                                    </p>
+
+                                  </div>
+                                )}
+
+                                {judgmentDate && (
+                                  <div className="sm:text-right">
+
+                                    <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                                      Judgment
+                                    </p>
+
+                                    <p className="mt-1 text-sm text-slate-700">
+                                      {formatDate(
+                                        judgmentDate,
+                                      )}
+                                    </p>
+
+                                  </div>
                                 )}
 
                               </div>
 
-                              {date && (
-                                <div className="text-left sm:text-right">
-
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-400">
-                                    {proceeding.judgment_date
-                                      ? "Judgment"
-                                      : "Filed"}
-                                  </p>
-
-                                  <p className="mt-1 text-sm font-medium text-slate-700">
-                                    {formatDate(date)}
-                                  </p>
-
-                                </div>
-                              )}
-
                             </div>
 
-                            <div className="mt-5 grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-2">
+                            <div className="mt-5 grid gap-5 border-t border-slate-100 pt-5 md:grid-cols-2">
 
                               {proceeding.status && (
                                 <div>
 
-                                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400">
                                     Status
                                   </p>
 
@@ -552,7 +722,7 @@ export default async function CasePage({
                               {proceeding.outcome && (
                                 <div>
 
-                                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400">
                                     Outcome
                                   </p>
 
@@ -565,27 +735,27 @@ export default async function CasePage({
 
                             </div>
 
-                            <div className="mt-5 flex flex-wrap items-center gap-4">
+                            {/* ORIGINAL SOURCE */}
 
-                              {proceeding.source_url && (
+                            {proceeding.source_url && (
+                              <div className="mt-5">
+
                                 <a
-                                  href={proceeding.source_url}
+                                  href={
+                                    proceeding.source_url
+                                  }
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center rounded-md bg-[#071B49] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0B2A69]"
+                                  className="inline-flex items-center gap-2 rounded-md border border-[#071B49] px-3 py-2 text-[10px] font-semibold text-[#071B49] transition hover:bg-[#071B49] hover:text-white"
                                 >
-                                  View Original Document →
-                                </a>
-                              )}
-
-                              {proceeding.source_url &&
-                                proceeding.source_type && (
-                                  <span className="text-xs text-slate-400">
-                                    {proceeding.source_type}
+                                  View original source
+                                  <span>
+                                    ↗
                                   </span>
-                                )}
+                                </a>
 
-                            </div>
+                              </div>
+                            )}
 
                           </div>
 
@@ -599,124 +769,13 @@ export default async function CasePage({
               </div>
 
             </div>
+          ) : (
+            <div className="mt-10 rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
 
-          </div>
-
-        </section>
-      )}
-
-      {/* ======================================================
-          CURA CASE ANALYSIS
-      ====================================================== */}
-
-      <section className="bg-white">
-
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-
-          <div className="max-w-4xl">
-
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#D71920]">
-              CURA Case Analysis
-            </p>
-
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-              Case Summary
-            </h2>
-
-            <p className="mt-4 text-base leading-7 text-slate-600">
-              A structured presentation of the case background,
-              decision, legal considerations and practical
-              implications.
-            </p>
-
-          </div>
-
-          {(typedCase.background ||
-            typedCase.decision ||
-            typedCase.legal_principle ||
-            typedCase.implications) && (
-
-            <div className="mt-10 grid gap-6 md:grid-cols-2">
-
-              {/* BACKGROUND */}
-
-              {typedCase.background && (
-                <div className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-8">
-
-                  <div className="border-l-4 border-[#D71920] pl-6">
-
-                    <h3 className="text-xl font-semibold">
-                      Background
-                    </h3>
-
-                    <p className="mt-5 text-base leading-8 text-slate-600">
-                      {typedCase.background}
-                    </p>
-
-                  </div>
-
-                </div>
-              )}
-
-              {/* DECISION */}
-
-              {typedCase.decision && (
-                <div className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-8">
-
-                  <div className="border-l-4 border-[#D71920] pl-6">
-
-                    <h3 className="text-xl font-semibold">
-                      Decision
-                    </h3>
-
-                    <p className="mt-5 text-base leading-8 text-slate-600">
-                      {typedCase.decision}
-                    </p>
-
-                  </div>
-
-                </div>
-              )}
-
-              {/* LEGAL PRINCIPLE */}
-
-              {typedCase.legal_principle && (
-                <div className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-8">
-
-                  <div className="border-l-4 border-[#168BC4] pl-6">
-
-                    <h3 className="text-xl font-semibold">
-                      Legal Principle
-                    </h3>
-
-                    <p className="mt-5 text-base leading-8 text-slate-600">
-                      {typedCase.legal_principle}
-                    </p>
-
-                  </div>
-
-                </div>
-              )}
-
-              {/* PRACTICAL IMPLICATIONS */}
-
-              {typedCase.implications && (
-                <div className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-8">
-
-                  <div className="border-l-4 border-[#071B49] pl-6">
-
-                    <h3 className="text-xl font-semibold">
-                      Practical Implications
-                    </h3>
-
-                    <p className="mt-5 text-base leading-8 text-slate-600">
-                      {typedCase.implications}
-                    </p>
-
-                  </div>
-
-                </div>
-              )}
+              <p className="text-sm text-slate-500">
+                No proceeding information is currently
+                available for this case.
+              </p>
 
             </div>
           )}
@@ -726,59 +785,268 @@ export default async function CasePage({
       </section>
 
       {/* ======================================================
-          KEY ISSUES
+          CASE TIMELINE
       ====================================================== */}
 
-      {issues.length > 0 && (
+      <section className="bg-white">
+
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+
+          <div className="max-w-3xl">
+
+            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#168BC4]">
+              CASE DEVELOPMENT
+            </p>
+
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
+              Case Timeline
+            </h2>
+
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              A chronological view of the major procedural
+              developments in the matter.
+            </p>
+
+          </div>
+
+          {timeline.length > 0 ? (
+            <div className="mt-12 max-w-4xl">
+
+              <div className="relative">
+
+                {/* Main timeline line */}
+
+                <div className="absolute left-[15px] top-2 h-[calc(100%-16px)] w-px bg-slate-200" />
+
+                <div className="space-y-10">
+
+                  {timeline.map(
+                    (event, index) => (
+
+                      <div
+                        key={event.id}
+                        className="relative flex gap-6"
+                      >
+
+                        {/* DOT */}
+
+                        <div className="relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-4 border-white bg-[#071B49] shadow-sm">
+
+                          <span className="sr-only">
+                            Timeline event{" "}
+                            {index + 1}
+                          </span>
+
+                        </div>
+
+                        {/* EVENT */}
+
+                        <div className="flex-1 pb-1">
+
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
+                            <div>
+
+                              {event.court && (
+                                <span
+                                  className={`inline-flex rounded px-2 py-1 text-[8px] font-bold uppercase tracking-[0.14em] ${courtTagClass(
+                                    event.court,
+                                  )}`}
+                                >
+                                  {courtTag(
+                                    event.court,
+                                  )}
+                                </span>
+                              )}
+
+                            </div>
+
+                            {event.event_date && (
+                              <p className="text-xs font-semibold text-slate-400 sm:text-right">
+                                {formatDate(
+                                  event.event_date,
+                                )}
+                              </p>
+                            )}
+
+                          </div>
+
+                          <p className="mt-3 text-sm leading-7 text-slate-700 md:text-base">
+                            {event.description}
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    ),
+                  )}
+
+                </div>
+
+              </div>
+
+            </div>
+          ) : (
+            <div className="mt-10 rounded-xl border border-dashed border-slate-300 bg-[#F5F8FC] p-8">
+
+              <p className="text-sm leading-6 text-slate-500">
+                Timeline information will be added as the
+                underlying proceedings are verified.
+              </p>
+
+            </div>
+          )}
+
+        </div>
+
+      </section>
+
+      {/* ======================================================
+          CURA CASE ANALYSIS
+      ====================================================== */}
+
+      {(typedCase.background ||
+        typedCase.decision ||
+        typedCase.legal_principle ||
+        typedCase.implications) && (
+
         <section className="bg-[#F5F8FC]">
 
-          <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+          <div className="mx-auto max-w-5xl px-6 py-20 lg:px-8">
 
             <div className="max-w-4xl">
 
-              <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#D71920]">
-                Legal Analysis
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#D71920]">
+                CURA CASE ANALYSIS
               </p>
 
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-                Case Issues
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#071B49] md:text-4xl">
+                Case Summary
               </h2>
 
-              <p className="mt-4 text-base leading-7 text-slate-600">
-                The principal legal and tax issues arising from
-                the case.
+              <p className="mt-4 text-base leading-8 text-slate-600">
+                A detailed analysis of the facts, proceedings,
+                decisions, legal principles and practical
+                implications arising from the case.
               </p>
 
             </div>
 
-            <div className="mt-10 space-y-4">
+            <div className="mt-12 space-y-12">
 
-              {issues.map((item, index) => (
+              {typedCase.background && (
+                <article className="border-l-2 border-[#D71920] pl-6 md:pl-8">
 
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-slate-200 bg-white p-6"
-                >
+                  <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
+                    Background &amp; Case Facts
+                  </h3>
 
-                  <div className="flex gap-5">
+                  <div className="mt-5 max-w-4xl text-base leading-8 text-slate-700 whitespace-pre-line">
+                    {typedCase.background}
+                  </div>
 
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#E8F6FC] text-xs font-bold text-[#168BC4]">
-                      {String(index + 1).padStart(2, "0")}
-                    </div>
+                </article>
+              )}
 
-                    <div>
+              {typedCase.decision && (
+                <article className="border-l-2 border-[#D71920] pl-6 md:pl-8">
 
-                      <h3 className="text-lg font-semibold leading-7 text-[#071B49]">
-                        {item.issue}
-                      </h3>
+                  <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
+                    Decision &amp; Judgment
+                  </h3>
+
+                  <div className="mt-5 max-w-4xl text-base leading-8 text-slate-700 whitespace-pre-line">
+                    {typedCase.decision}
+                  </div>
+
+                </article>
+              )}
+
+              {typedCase.legal_principle && (
+                <article className="border-l-2 border-[#168BC4] pl-6 md:pl-8">
+
+                  <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
+                    Legal Principles
+                  </h3>
+
+                  <div className="mt-5 max-w-4xl text-base leading-8 text-slate-700 whitespace-pre-line">
+                    {typedCase.legal_principle}
+                  </div>
+
+                </article>
+              )}
+
+              {typedCase.implications && (
+                <article className="border-l-2 border-[#071B49] pl-6 md:pl-8">
+
+                  <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
+                    Practical Implications
+                  </h3>
+
+                  <div className="mt-5 max-w-4xl text-base leading-8 text-slate-700 whitespace-pre-line">
+                    {typedCase.implications}
+                  </div>
+
+                </article>
+              )}
+
+            </div>
+
+          </div>
+
+        </section>
+      )}
+
+      {/* ======================================================
+          CASE ISSUES
+      ====================================================== */}
+
+      {issues.length > 0 && (
+        <section className="bg-white">
+
+          <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+
+            <div className="max-w-3xl">
+
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#D71920]">
+                LEGAL ANALYSIS
+              </p>
+
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
+                Key Issues
+              </h2>
+
+            </div>
+
+            <div className="mt-10 grid gap-4 md:grid-cols-2">
+
+              {issues.map(
+                (issue, index) => (
+
+                  <div
+                    key={issue.id}
+                    className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-6"
+                  >
+
+                    <div className="flex gap-4">
+
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#E8F6FC] text-[10px] font-bold text-[#168BC4]">
+                        {String(
+                          index + 1,
+                        ).padStart(2, "0")}
+                      </div>
+
+                      <p className="text-sm font-medium leading-7 text-[#071B49]">
+                        {issue.issue}
+                      </p>
 
                     </div>
 
                   </div>
 
-                </div>
-
-              ))}
+                ),
+              )}
 
             </div>
 
@@ -788,157 +1056,86 @@ export default async function CasePage({
       )}
 
       {/* ======================================================
-          CASE TIMELINE
+          ORIGINAL SOURCE DOCUMENTS
       ====================================================== */}
 
-      {timeline.length > 0 && (
-        <section className="bg-white">
+      {sources.length > 0 && (
+        <section className="bg-[#061936]">
 
-          <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+          <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
 
-            <div className="max-w-4xl">
+            <div className="max-w-3xl">
 
-              <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#168BC4]">
-                Case Development
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#62C4EA]">
+                PRIMARY SOURCES
               </p>
 
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-                Case Timeline
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+                Original Source Documents
               </h2>
+
+              <p className="mt-4 text-sm leading-7 text-slate-400">
+                Original official records and judgments used
+                as sources for the case information presented
+                on this page.
+              </p>
 
             </div>
 
-            <div className="mt-10 max-w-4xl">
+            {/* 2 × 2 compact source grid */}
 
-              <div className="space-y-7">
+            <div className="mt-10 grid gap-3 sm:grid-cols-2">
 
-                {timeline.map(
-                  (event, index) => (
+              {sources.slice(0, 4).map(
+                (source) => (
 
-                    <div
-                      key={event.id}
-                      className="flex gap-5"
-                    >
+                  <a
+                    key={source.id}
+                    href={source.url || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-lg border border-white/10 bg-white/5 px-4 py-4 transition hover:border-[#62C4EA]/40 hover:bg-white/10"
+                  >
 
-                      <div className="flex flex-col items-center">
+                    <div className="flex items-start justify-between gap-4">
 
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#071B49] text-[10px] font-bold text-white">
-                          {index + 1}
-                        </div>
+                      <div>
 
-                        {index !==
-                          timeline.length - 1 && (
-                          <div className="mt-2 h-full min-h-10 w-px bg-slate-200" />
-                        )}
+                        <span className="inline-flex rounded bg-white/10 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.13em] text-[#62C4EA]">
+                          {source.source_type ||
+                            "Official Source"}
+                        </span>
 
-                      </div>
-
-                      <div className="pb-4">
-
-                        {event.event_date && (
-                          <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#168BC4]">
-                            {formatDate(
-                              event.event_date,
-                            )}
-                          </p>
-                        )}
-
-                        {!event.event_date &&
-                          event.year && (
-                            <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#168BC4]">
-                              {event.year}
-                            </p>
-                          )}
-
-                        {event.court && (
-                          <h3 className="mt-2 text-lg font-semibold">
-                            {event.court}
-                          </h3>
-                        )}
-
-                        {event.description && (
-                          <p className="mt-2 text-sm leading-7 text-slate-600">
-                            {event.description}
-                          </p>
-                        )}
+                        <p className="mt-3 text-sm font-medium leading-6 text-white">
+                          {source.title}
+                        </p>
 
                       </div>
+
+                      <span className="mt-1 text-sm text-slate-500 transition group-hover:text-[#62C4EA]">
+                        ↗
+                      </span>
 
                     </div>
 
-                  ),
-                )}
+                  </a>
 
-              </div>
+                ),
+              )}
 
             </div>
+
+            {sources.length > 4 && (
+              <p className="mt-4 text-xs text-slate-500">
+                Additional source documents are available
+                within the relevant proceedings above.
+              </p>
+            )}
 
           </div>
 
         </section>
       )}
-
-      {/* ======================================================
-          OFFICIAL SOURCE
-      ====================================================== */}
-
-      {proceedings.some(
-        (item) => !!item.source_url,
-      ) && (
-        <section className="bg-[#F5F8FC]">
-
-          <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 md:p-10">
-
-              <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#D71920]">
-                Official Sources
-              </p>
-
-              <h2 className="mt-4 text-2xl font-semibold md:text-3xl">
-                MIRA Legal Case Documents
-              </h2>
-
-              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-                Original documents and official case records are
-                linked to the relevant proceedings above where a
-                verified source is available.
-              </p>
-
-              <div className="mt-7 flex flex-wrap gap-3">
-
-                {proceedings
-                  .filter(
-                    (item) => !!item.source_url,
-                  )
-                  .map((item) => (
-
-                    <a
-                      key={`source-${item.id}`}
-                      href={item.source_url!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-md border border-[#071B49] px-4 py-2.5 text-xs font-semibold text-[#071B49] transition hover:bg-[#071B49] hover:text-white"
-                    >
-                      {item.case_number ||
-                        "View source"}{" "}
-                      →
-                    </a>
-
-                  ))}
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-      )}
-
-      {/* ======================================================
-          FOOTER
-      ====================================================== */}
 
       <CuraFooter />
 
