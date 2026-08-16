@@ -124,7 +124,7 @@ export default function Home() {
               </a>
 
               <a
-                href="#cases"
+                href="/cases"
                 className="rounded-md bg-white px-7 py-3.5 text-center text-sm font-semibold text-[#071B49] transition hover:bg-slate-100"
               >
                 Browse Legal Cases →
@@ -499,7 +499,7 @@ export default function Home() {
                   Tax Articles
                 </a>
 
-                <a href="#cases" className="block hover:text-white">
+                <a href="/cases" className="block hover:text-white">
                   Legal Cases
                 </a>
 
