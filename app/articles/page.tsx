@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import CuraHeader from "@/components/CuraHeader"
 
 const articles = [
   {
@@ -86,70 +87,11 @@ export default function ArticlesPage() {
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
 
-      {/* HEADER */}
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-
-          <a href="/">
-            <img
-              src="/cura-logo.png"
-              alt="CURA - Audit Tax Advisory"
-              className="h-24 w-auto object-contain"
-            />
-          </a>
-
-          <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
-
-            <a
-              href="/"
-              className="text-slate-600 hover:text-[#071B49]"
-            >
-              Home
-            </a>
-
-            <a
-              href="/articles"
-              className="border-b-2 border-[#D71920] pb-1 text-[#071B49]"
-            >
-              Knowledge
-            </a>
-
-            <a
-              href="/cases"
-              className="text-slate-600 hover:text-[#071B49]"
-            >
-              Legal Cases
-            </a>
-
-            <a
-              href="/#education"
-              className="text-slate-600 hover:text-[#071B49]"
-            >
-              Education
-            </a>
-
-            <a
-              href="/#about"
-              className="text-slate-600 hover:text-[#071B49]"
-            >
-              About
-            </a>
-
-            <a
-              href="/#contact"
-              className="rounded-md bg-[#071B49] px-5 py-2.5 text-white"
-            >
-              Contact
-            </a>
-
-          </nav>
-
-        </div>
-      </header>
+      {/* SHARED CURA HEADER */}
+      <CuraHeader />
 
       {/* HERO */}
       <section className="bg-[#071B49]">
-
         <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
 
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#35B5E5]">
@@ -166,12 +108,10 @@ export default function ArticlesPage() {
           </p>
 
         </div>
-
       </section>
 
       {/* CONTENT */}
       <section>
-
         <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
 
           {/* SEARCH */}
@@ -200,7 +140,6 @@ export default function ArticlesPage() {
           <div className="mt-6 flex flex-wrap gap-3">
 
             {categories.map((category) => {
-
               const active = selectedCategory === category
 
               return (
@@ -222,7 +161,6 @@ export default function ArticlesPage() {
 
           {/* RESULT COUNT */}
           <div className="mt-10">
-
             <p className="text-sm text-slate-500">
               Showing{" "}
               <span className="font-semibold text-[#071B49]">
@@ -230,7 +168,6 @@ export default function ArticlesPage() {
               </span>{" "}
               {filteredArticles.length === 1 ? "article" : "articles"}
             </p>
-
           </div>
 
           {/* ARTICLE CARDS */}
@@ -306,7 +243,6 @@ export default function ArticlesPage() {
           )}
 
         </div>
-
       </section>
 
       {/* FOOTER */}
@@ -336,6 +272,7 @@ export default function ArticlesPage() {
 
             <div className="text-sm text-slate-400">
               <p>Maldives</p>
+
               <p className="mt-2">
                 Professional knowledge platform
               </p>

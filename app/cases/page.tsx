@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import CuraHeader from "@/components/CuraHeader"
 import { createClient } from "@/lib/supabase/client"
 
 type LegalCase = {
@@ -75,7 +76,7 @@ export default function CasesPage() {
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [selectedIssue, setSelectedIssue] = useState("All")
   const [issueSearch, setIssueSearch] = useState("")
-const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
+  const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -84,12 +85,15 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
 
       setLoading(true)
 
-      const { data: legalCases, error: casesError } =
-        await supabase
-          .from("legal_cases")
-          .select(
-            "id, slug, title, category, description, published"
-          )
+      const {
+        data: legalCases,
+        error: casesError,
+      } = await supabase
+        .from("legal_cases")
+        .select(
+          "id, slug, title, category, description, published"
+        )
+        .eq("published", true)
 
       console.log("LEGAL CASES:", legalCases)
       console.log("LEGAL CASES ERROR:", casesError)
@@ -301,9 +305,12 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
       )
     ).sort(),
   ]
+
   const filteredIssues = issues.filter((issue) =>
-  issue.toLowerCase().includes(issueSearch.toLowerCase())
-)
+    issue
+      .toLowerCase()
+      .includes(issueSearch.toLowerCase())
+  )
 
   /*
    * Filter cases.
@@ -379,67 +386,8 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
 
-      {/* HEADER */}
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-
-          <a href="/">
-            <img
-              src="/cura-logo.png"
-              alt="CURA - Audit Tax Advisory"
-              className="h-24 w-auto object-contain"
-            />
-          </a>
-
-          <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
-
-            <a
-              href="/"
-              className="text-slate-600 hover:text-[#071B49]"
-            >
-              Home
-            </a>
-
-            <a
-              href="/articles"
-              className="text-slate-600 hover:text-[#071B49]"
-            >
-              Knowledge
-            </a>
-
-            <a
-              href="/cases"
-              className="text-[#071B49]"
-            >
-              Legal Cases
-            </a>
-
-            <a
-              href="/#education"
-              className="text-slate-600 hover:text-[#071B49]"
-            >
-              Education
-            </a>
-
-            <a
-              href="/#about"
-              className="text-slate-600 hover:text-[#071B49]"
-            >
-              About
-            </a>
-
-            <a
-              href="/#contact"
-              className="rounded-md bg-[#071B49] px-5 py-2.5 text-white hover:bg-[#0B2A69]"
-            >
-              Contact
-            </a>
-
-          </nav>
-
-        </div>
-      </header>
-
+      {/* SHARED CURA HEADER */}
+      <CuraHeader />
 
       {/* HERO */}
       <section className="bg-[#071B49]">
@@ -463,7 +411,6 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
         </div>
 
       </section>
-
 
       {/* CONTENT */}
       <section>
@@ -496,7 +443,6 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
 
           </div>
 
-
           {/* FILTERS */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
 
@@ -526,84 +472,88 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
               }
             )}
 
+            {/* ISSUE SEARCH */}
             <div className="relative w-full max-w-md">
 
-  <input
-    type="text"
-    value={
-      issueDropdownOpen
-        ? issueSearch
-        : selectedIssue === "All"
-          ? ""
-          : selectedIssue
-    }
-    onFocus={() => {
-      setIssueDropdownOpen(true)
-      setIssueSearch("")
-    }}
-    onChange={(e) => {
-      setIssueSearch(e.target.value)
-      setIssueDropdownOpen(true)
-    }}
-    placeholder="Search issues..."
-    className="w-full rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 outline-none focus:border-[#168BC4] focus:ring-2 focus:ring-[#168BC4]/20"
-  />
+              <input
+                type="text"
+                value={
+                  issueDropdownOpen
+                    ? issueSearch
+                    : selectedIssue === "All"
+                    ? ""
+                    : selectedIssue
+                }
+                onFocus={() => {
+                  setIssueDropdownOpen(true)
+                  setIssueSearch("")
+                }}
+                onChange={(e) => {
+                  setIssueSearch(e.target.value)
+                  setIssueDropdownOpen(true)
+                }}
+                placeholder="Search issues..."
+                className="w-full rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 outline-none focus:border-[#168BC4] focus:ring-2 focus:ring-[#168BC4]/20"
+              />
 
-  {issueDropdownOpen && (
-    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+              {issueDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
 
-      <button
-        type="button"
-        onClick={() => {
-          setSelectedIssue("All")
-          setIssueSearch("")
-          setIssueDropdownOpen(false)
-        }}
-        className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 ${
-          selectedIssue === "All"
-            ? "font-semibold text-[#071B49]"
-            : "text-slate-600"
-        }`}
-      >
-        All Issues
-      </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedIssue("All")
+                      setIssueSearch("")
+                      setIssueDropdownOpen(false)
+                    }}
+                    className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 ${
+                      selectedIssue === "All"
+                        ? "font-semibold text-[#071B49]"
+                        : "text-slate-600"
+                    }`}
+                  >
+                    All Issues
+                  </button>
 
-      {filteredIssues
-        .filter((issue) => issue !== "All")
-        .map((issue) => (
-          <button
-            type="button"
-            key={issue}
-            onClick={() => {
-              setSelectedIssue(issue)
-              setIssueSearch("")
-              setIssueDropdownOpen(false)
-            }}
-            className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 ${
-              selectedIssue === issue
-                ? "font-semibold text-[#071B49]"
-                : "text-slate-600"
-            }`}
-          >
-            {issue}
-          </button>
-        ))}
+                  {filteredIssues
+                    .filter(
+                      (issue) =>
+                        issue !== "All"
+                    )
+                    .map((issue) => (
+                      <button
+                        type="button"
+                        key={issue}
+                        onClick={() => {
+                          setSelectedIssue(issue)
+                          setIssueSearch("")
+                          setIssueDropdownOpen(false)
+                        }}
+                        className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 ${
+                          selectedIssue === issue
+                            ? "font-semibold text-[#071B49]"
+                            : "text-slate-600"
+                        }`}
+                      >
+                        {issue}
+                      </button>
+                    ))}
 
-      {filteredIssues.filter(
-        (issue) => issue !== "All"
-      ).length === 0 && (
-        <div className="px-3 py-3 text-sm text-slate-400">
-          No matching issues found.
-        </div>
-      )}
+                  {filteredIssues.filter(
+                    (issue) =>
+                      issue !== "All"
+                  ).length === 0 && (
+                    <div className="px-3 py-3 text-sm text-slate-400">
+                      No matching issues found.
+                    </div>
+                  )}
 
-    </div>
-  )}
+                </div>
+              )}
 
-</div>
+            </div>
 
           </div>
-
 
           {/* RESULT COUNT */}
           <div className="mt-10">
@@ -630,7 +580,6 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
             </p>
 
           </div>
-
 
           {/* CASES */}
           {!loading &&
@@ -689,25 +638,21 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
 
                     </div>
 
-
                     {/* CASE NUMBER */}
                     <p className="mt-6 text-xs font-medium uppercase tracking-[0.15em] text-slate-400">
                       {item.caseNumber}
                     </p>
-
 
                     {/* TITLE */}
                     <h2 className="mt-3 text-2xl font-semibold leading-8 text-[#071B49]">
                       {item.title}
                     </h2>
 
-
                     {/* DESCRIPTION */}
                     <p className="mt-4 text-sm leading-7 text-slate-600">
                       {item.description ||
                         "A structured summary of this tax legal case and its implications."}
                     </p>
-
 
                     {/* ISSUES */}
                     {item.issues.length >
@@ -737,7 +682,6 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
 
                         </div>
                       )}
-
 
                     {/* CASE LINK */}
                     <a
@@ -775,6 +719,7 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
                   setSelectedIssue(
                     "All"
                   )
+                  setIssueSearch("")
                 }}
                 className="mt-6 rounded-md bg-[#071B49] px-5 py-2.5 text-sm font-semibold text-white"
               >
@@ -788,7 +733,6 @@ const [issueDropdownOpen, setIssueDropdownOpen] = useState(false)
         </div>
 
       </section>
-
 
       {/* FOOTER */}
       <footer className="bg-[#04132D] text-white">
