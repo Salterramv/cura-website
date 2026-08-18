@@ -61,7 +61,7 @@ export default function AdminLoginPage() {
     }
 
     // Step 3: Administrator confirmed
-    router.push("/admin/exchange-rates")
+    router.push("/admin")
     router.refresh()
   }
 
