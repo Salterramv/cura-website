@@ -15,7 +15,7 @@ const sections = [
       "Create, edit and manage CURA articles, tax guides and professional knowledge content.",
     href: "/admin/articles",
     label: "Manage Knowledge",
-    status: "Coming Soon",
+    status: "Available",
     icon: "✦",
   },
   {
@@ -24,7 +24,7 @@ const sections = [
       "Manage legal cases, proceedings, issues, timelines and official source documents.",
     href: "/admin/cases",
     label: "Manage Legal Cases",
-    status: "Coming Soon",
+    status: "Available",
     icon: "⚖",
   },
   {
@@ -33,7 +33,7 @@ const sections = [
       "Create and manage vacancies, job descriptions, requirements and publication status.",
     href: "/admin/careers",
     label: "Manage Careers",
-    status: "Coming Soon",
+    status: "Available",
     icon: "▣",
   },
   {
@@ -60,7 +60,7 @@ const sections = [
       "Manage CURA team profiles, qualifications, positions and professional biographies.",
     href: "/admin/team",
     label: "Manage Team",
-    status: "Coming Soon",
+    status: "Available",
     icon: "♙",
   },
   {
@@ -69,7 +69,7 @@ const sections = [
       "Manage selected homepage, About, Education and contact information.",
     href: "/admin/site-content",
     label: "Manage Site Content",
-    status: "Coming Soon",
+    status: "Available",
     icon: "◈",
   },
 ]
