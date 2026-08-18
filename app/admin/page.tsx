@@ -364,7 +364,7 @@ export default function AdminDashboard() {
                     {available ? (
                       <a
                         href={section.href}
-                        className="inline-flex items-center rounded-lg bg-[#061b3d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
+                        className="inline-flex items-center rounded-lg bg-[#061b3d] px-5 py-2.5 text-sm font-semibold !text-white transition hover:bg-[#0b2a55]"
                       >
                         {section.label}
                         <span className="ml-2">→</span>
