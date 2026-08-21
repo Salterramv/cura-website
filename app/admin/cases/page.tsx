@@ -84,6 +84,12 @@ export default function AdminCasesPage() {
 
   const [proceedings, setProceedings] = useState<Proceeding[]>([])
 
+  const [findingSourceId, setFindingSourceId] = useState<string | null>(null)
+  const [sourceCandidates, setSourceCandidates] = useState<
+    Record<string, any[]>
+  >({})
+  const [sourceFinderMessage, setSourceFinderMessage] = useState("")
+
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -465,6 +471,122 @@ export default function AdminCasesPage() {
     )
 
     setSaving(false)
+  }
+
+  async function findOfficialSource(
+    proceeding: Proceeding,
+  ) {
+    if (!selectedId) {
+      setError("Save the case before finding official sources.")
+      return
+    }
+
+    if (!proceeding.case_number?.trim()) {
+      setError(
+        "Enter the court proceeding case number before finding the official source.",
+      )
+      return
+    }
+
+    if (!proceeding.id) {
+      setError("This proceeding has not been saved yet. Save the case before finding its official source.")
+      return
+    }
+
+    const proceedingId = proceeding.id
+
+    setFindingSourceId(proceedingId)
+    setError("")
+    setSuccess("")
+    setSourceFinderMessage(
+      `Searching official sources for ${proceeding.case_number}...`,
+    )
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "find-official-legal-source",
+        {
+          body: {
+            case_id: selectedId,
+            court: proceeding.court,
+            case_number: proceeding.case_number.trim(),
+            party_name: title.trim(),
+          },
+        },
+      )
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      if (data?.error) {
+        throw new Error(data.error)
+      }
+
+      const candidates = Array.isArray(data?.candidates)
+        ? data.candidates
+        : []
+
+      setSourceCandidates((current) => ({
+        ...current,
+        [proceedingId]: candidates,
+      }))
+
+      setSourceFinderMessage(
+        candidates.length > 0
+          ? `Found ${candidates.length} official source candidate${
+              candidates.length === 1 ? "" : "s"
+            }. Verify the result before using it.`
+          : "No matching official source was found. You can enter the URL manually.",
+      )
+    } catch (sourceError) {
+      setError(
+        sourceError instanceof Error
+          ? sourceError.message
+          : "Unable to find the official source.",
+      )
+      setSourceFinderMessage("")
+    } finally {
+      setFindingSourceId(null)
+    }
+  }
+
+  function useOfficialSource(
+    proceedingId: string,
+    candidate: any,
+  ) {
+    setProceedings((current) =>
+      current.map((item) =>
+        item.id === proceedingId
+          ? {
+              ...item,
+              source_url: candidate.url || "",
+              source_title:
+                candidate.title ||
+                item.source_title ||
+                "Official source",
+              source_type:
+                candidate.source_type ||
+                item.source_type ||
+                "Official source",
+              source_status: "needs_verification",
+              source_notes:
+                candidate.notes ||
+                item.source_notes ||
+                "Found by CURA official source finder. Human verification required.",
+            }
+          : item,
+      ),
+    )
+
+    setSourceCandidates((current) => ({
+      ...current,
+      [proceedingId]: [],
+    }))
+
+    setSourceFinderMessage(
+      "Official source added to the proceeding. Verify the document before saving and using it for AI analysis.",
+    )
   }
 
   async function analyzeCase() {
@@ -1020,6 +1142,125 @@ export default function AdminCasesPage() {
                                     Use the official MIRA, TAT, High Court or
                                     Supreme Court source.
                                   </p>
+
+                                  <div className="mt-3 flex flex-wrap items-center gap-3">
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        findOfficialSource(item)
+                                      }
+                                      disabled={
+                                        findingSourceId === item.id ||
+                                        !item.case_number.trim()
+                                      }
+                                      className="rounded-lg border border-[#18b8ee] bg-[#eafaff] px-4 py-2 text-xs font-bold text-[#087dcc] transition hover:bg-[#d9f6ff] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      {findingSourceId === item.id
+                                        ? "Searching official sources..."
+                                        : "🔎 Find Official Source"}
+                                    </button>
+
+                                    {!item.case_number.trim() && (
+                                      <span className="text-xs text-slate-400">
+                                        Enter the proceeding case number first.
+                                      </span>
+                                    )}
+
+                                  </div>
+
+                                  {sourceCandidates[item.id || ""]?.length > 0 && (
+                                    <div className="mt-4 space-y-3 rounded-xl border border-[#18b8ee]/20 bg-[#f4fbfe] p-4">
+
+                                      <div>
+                                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#087dcc]">
+                                          Official Source Candidates
+                                        </p>
+
+                                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                                          Verify the document before adding it
+                                          to this proceeding.
+                                        </p>
+                                      </div>
+
+                                      {sourceCandidates[item.id || ""].map(
+                                        (candidate, candidateIndex) => (
+                                          <div
+                                            key={
+                                              candidate.url ||
+                                              `${item.id}-${candidateIndex}`
+                                            }
+                                            className="rounded-lg border border-slate-200 bg-white p-4"
+                                          >
+
+                                            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
+                                              <div className="min-w-0">
+
+                                                <p className="text-sm font-semibold text-[#071d41]">
+                                                  {candidate.title ||
+                                                    item.source_title ||
+                                                    `${item.court} official source`}
+                                                </p>
+
+                                                {candidate.description && (
+                                                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                                                    {candidate.description}
+                                                  </p>
+                                                )}
+
+                                                {candidate.url && (
+                                                  <p className="mt-2 break-all text-[11px] text-slate-400">
+                                                    {candidate.url}
+                                                  </p>
+                                                )}
+
+                                              </div>
+
+                                              <div className="flex shrink-0 gap-2">
+
+                                                {candidate.url && (
+                                                  <a
+                                                    href={candidate.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                  >
+                                                    Open Source ↗
+                                                  </a>
+                                                )}
+
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    useOfficialSource(
+                                                      item.id || "",
+                                                      candidate,
+                                                    )
+                                                  }
+                                                  disabled={!item.id || !candidate.url}
+                                                  className="rounded-lg bg-[#061b3d] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2a55] disabled:opacity-50"
+                                                >
+                                                  Use This Source
+                                                </button>
+
+                                              </div>
+
+                                            </div>
+
+                                          </div>
+                                        ),
+                                      )}
+
+                                    </div>
+                                  )}
+
+                                  {sourceFinderMessage && (
+                                    <p className="mt-3 text-xs font-medium text-[#087dcc]">
+                                      {sourceFinderMessage}
+                                    </p>
+                                  )}
+
                                 </div>
 
                                 <div>
