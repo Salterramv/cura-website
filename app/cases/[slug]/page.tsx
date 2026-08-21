@@ -273,19 +273,54 @@ function mergeTimeline(
 function uniqueSources(
   sources: CaseSource[],
   proceedings: Proceeding[],
+  miraUrl: string | null,
 ) {
   const result: CaseSource[] = []
   const seen = new Set<string>()
 
+  /*
+   * Legacy MIRA case records:
+   *
+   * Older CURA cases store their official MIRA URL directly
+   * on legal_cases.mira_url rather than in case_sources.
+   *
+   * Include it here so existing cases continue to display
+   * their official MIRA record without requiring a database
+   * migration.
+   */
+  if (miraUrl?.trim()) {
+    const url = miraUrl.trim()
+
+    seen.add(url)
+
+    result.push({
+      id: "legacy-mira-record",
+      case_id: "",
+      title: "MIRA Official Case Record",
+      url,
+      source_type: "Official MIRA Case Record",
+      sort_order: 0,
+    })
+  }
+
+  /*
+   * Explicit sources stored in case_sources.
+   */
   for (const source of sources) {
     if (!source.url) continue
 
     if (seen.has(source.url)) continue
 
     seen.add(source.url)
-    result.push(source)
+    result.push({
+      ...source,
+      sort_order: result.length + 1,
+    })
   }
 
+  /*
+   * Sources attached directly to proceedings.
+   */
   for (const proceeding of proceedings) {
     if (!proceeding.source_url) continue
 
@@ -479,6 +514,7 @@ export default async function CasePage({
   const sources = uniqueSources(
     databaseSources,
     proceedings,
+    typedCase.mira_url,
   )
 
   /*
