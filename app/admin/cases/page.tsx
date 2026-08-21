@@ -487,47 +487,150 @@ export default function AdminCasesPage() {
     setAnalyzing(true)
     setError("")
     setSuccess("")
-    setAnalysisMessage("CURA AI is analyzing the available proceedings...")
-
-    /*
-     * Make sure the latest proceeding changes are saved first.
-     */
-    await saveCase()
-
-    const { data, error } = await supabase.functions.invoke(
-      "analyze-legal-case",
-      {
-        body: {
-          case_id: selectedId,
-        },
-      },
-    )
-
-    if (error) {
-      setError(error.message)
-      setAnalysisMessage("")
-      setAnalyzing(false)
-      return
-    }
-
-    if (data?.error) {
-      setError(data.error)
-      setAnalysisMessage("")
-      setAnalyzing(false)
-      return
-    }
-
-    const version = data?.analysis?.version
-
     setAnalysisMessage(
-      version
-        ? `Analysis complete. Version ${version} is ready for human verification.`
-        : "Analysis complete and ready for human verification.",
+      "CURA AI is analyzing all currently available official sources...",
     )
 
-    await loadCases()
+    try {
+      /*
+       * Save the latest case information and proceeding URLs first.
+       */
+      await saveCase()
 
-    setAnalyzing(false)
+      /*
+       * Run the secure Supabase Edge Function.
+       */
+      const { data, error } = await supabase.functions.invoke(
+        "analyze-legal-case",
+        {
+          body: {
+            case_id: selectedId,
+          },
+        },
+      )
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      if (data?.error) {
+        throw new Error(data.error)
+      }
+
+      /*
+       * The Edge Function returns the newly-created analysis record.
+       */
+      const generatedData = data?.analysis?.generated_data
+
+      if (!generatedData) {
+        throw new Error(
+          "CURA AI completed the analysis but returned no case data.",
+        )
+      }
+
+      const generatedCase = generatedData.case
+
+      /*
+       * Populate the existing case editor with the AI-generated draft.
+       * Everything remains editable for human verification.
+       */
+      if (generatedCase) {
+        if (generatedCase.title) {
+          setTitle(generatedCase.title)
+        }
+
+        if (generatedCase.category) {
+          setCategory(generatedCase.category)
+        }
+
+        if (generatedCase.description !== undefined) {
+          setDescription(generatedCase.description || "")
+        }
+
+        if (generatedCase.background !== undefined) {
+          setBackground(generatedCase.background || "")
+        }
+
+        if (generatedCase.claim !== undefined) {
+          setClaim(generatedCase.claim || "")
+        }
+
+        if (generatedCase.decision !== undefined) {
+          setDecision(generatedCase.decision || "")
+        }
+
+        if (generatedCase.legal_principle !== undefined) {
+          setLegalPrinciple(generatedCase.legal_principle || "")
+        }
+
+        if (generatedCase.implications !== undefined) {
+          setImplications(generatedCase.implications || "")
+        }
+
+        if (generatedCase.status !== undefined) {
+          setStatus(generatedCase.status || "")
+        }
+
+        if (generatedCase.outcome !== undefined) {
+          setOutcome(generatedCase.outcome || "")
+        }
+
+        if (generatedCase.mira_case_number !== undefined) {
+          setMiraCaseNumber(generatedCase.mira_case_number || "")
+        }
+
+        if (generatedCase.filed_date !== undefined) {
+          setFiledDate(generatedCase.filed_date || "")
+        }
+      }
+
+      /*
+       * Reload the saved case list so the AI status/version is updated.
+       */
+      await loadCases()
+
+      /*
+       * Reload proceedings from Supabase.
+       *
+       * This preserves the official proceeding records and allows
+       * future proceedings/re-appeals to be added without replacing
+       * the historical source records.
+       */
+      await loadProceedings(selectedId)
+
+      const version = data?.analysis?.version
+
+      setAnalysisMessage(
+        version
+          ? `CURA AI analysis complete — Version ${version} is ready for human verification. Review the generated case information below before publishing.`
+          : "CURA AI analysis complete and ready for human verification.",
+      )
+
+      /*
+       * Do not automatically publish anything.
+       */
+      setPublished(false)
+
+      /*
+       * Scroll back toward the generated case analysis.
+       */
+      setTimeout(() => {
+        window.scrollTo({
+          top: 700,
+          behavior: "smooth",
+        })
+      }, 100)
+    } catch (analysisError) {
+      setError(
+        analysisError instanceof Error
+          ? analysisError.message
+          : "Unable to complete CURA AI analysis.",
+      )
+
+      setAnalysisMessage("")
+    } finally {
+      setAnalyzing(false)
+    }
   }
 
   async function deleteCase(id: string) {
@@ -1039,6 +1142,102 @@ export default function AdminCasesPage() {
 
             </section>
 
+            {/* AI ANALYSIS ACTION */}
+
+            <section className="border-t border-slate-200 pt-10">
+
+              <div className="rounded-2xl border-2 border-[#18b8ee]/30 bg-[#eafaff] p-6">
+
+                <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0876a8]">
+                      CURA AI Case Analysis
+                    </p>
+
+                    <h3 className="mt-2 text-xl font-bold text-[#071d41]">
+                      Analyze the official proceedings
+                    </h3>
+
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                      CURA will read all official sources currently attached
+                      to this case and prepare the complete case summary,
+                      background, issues, proceedings, timeline, decision,
+                      legal principles, implications and current status.
+                      You can review and edit everything before publishing.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={analyzeCase}
+                    disabled={
+                      !selectedId ||
+                      saving ||
+                      analyzing ||
+                      proceedings.filter(
+                        (item) => item.source_url.trim() !== "",
+                      ).length === 0
+                    }
+                    className="shrink-0 rounded-xl bg-gradient-to-r from-[#18b8ee] to-[#087dcc] px-7 py-4 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {analyzing
+                      ? "Analyzing Sources..."
+                      : selectedId &&
+                          cases.find((item) => item.id === selectedId)
+                            ?.ai_analysis_version
+                        ? "↻ Re-analyze Case"
+                        : "✨ Analyze Case with CURA AI"}
+                  </button>
+
+                </div>
+
+                {!selectedId && (
+                  <p className="mt-4 text-xs font-medium text-slate-500">
+                    Save the case first, then add the official proceedings
+                    before starting the analysis.
+                  </p>
+                )}
+
+                {selectedId &&
+                  proceedings.filter(
+                    (item) => item.source_url.trim() !== "",
+                  ).length === 0 && (
+                    <p className="mt-4 text-xs font-medium text-amber-700">
+                      Add at least one official proceeding source URL before
+                      starting the analysis.
+                    </p>
+                  )}
+
+                {selectedId && (
+                  <div className="mt-5 border-t border-[#18b8ee]/20 pt-4">
+                    <span className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+                      Analysis status
+                    </span>
+
+                    <span className="ml-3 text-sm font-semibold text-[#071d41]">
+                      {cases.find((item) => item.id === selectedId)
+                        ?.ai_analysis_status || "not_analyzed"}
+                    </span>
+
+                    {cases.find((item) => item.id === selectedId)
+                      ?.ai_analyzed_at && (
+                      <span className="ml-3 text-xs text-slate-500">
+                        Last analyzed:{" "}
+                        {new Date(
+                          cases.find(
+                            (item) => item.id === selectedId,
+                          )!.ai_analyzed_at!,
+                        ).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+              </div>
+
+            </section>
+
             {/* MANUAL CONTENT */}
 
             <section className="border-t border-slate-200 pt-10">
@@ -1133,28 +1332,6 @@ export default function AdminCasesPage() {
                   {saving ? "Saving..." : "Save Case"}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={analyzeCase}
-                  disabled={
-                    !selectedId ||
-                    saving ||
-                    analyzing ||
-                    proceedings.filter(
-                      (item) => item.source_url.trim() !== "",
-                    ).length === 0
-                  }
-                  className="rounded-lg bg-gradient-to-r from-[#18b8ee] to-[#087dcc] px-6 py-3 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {analyzing
-                    ? "Analyzing Sources..."
-                    : selectedId &&
-                        cases.find((item) => item.id === selectedId)
-                          ?.ai_analysis_version
-                      ? "↻ Re-analyze Case with CURA AI"
-                      : "✨ Analyze Case with CURA AI"}
-                </button>
-
                 {selectedId && (
                   <button
                     type="button"
@@ -1166,33 +1343,6 @@ export default function AdminCasesPage() {
                 )}
 
               </div>
-
-              {selectedId && (
-                <div className="mt-5 rounded-xl bg-[#f4f7fb] p-5">
-
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                    CURA AI Status
-                  </p>
-
-                  <p className="mt-2 text-sm font-semibold">
-                    {cases.find((item) => item.id === selectedId)
-                      ?.ai_analysis_status || "not_analyzed"}
-                  </p>
-
-                  {cases.find((item) => item.id === selectedId)
-                    ?.ai_analyzed_at && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Last analyzed:{" "}
-                      {new Date(
-                        cases.find(
-                          (item) => item.id === selectedId,
-                        )!.ai_analyzed_at!,
-                      ).toLocaleString()}
-                    </p>
-                  )}
-
-                </div>
-              )}
 
             </div>
 
