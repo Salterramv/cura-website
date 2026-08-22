@@ -1230,7 +1230,6 @@ export default function AdminTeamPage() {
                           className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
                         >
                           Edit
-                          Edit
                         </button>
 
                         <button
@@ -1240,8 +1239,7 @@ export default function AdminTeamPage() {
                           }
                           className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                         >
-                                <span>Delete</span>
-                                <span>Delete</span>
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>
