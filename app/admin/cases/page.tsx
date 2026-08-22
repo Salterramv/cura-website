@@ -483,6 +483,7 @@ export default function AdminCasesPage() {
 
   async function findOfficialSource(proceeding: Proceeding) {
     const caseNumber = proceeding.case_number.trim()
+    const proceedingId = getProceedingKey(proceeding)
 
     if (!selectedId) {
       setError("Select or save the legal case before finding an official source.")
@@ -496,8 +497,6 @@ export default function AdminCasesPage() {
       return
     }
 
-    const proceedingId = getProceedingKey(proceeding)
-
     setFindingSourceId(proceedingId)
     setError("")
     setSuccess("")
@@ -510,48 +509,69 @@ export default function AdminCasesPage() {
     }))
 
     try {
-      // Get the current authenticated session explicitly. This avoids relying
-      // on the browser client's implicit function-auth header and gives the
-      // admin a useful error when the session has expired.
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession()
-
-      if (sessionError) throw new Error(sessionError.message)
-
-      const accessToken = sessionData.session?.access_token
-
-      if (!accessToken) {
-        window.location.href = "/admin/login"
-        return
-      }
-
       /*
-       * Use Supabase's own function client rather than constructing the
-       * Edge Function URL manually. supabase.functions.invoke() automatically
-       * carries the signed-in user's JWT and project API key, which is the
-       * supported browser invocation path for a JWT-protected function.
+       * IMPORTANT:
+       * The source finder is now a same-origin Next.js API route.
+       * Do not call the old Supabase Edge Function here.
+       *
+       * This avoids the browser/JWT/CORS problem that was preventing the
+       * Find Official Source button from reaching the server.
        */
-      const { data, error: functionError } =
-        await supabase.functions.invoke("find-official-legal-source", {
-          body: {
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), 30000)
+
+      let response: Response
+
+      try {
+        response = await fetch("/api/legal-source", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "same-origin",
+          signal: controller.signal,
+          body: JSON.stringify({
             case_id: selectedId,
             court: proceeding.court,
             case_number: caseNumber,
-            search_court_by_reference: true,
             party_name: title.trim(),
-          },
+          }),
         })
+      } catch (networkError) {
+        if (
+          networkError instanceof DOMException &&
+          networkError.name === "AbortError"
+        ) {
+          throw new Error(
+            "The official source search timed out after 30 seconds. Please try again.",
+          )
+        }
 
-      if (functionError) {
         throw new Error(
-          functionError.message ||
-            "CURA could not connect to the official source finder.",
+          networkError instanceof Error
+            ? `Could not reach the official source finder: ${networkError.message}`
+            : "Could not reach the official source finder.",
+        )
+      } finally {
+        window.clearTimeout(timeout)
+      }
+
+      const responseText = await response.text()
+
+      let data: any = null
+
+      try {
+        data = responseText ? JSON.parse(responseText) : null
+      } catch {
+        throw new Error(
+          `The official source finder returned an invalid response (HTTP ${response.status}).`,
         )
       }
 
-      if (!data) {
+      if (!response.ok) {
         throw new Error(
-          "The official source finder returned no response. Please try again.",
+          data?.error ||
+            `The official source finder returned HTTP ${response.status}.`,
         )
       }
 
@@ -568,8 +588,10 @@ export default function AdminCasesPage() {
         [proceedingId]: candidates,
       }))
 
-      // The first result is automatically placed into the Official Source URL
-      // field. The admin can still replace it by selecting another candidate.
+      /*
+       * Automatically place the best official candidate into the URL field.
+       * It remains "needs_verification" until the admin verifies it.
+       */
       if (candidates.length > 0 && candidates[0]?.url) {
         const candidate = candidates[0]
 
@@ -580,15 +602,17 @@ export default function AdminCasesPage() {
                   ...item,
                   source_url: candidate.url,
                   source_title:
-                    candidate.title || item.source_title || "Official source",
+                    candidate.title ||
+                    item.source_title ||
+                    `${item.court} Official Source`,
                   source_type:
                     candidate.source_type ||
                     item.source_type ||
-                    "Official source",
+                    "Official Proceeding",
                   source_status: "needs_verification",
                   source_notes:
+                    candidate.reason ||
                     candidate.notes ||
-                    item.source_notes ||
                     "Found by CURA official source finder. Human verification required.",
                 }
               : item,
@@ -596,9 +620,9 @@ export default function AdminCasesPage() {
         )
 
         setSourceFinderMessage(
-          `Official source found and placed in the URL field. Verify it before saving. ${
+          `Official source found and placed in the URL field. Verify it before saving.${
             candidates.length > 1
-              ? `${candidates.length - 1} additional candidate${
+              ? ` ${candidates.length - 1} additional candidate${
                   candidates.length - 1 === 1 ? "" : "s"
                 } available below.`
               : ""
