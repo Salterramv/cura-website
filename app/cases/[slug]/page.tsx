@@ -73,6 +73,16 @@ type CaseSource = {
   sort_order: number | null
 }
 
+type LegalCaseAnalysis = {
+  id: string
+  case_id: string
+  version: number | null
+  status: string | null
+  generated_data: Record<string, any> | null
+  model: string | null
+  analyzed_at: string | null
+}
+
 function formatDate(date: string | null) {
   if (!date) return null
 
@@ -347,6 +357,36 @@ function uniqueSources(
   return result
 }
 
+function analysisText(data: Record<string, any>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = data[key]
+    if (typeof value === "string" && value.trim()) return value
+  }
+  return null
+}
+
+function analysisList(data: Record<string, any>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = data[key]
+    if (Array.isArray(value)) {
+      return value
+        .map((item) =>
+          typeof item === "string"
+            ? item
+            : item?.issue ||
+              item?.description ||
+              item?.text ||
+              item?.title ||
+              item?.principle ||
+              item?.point ||
+              null,
+        )
+        .filter(Boolean) as string[]
+    }
+  }
+  return []
+}
+
 export default async function CasePage({
   params,
 }: PageProps) {
@@ -416,6 +456,7 @@ export default async function CasePage({
     issuesResult,
     timelineResult,
     sourcesResult,
+    analysisResult,
   ] = await Promise.all([
     supabase
       .from("case_proceedings")
@@ -483,6 +524,31 @@ export default async function CasePage({
       .order("sort_order", {
         ascending: true,
       }),
+
+    /*
+     * Latest CURA AI analysis.
+     *
+     * AI analysis is versioned separately from legal_cases so that
+     * a new analysis can be generated after later proceedings are
+     * uploaded without destroying the previous version.
+     */
+    supabase
+      .from("legal_case_analyses")
+      .select(`
+        id,
+        case_id,
+        version,
+        status,
+        generated_data,
+        model,
+        analyzed_at
+      `)
+      .eq("case_id", typedCase.id)
+      .order("version", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle(),
   ])
 
   /*
@@ -516,6 +582,92 @@ export default async function CasePage({
     proceedings,
     typedCase.mira_url,
   )
+
+  const aiAnalysis =
+    (analysisResult.data || null) as LegalCaseAnalysis | null
+
+  const aiData =
+    aiAnalysis?.generated_data || {}
+
+  const aiSummary =
+    analysisText(
+      aiData,
+      "summary",
+      "case_summary",
+      "caseSummary",
+      "executive_summary",
+      "executiveSummary",
+    ) || typedCase.description
+
+  const aiBackground =
+    analysisText(
+      aiData,
+      "background",
+      "case_background",
+      "caseBackground",
+    ) || typedCase.background
+
+  const aiClaim =
+    analysisText(
+      aiData,
+      "claim",
+      "claims",
+      "arguments",
+      "claim_arguments",
+      "claimArguments",
+    ) || typedCase.claim
+
+  const aiDecision =
+    analysisText(
+      aiData,
+      "decision",
+      "judgment",
+      "judgement",
+      "decision_summary",
+      "decisionSummary",
+    ) || typedCase.decision
+
+  const aiPrinciple =
+    analysisText(
+      aiData,
+      "legal_principle",
+      "legalPrinciple",
+      "legal_principles",
+      "legalPrinciples",
+    ) || typedCase.legal_principle
+
+  const aiImplications =
+    analysisText(
+      aiData,
+      "implications",
+      "practical_implications",
+      "practicalImplications",
+    ) || typedCase.implications
+
+  const aiIssues =
+    analysisList(
+      aiData,
+      "issues",
+      "key_issues",
+      "keyIssues",
+      "legal_issues",
+    )
+
+  const aiTimeline =
+    analysisList(
+      aiData,
+      "timeline",
+      "case_timeline",
+      "caseTimeline",
+    )
+
+  const aiKeyFindings =
+    analysisList(
+      aiData,
+      "key_findings",
+      "keyFindings",
+      "findings",
+    )
 
   /*
    * Compact court-stage tags.
@@ -942,10 +1094,13 @@ export default async function CasePage({
           CURA CASE ANALYSIS
       ====================================================== */}
 
-      {(typedCase.background ||
-        typedCase.decision ||
-        typedCase.legal_principle ||
-        typedCase.implications) && (
+      {(aiAnalysis ||
+        aiBackground ||
+        aiClaim ||
+        aiDecision ||
+        aiPrinciple ||
+        aiImplications ||
+        aiSummary) && (
 
         <section className="bg-[#F5F8FC]">
 
@@ -953,77 +1108,145 @@ export default async function CasePage({
 
             <div className="max-w-4xl">
 
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#D71920]">
-                CURA CASE ANALYSIS
-              </p>
+              <div className="flex flex-wrap items-center gap-3">
+
+                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#D71920]">
+                  CURA CASE ANALYSIS
+                </p>
+
+                {aiAnalysis && (
+                  <span className="rounded-full bg-[#E8F6FC] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-[#168BC4]">
+                    AI VERSION {aiAnalysis.version ?? "—"}
+                  </span>
+                )}
+
+              </div>
 
               <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#071B49] md:text-4xl">
                 Case Summary
               </h2>
 
-              <p className="mt-4 text-base leading-8 text-slate-600">
-                A detailed analysis of the facts, proceedings,
-                decisions, legal principles and practical
-                implications arising from the case.
-              </p>
+              {aiSummary && (
+                <p className="mt-4 text-base leading-8 text-slate-600 whitespace-pre-line">
+                  {aiSummary}
+                </p>
+              )}
+
+              {aiAnalysis?.analyzed_at && (
+                <p className="mt-3 text-xs text-slate-400">
+                  CURA AI analysis generated{" "}
+                  {new Date(aiAnalysis.analyzed_at).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  . This analysis is provided for human verification.
+                </p>
+              )}
 
             </div>
 
             <div className="mt-12 space-y-12">
 
-              {typedCase.background && (
+              {aiBackground && (
                 <article className="border-l-2 border-[#D71920] pl-6 md:pl-8">
-
                   <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
                     Background &amp; Case Facts
                   </h3>
-
-                  <div className="mt-5 max-w-4xl text-base leading-8 text-slate-700 whitespace-pre-line">
-                    {typedCase.background}
+                  <div className="mt-5 max-w-4xl whitespace-pre-line text-base leading-8 text-slate-700">
+                    {aiBackground}
                   </div>
-
                 </article>
               )}
 
-              {typedCase.decision && (
-                <article className="border-l-2 border-[#D71920] pl-6 md:pl-8">
+              {aiClaim && (
+                <article className="border-l-2 border-[#168BC4] pl-6 md:pl-8">
+                  <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
+                    Claim &amp; Arguments
+                  </h3>
+                  <div className="mt-5 max-w-4xl whitespace-pre-line text-base leading-8 text-slate-700">
+                    {aiClaim}
+                  </div>
+                </article>
+              )}
 
+              {aiDecision && (
+                <article className="border-l-2 border-[#D71920] pl-6 md:pl-8">
                   <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
                     Decision &amp; Judgment
                   </h3>
-
-                  <div className="mt-5 max-w-4xl text-base leading-8 text-slate-700 whitespace-pre-line">
-                    {typedCase.decision}
+                  <div className="mt-5 max-w-4xl whitespace-pre-line text-base leading-8 text-slate-700">
+                    {aiDecision}
                   </div>
-
                 </article>
               )}
 
-              {typedCase.legal_principle && (
+              {aiPrinciple && (
                 <article className="border-l-2 border-[#168BC4] pl-6 md:pl-8">
-
                   <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
                     Legal Principles
                   </h3>
-
-                  <div className="mt-5 max-w-4xl text-base leading-8 text-slate-700 whitespace-pre-line">
-                    {typedCase.legal_principle}
+                  <div className="mt-5 max-w-4xl whitespace-pre-line text-base leading-8 text-slate-700">
+                    {aiPrinciple}
                   </div>
-
                 </article>
               )}
 
-              {typedCase.implications && (
+              {aiImplications && (
                 <article className="border-l-2 border-[#071B49] pl-6 md:pl-8">
-
                   <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
                     Practical Implications
                   </h3>
-
-                  <div className="mt-5 max-w-4xl text-base leading-8 text-slate-700 whitespace-pre-line">
-                    {typedCase.implications}
+                  <div className="mt-5 max-w-4xl whitespace-pre-line text-base leading-8 text-slate-700">
+                    {aiImplications}
                   </div>
+                </article>
+              )}
 
+              {aiKeyFindings.length > 0 && (
+                <article>
+                  <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
+                    Key Findings
+                  </h3>
+
+                  <div className="mt-6 space-y-3">
+                    {aiKeyFindings.map((finding, index) => (
+                      <div
+                        key={`finding-${index}`}
+                        className="rounded-xl border border-slate-200 bg-white p-5"
+                      >
+                        <div className="flex gap-4">
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#E8F6FC] text-[10px] font-bold text-[#168BC4]">
+                            {String(index + 1).padStart(2, "0")}
+                          </div>
+                          <p className="text-sm leading-7 text-[#071B49]">
+                            {finding}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              )}
+
+              {aiTimeline.length > 0 && (
+                <article>
+                  <h3 className="text-xl font-semibold tracking-tight text-[#071B49] md:text-2xl">
+                    AI-Identified Case Development
+                  </h3>
+
+                  <div className="mt-6 space-y-3">
+                    {aiTimeline.map((event, index) => (
+                      <div
+                        key={`ai-timeline-${index}`}
+                        className="rounded-xl border border-slate-200 bg-white p-5"
+                      >
+                        <p className="text-sm leading-7 text-slate-700">
+                          {event}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </article>
               )}
 
@@ -1038,7 +1261,7 @@ export default async function CasePage({
           CASE ISSUES
       ====================================================== */}
 
-      {issues.length > 0 && (
+      {(issues.length > 0 || aiIssues.length > 0) && (
         <section className="bg-white">
 
           <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
@@ -1057,32 +1280,31 @@ export default async function CasePage({
 
             <div className="mt-10 grid gap-4 md:grid-cols-2">
 
-              {issues.map(
-                (issue, index) => (
+              {(issues.length > 0
+                ? issues.map((issue) => issue.issue)
+                : aiIssues
+              ).map((issueText, index) => (
 
-                  <div
-                    key={issue.id}
-                    className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-6"
-                  >
+                <div
+                  key={`issue-${index}`}
+                  className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-6"
+                >
 
-                    <div className="flex gap-4">
+                  <div className="flex gap-4">
 
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#E8F6FC] text-[10px] font-bold text-[#168BC4]">
-                        {String(
-                          index + 1,
-                        ).padStart(2, "0")}
-                      </div>
-
-                      <p className="text-sm font-medium leading-7 text-[#071B49]">
-                        {issue.issue}
-                      </p>
-
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#E8F6FC] text-[10px] font-bold text-[#168BC4]">
+                      {String(index + 1).padStart(2, "0")}
                     </div>
+
+                    <p className="text-sm font-medium leading-7 text-[#071B49]">
+                      {issueText}
+                    </p>
 
                   </div>
 
-                ),
-              )}
+                </div>
+
+              ))}
 
             </div>
 
