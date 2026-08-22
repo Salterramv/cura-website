@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import CuraHeader from "@/components/CuraHeader"
+import CuraFooter from "@/components/CuraFooter"
 
 type TeamMember = {
   id: string
@@ -43,9 +45,7 @@ export default function TeamMemberProfilePage() {
 
   const [member, setMember] = useState<TeamMember | null>(null)
   const [experience, setExperience] = useState<Experience[]>([])
-  const [qualifications, setQualifications] = useState<
-    Qualification[]
-  >([])
+  const [qualifications, setQualifications] = useState<Qualification[]>([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -166,243 +166,262 @@ export default function TeamMemberProfilePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
-        <div className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-6">
-          <div className="text-center">
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#1B5DBF]" />
-            <p className="mt-4 text-sm text-slate-500">
-              Loading profile...
-            </p>
+      <>
+        <CuraHeader />
+
+        <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
+          <div className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-6">
+            <div className="text-center">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#1B5DBF]" />
+
+              <p className="mt-4 text-sm text-slate-500">
+                Loading profile...
+              </p>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+
+        <CuraFooter />
+      </>
     )
   }
 
   if (error || !member) {
     return (
-      <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
-        <div className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-6">
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold">
-              Profile unavailable
-            </h1>
+      <>
+        <CuraHeader />
 
-            <p className="mt-3 text-slate-500">
-              This team member profile could not be found.
-            </p>
+        <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
+          <div className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-semibold">
+                Profile unavailable
+              </h1>
 
-            <Link
-              href="/team"
-              className="mt-6 inline-flex rounded-full bg-[#071B49] px-6 py-3 text-sm font-semibold text-white"
-            >
-              ← Back to Our Team
-            </Link>
+              <p className="mt-3 text-slate-500">
+                This team member profile could not be found.
+              </p>
+
+              <Link
+                href="/team"
+                className="mt-6 inline-flex rounded-full bg-[#071B49] px-6 py-3 text-sm font-semibold text-white"
+              >
+                ← Back to Our Team
+              </Link>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+
+        <CuraFooter />
+      </>
     )
   }
 
   return (
-    <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
-      {/* PROFILE HERO */}
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
-          <Link
-            href="/team"
-            className="inline-flex items-center text-sm font-semibold text-slate-500 transition hover:text-[#1B5DBF]"
-          >
-            ← Back to Our Team
-          </Link>
+    <>
+      <CuraHeader />
 
-          <div className="mt-10 grid gap-10 md:grid-cols-[280px_1fr] md:items-center">
-            {/* PHOTO */}
-            <div className="aspect-square overflow-hidden rounded-2xl bg-slate-100 shadow-sm">
-              {member.image_url ? (
-                <img
-                  src={member.image_url}
-                  alt={member.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-slate-300">
-                  <span className="text-7xl">♙</span>
-                </div>
-              )}
-            </div>
+      <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
+        {/* PROFILE HERO */}
+        <section className="border-b border-slate-200 bg-white">
+          <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
+            <Link
+              href="/team"
+              className="inline-flex items-center text-sm font-semibold text-slate-500 transition hover:text-[#1B5DBF]"
+            >
+              ← Back to Our Team
+            </Link>
 
-            {/* INTRODUCTION */}
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1B5DBF]">
-                {member.position}
-              </p>
+            <div className="mt-10 grid gap-10 md:grid-cols-[280px_1fr] md:items-center">
+              {/* PHOTO */}
+              <div className="aspect-square overflow-hidden rounded-2xl bg-slate-100 shadow-sm">
+                {member.image_url ? (
+                  <img
+                    src={member.image_url}
+                    alt={member.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-slate-300">
+                    <span className="text-7xl">♙</span>
+                  </div>
+                )}
+              </div>
 
-              <h1 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
-                {member.name}
-              </h1>
-
-              {member.qualifications && (
-                <p className="mt-4 text-lg font-medium text-slate-500">
-                  {member.qualifications}
+              {/* INTRODUCTION */}
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1B5DBF]">
+                  {member.position}
                 </p>
-              )}
 
-              {member.short_bio && (
-                <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-600">
-                  {member.short_bio}
-                </p>
-              )}
+                <h1 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
+                  {member.name}
+                </h1>
 
-              {member.linkedin_url && (
-                <a
-                  href={member.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-7 inline-flex rounded-md bg-[#071B49] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0B2A69]"
-                >
-                  LinkedIn →
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PROFILE CONTENT */}
-      <section className="mx-auto max-w-6xl px-6 py-16 md:py-20">
-        <div className="grid gap-14 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-          {/* MAIN */}
-          <div>
-            {member.professional_bio && (
-              <section>
-                <h2 className="text-3xl font-semibold tracking-tight">
-                  About
-                </h2>
-
-                <div className="mt-6 whitespace-pre-line text-base leading-8 text-slate-600">
-                  {member.professional_bio}
-                </div>
-              </section>
-            )}
-
-            {/* EXPERIENCE */}
-            <section className="mt-14">
-              <h2 className="text-3xl font-semibold tracking-tight">
-                Professional Experience
-              </h2>
-
-              {experience.length === 0 ? (
-                <p className="mt-6 text-slate-500">
-                  Professional experience details will be available
-                  soon.
-                </p>
-              ) : (
-                <div className="mt-8 space-y-8">
-                  {experience.map((item) => (
-                    <article
-                      key={item.id}
-                      className="relative border-l-2 border-[#18b8ee] pl-6"
-                    >
-                      <div className="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-[#18b8ee]" />
-
-                      <h3 className="text-xl font-semibold">
-                        {item.position}
-                      </h3>
-
-                      <p className="mt-1 font-medium text-[#1B5DBF]">
-                        {item.employer}
-                      </p>
-
-                      {experiencePeriod(item) && (
-                        <p className="mt-1 text-sm text-slate-500">
-                          {experiencePeriod(item)}
-                        </p>
-                      )}
-
-                      {item.description && (
-                        <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600">
-                          {item.description}
-                        </p>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-
-          {/* SIDEBAR */}
-          <aside>
-            <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-              <h2 className="text-xl font-semibold">
-                Qualifications
-              </h2>
-
-              {qualifications.length === 0 ? (
-                member.qualifications ? (
-                  <p className="mt-5 whitespace-pre-line text-sm leading-7 text-slate-600">
+                {member.qualifications && (
+                  <p className="mt-4 text-lg font-medium text-slate-500">
                     {member.qualifications}
                   </p>
-                ) : (
-                  <p className="mt-5 text-sm text-slate-500">
-                    Qualification details will be available soon.
+                )}
+
+                {member.short_bio && (
+                  <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-600">
+                    {member.short_bio}
                   </p>
-                )
-              ) : (
-                <div className="mt-6 space-y-6">
-                  {qualifications.map((item) => (
-                    <article key={item.id}>
-                      <h3 className="font-semibold">
-                        {item.qualification}
-                      </h3>
+                )}
 
-                      {item.institution && (
-                        <p className="mt-1 text-sm text-[#1B5DBF]">
-                          {item.institution}
-                        </p>
-                      )}
-
-                      {item.year && (
-                        <p className="mt-1 text-sm text-slate-500">
-                          {item.year}
-                        </p>
-                      )}
-
-                      {item.description && (
-                        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
-                          {item.description}
-                        </p>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              )}
+                {member.linkedin_url && (
+                  <a
+                    href={member.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-7 inline-flex rounded-md bg-[#071B49] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0B2A69]"
+                  >
+                    LinkedIn →
+                  </a>
+                )}
+              </div>
             </div>
-          </aside>
-        </div>
-      </section>
+          </div>
+        </section>
 
-      {/* CTA */}
-      <section className="bg-[#071B49]">
-        <div className="mx-auto max-w-6xl px-6 py-20 text-center">
-          <h2 className="text-3xl font-semibold text-white md:text-4xl">
-            Let&apos;s work together.
-          </h2>
+        {/* PROFILE CONTENT */}
+        <section className="mx-auto max-w-6xl px-6 py-16 md:py-20">
+          <div className="grid gap-14 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+            {/* MAIN */}
+            <div>
+              {member.professional_bio && (
+                <section>
+                  <h2 className="text-3xl font-semibold tracking-tight">
+                    About
+                  </h2>
 
-          <p className="mx-auto mt-5 max-w-2xl text-slate-300">
-            Whether you need audit, tax, advisory or legal support,
-            our team is ready to help you find a practical way forward.
-          </p>
+                  <div className="mt-6 whitespace-pre-line text-base leading-8 text-slate-600">
+                    {member.professional_bio}
+                  </div>
+                </section>
+              )}
 
-          <Link
-            href="/#contact"
-            className="mt-8 inline-flex rounded-full bg-white px-7 py-3 text-sm font-semibold text-[#071B49] transition hover:bg-slate-100"
-          >
-            Get in touch
-          </Link>
-        </div>
-      </section>
-    </main>
+              {/* EXPERIENCE */}
+              <section className="mt-14">
+                <h2 className="text-3xl font-semibold tracking-tight">
+                  Professional Experience
+                </h2>
+
+                {experience.length === 0 ? (
+                  <p className="mt-6 text-slate-500">
+                    Professional experience details will be available
+                    soon.
+                  </p>
+                ) : (
+                  <div className="mt-8 space-y-8">
+                    {experience.map((item) => (
+                      <article
+                        key={item.id}
+                        className="relative border-l-2 border-[#18b8ee] pl-6"
+                      >
+                        <div className="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-[#18b8ee]" />
+
+                        <h3 className="text-xl font-semibold">
+                          {item.position}
+                        </h3>
+
+                        <p className="mt-1 font-medium text-[#1B5DBF]">
+                          {item.employer}
+                        </p>
+
+                        {experiencePeriod(item) && (
+                          <p className="mt-1 text-sm text-slate-500">
+                            {experiencePeriod(item)}
+                          </p>
+                        )}
+
+                        {item.description && (
+                          <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600">
+                            {item.description}
+                          </p>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            {/* SIDEBAR */}
+            <aside>
+              <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+                <h2 className="text-xl font-semibold">
+                  Qualifications
+                </h2>
+
+                {qualifications.length === 0 ? (
+                  member.qualifications ? (
+                    <p className="mt-5 whitespace-pre-line text-sm leading-7 text-slate-600">
+                      {member.qualifications}
+                    </p>
+                  ) : (
+                    <p className="mt-5 text-sm text-slate-500">
+                      Qualification details will be available soon.
+                    </p>
+                  )
+                ) : (
+                  <div className="mt-6 space-y-6">
+                    {qualifications.map((item) => (
+                      <article key={item.id}>
+                        <h3 className="font-semibold">
+                          {item.qualification}
+                        </h3>
+
+                        {item.institution && (
+                          <p className="mt-1 text-sm text-[#1B5DBF]">
+                            {item.institution}
+                          </p>
+                        )}
+
+                        {item.year && (
+                          <p className="mt-1 text-sm text-slate-500">
+                            {item.year}
+                          </p>
+                        )}
+
+                        {item.description && (
+                          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+                            {item.description}
+                          </p>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="bg-[#071B49]">
+          <div className="mx-auto max-w-6xl px-6 py-20 text-center">
+            <h2 className="text-3xl font-semibold text-white md:text-4xl">
+              Let&apos;s work together.
+            </h2>
+
+            <p className="mx-auto mt-5 max-w-2xl text-slate-300">
+              Whether you need audit, tax, advisory or legal support,
+              our team is ready to help you find a practical way forward.
+            </p>
+
+            <Link
+              href="/#contact"
+              className="mt-8 inline-flex rounded-full bg-white px-7 py-3 text-sm font-semibold text-[#071B49] transition hover:bg-slate-100"
+            >
+              Get in touch
+            </Link>
+          </div>
+        </section>
+      </main>
+
+      <CuraFooter />
+    </>
   )
 }
