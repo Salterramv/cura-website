@@ -41,6 +41,7 @@ type Proceeding = {
 }
 
 const COURTS = [
+  "Civil Court",
   "Tax Appeal Tribunal",
   "High Court",
   "Supreme Court",
@@ -595,33 +596,21 @@ export default function AdminCasesPage() {
       return
     }
 
-    const validSources = proceedings.filter(
-      (item) => item.source_url.trim() !== "",
-    )
-
-    if (validSources.length === 0) {
-      setError(
-        "Add at least one official proceeding URL before running AI analysis.",
-      )
-      return
-    }
-
     setAnalyzing(true)
     setError("")
     setSuccess("")
     setAnalysisMessage(
-      "CURA AI is analyzing all currently available official sources...",
+      "CURA AI is analyzing all currently available case information and official sources...",
     )
 
     try {
       /*
        * Save the latest case information and proceeding URLs first.
+       * A judgment/source URL is NOT mandatory. CURA can analyse the
+       * information already available in the case record and proceedings.
        */
       await saveCase()
 
-      /*
-       * Run the secure Supabase Edge Function.
-       */
       const { data, error } = await supabase.functions.invoke(
         "analyze-legal-case",
         {
@@ -639,9 +628,6 @@ export default function AdminCasesPage() {
         throw new Error(data.error)
       }
 
-      /*
-       * The Edge Function returns the newly-created analysis record.
-       */
       const generatedData = data?.analysis?.generated_data
 
       if (!generatedData) {
@@ -657,85 +643,57 @@ export default function AdminCasesPage() {
        * Everything remains editable for human verification.
        */
       if (generatedCase) {
-        if (generatedCase.title) {
-          setTitle(generatedCase.title)
-        }
-
-        if (generatedCase.category) {
-          setCategory(generatedCase.category)
-        }
-
+        if (generatedCase.title) setTitle(generatedCase.title)
+        if (generatedCase.category) setCategory(generatedCase.category)
         if (generatedCase.description !== undefined) {
           setDescription(generatedCase.description || "")
         }
-
         if (generatedCase.background !== undefined) {
           setBackground(generatedCase.background || "")
         }
-
         if (generatedCase.claim !== undefined) {
           setClaim(generatedCase.claim || "")
         }
-
         if (generatedCase.decision !== undefined) {
           setDecision(generatedCase.decision || "")
         }
-
         if (generatedCase.legal_principle !== undefined) {
           setLegalPrinciple(generatedCase.legal_principle || "")
         }
-
         if (generatedCase.implications !== undefined) {
           setImplications(generatedCase.implications || "")
         }
-
         if (generatedCase.status !== undefined) {
           setStatus(generatedCase.status || "")
         }
-
         if (generatedCase.outcome !== undefined) {
           setOutcome(generatedCase.outcome || "")
         }
-
         if (generatedCase.mira_case_number !== undefined) {
           setMiraCaseNumber(generatedCase.mira_case_number || "")
         }
-
         if (generatedCase.filed_date !== undefined) {
           setFiledDate(generatedCase.filed_date || "")
         }
       }
 
-      /*
-       * Reload the saved case list so the AI status/version is updated.
-       */
       await loadCases()
-
-      /*
-       * Reload proceedings from Supabase.
-       *
-       * This preserves the official proceeding records and allows
-       * future proceedings/re-appeals to be added without replacing
-       * the historical source records.
-       */
       await loadProceedings(selectedId)
 
       const version = data?.analysis?.version
 
       setAnalysisMessage(
         version
-          ? `CURA AI analysis complete — Version ${version} is ready for human verification. Review the generated case information below before publishing.`
+          ? `CURA AI analysis complete — Version ${version} is ready for human verification. Review and edit the generated analysis before verifying the case.`
           : "CURA AI analysis complete and ready for human verification.",
       )
 
       /*
-       * Do not automatically publish anything.
+       * AI-generated cases remain public with the AI/Human Verification
+       * Pending tag. Do not mark them as verified automatically.
        */
-      setPublished(false)
+      setPublished(true)
 
-      /*
-       * Scroll back toward the generated case analysis.
-       */
       setTimeout(() => {
         window.scrollTo({
           top: 700,
@@ -748,10 +706,99 @@ export default function AdminCasesPage() {
           ? analysisError.message
           : "Unable to complete CURA AI analysis.",
       )
-
       setAnalysisMessage("")
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  async function verifyAndPublishCase() {
+    if (!selectedId) {
+      setError("Select a case before verifying it.")
+      return
+    }
+
+    const confirmed = window.confirm(
+      "Confirm that you have reviewed this case analysis and want to mark it as human verified and publish it without the AI verification-pending tag?",
+    )
+
+    if (!confirmed) return
+
+    setSaving(true)
+    setError("")
+    setSuccess("")
+
+    try {
+      /*
+       * Save all edits first. This preserves the admin's corrections to
+       * the AI-generated analysis before the case is marked verified.
+       */
+      await saveCase()
+
+      const now = new Date().toISOString()
+
+      /*
+       * Mark the latest AI analysis as verified.
+       */
+      const { data: latestAnalysis, error: latestError } = await supabase
+        .from("legal_case_analyses")
+        .select("id")
+        .eq("case_id", selectedId)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (latestError) {
+        throw new Error(latestError.message)
+      }
+
+      if (latestAnalysis?.id) {
+        const { error: analysisUpdateError } = await supabase
+          .from("legal_case_analyses")
+          .update({
+            status: "verified",
+          })
+          .eq("id", latestAnalysis.id)
+
+        if (analysisUpdateError) {
+          throw new Error(analysisUpdateError.message)
+        }
+      }
+
+      /*
+       * "verified" is the human-verification state used by the public
+       * case page to remove the AI-pending label.
+       */
+      const { error: caseUpdateError } = await supabase
+        .from("legal_cases")
+        .update({
+          published: true,
+          ai_analysis_status: "verified",
+          updated_at: now,
+        })
+        .eq("id", selectedId)
+
+      if (caseUpdateError) {
+        throw new Error(caseUpdateError.message)
+      }
+
+      await loadCases()
+
+      setPublished(true)
+      setSuccess(
+        "Case verified successfully. It remains published and the AI verification-pending tag has been removed.",
+      )
+      setAnalysisMessage(
+        "Human verification complete. The latest analysis is now marked as verified.",
+      )
+    } catch (verificationError) {
+      setError(
+        verificationError instanceof Error
+          ? verificationError.message
+          : "Unable to verify the case.",
+      )
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -1401,25 +1448,19 @@ export default function AdminCasesPage() {
                     </h3>
 
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                      CURA will read all official sources currently attached
-                      to this case and prepare the complete case summary,
-                      background, issues, proceedings, timeline, decision,
-                      legal principles, implications and current status.
-                      You can review and edit everything before publishing.
+                      CURA will analyze all case information currently
+                      available, together with attached official sources,
+                      and prepare a detailed case summary, background,
+                      issues, proceedings, timeline, decision, legal
+                      principles, implications and current status. You can
+                      review and edit everything before human verification.
                     </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={analyzeCase}
-                    disabled={
-                      !selectedId ||
-                      saving ||
-                      analyzing ||
-                      proceedings.filter(
-                        (item) => item.source_url.trim() !== "",
-                      ).length === 0
-                    }
+                    disabled={selectedId === null || saving || analyzing}
                     className="shrink-0 rounded-xl bg-gradient-to-r from-[#18b8ee] to-[#087dcc] px-7 py-4 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {analyzing
@@ -1435,8 +1476,10 @@ export default function AdminCasesPage() {
 
                 {!selectedId && (
                   <p className="mt-4 text-xs font-medium text-slate-500">
-                    Save the case first, then add the official proceedings
-                    before starting the analysis.
+                    Save the case first. Official proceedings and source
+                    documents should be added whenever available, but a case
+                    can still be analyzed from the information already in
+                    CURA.
                   </p>
                 )}
 
@@ -1445,8 +1488,10 @@ export default function AdminCasesPage() {
                     (item) => item.source_url.trim() !== "",
                   ).length === 0 && (
                     <p className="mt-4 text-xs font-medium text-amber-700">
-                      Add at least one official proceeding source URL before
-                      starting the analysis.
+                      No official proceeding URL is currently attached. CURA
+                      can still analyze the case record and available
+                      proceeding information; add official sources whenever
+                      they are available for a fuller analysis.
                     </p>
                   )}
 
@@ -1472,6 +1517,23 @@ export default function AdminCasesPage() {
                         ).toLocaleString()}
                       </span>
                     )}
+
+                    {cases.find((item) => item.id === selectedId)
+                      ?.ai_analysis_status === "ready_for_review" && (
+                      <p className="mt-3 text-xs font-medium text-amber-700">
+                        AI analysis is ready for human verification. Review
+                        and edit the analysis above, then use “Verify &
+                        Publish” to remove the AI verification-pending status.
+                      </p>
+                    )}
+
+                    {cases.find((item) => item.id === selectedId)
+                      ?.ai_analysis_status === "verified" && (
+                      <p className="mt-3 text-xs font-medium text-emerald-700">
+                        Human verification completed. This case is marked as
+                        verified.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -1488,8 +1550,10 @@ export default function AdminCasesPage() {
               </h3>
 
               <p className="mt-2 text-sm text-slate-500">
-                These fields can be completed manually or, after AI analysis,
-                reviewed and edited by you.
+                These fields can be completed manually or reviewed and edited
+                after AI analysis. If a judgment is unavailable, the analysis
+                should clearly state that rather than inventing a judicial
+                finding.
               </p>
 
               <div className="mt-6 space-y-5">
@@ -1572,6 +1636,19 @@ export default function AdminCasesPage() {
                 >
                   {saving ? "Saving..." : "Save Case"}
                 </button>
+
+                {selectedId &&
+                  cases.find((item) => item.id === selectedId)
+                    ?.ai_analysis_status === "ready_for_review" && (
+                    <button
+                      type="button"
+                      onClick={verifyAndPublishCase}
+                      disabled={saving || analyzing}
+                      className="rounded-lg bg-emerald-600 px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      ✓ Verify & Publish
+                    </button>
+                  )}
 
                 {selectedId && (
                   <button
