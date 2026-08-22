@@ -586,8 +586,23 @@ export default async function CasePage({
   const aiAnalysis =
     (analysisResult.data || null) as LegalCaseAnalysis | null
 
+  /*
+   * CURA AI stores the main case analysis inside
+   * generated_data.case, while issues, timeline, proceedings,
+   * and source assessments are stored alongside that object.
+   *
+   * Older analysis records may store the fields directly under
+   * generated_data, so support both structures.
+   */
   const aiData =
     aiAnalysis?.generated_data || {}
+
+  const aiCase =
+    aiData.case &&
+    typeof aiData.case === "object" &&
+    !Array.isArray(aiData.case)
+      ? aiData.case
+      : aiData
 
   const aiSummary =
     analysisText(
@@ -597,11 +612,21 @@ export default async function CasePage({
       "caseSummary",
       "executive_summary",
       "executiveSummary",
-    ) || typedCase.description
+    ) ||
+    analysisText(
+      aiCase,
+      "summary",
+      "case_summary",
+      "caseSummary",
+      "executive_summary",
+      "executiveSummary",
+      "description",
+    ) ||
+    typedCase.description
 
   const aiBackground =
     analysisText(
-      aiData,
+      aiCase,
       "background",
       "case_background",
       "caseBackground",
@@ -609,7 +634,7 @@ export default async function CasePage({
 
   const aiClaim =
     analysisText(
-      aiData,
+      aiCase,
       "claim",
       "claims",
       "arguments",
@@ -619,7 +644,7 @@ export default async function CasePage({
 
   const aiDecision =
     analysisText(
-      aiData,
+      aiCase,
       "decision",
       "judgment",
       "judgement",
@@ -629,7 +654,7 @@ export default async function CasePage({
 
   const aiPrinciple =
     analysisText(
-      aiData,
+      aiCase,
       "legal_principle",
       "legalPrinciple",
       "legal_principles",
@@ -638,7 +663,7 @@ export default async function CasePage({
 
   const aiImplications =
     analysisText(
-      aiData,
+      aiCase,
       "implications",
       "practical_implications",
       "practicalImplications",
