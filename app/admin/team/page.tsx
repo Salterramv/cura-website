@@ -1,6 +1,18 @@
 "use client"
 
-import { FormEvent, useEffect, useState } from "react"
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react"
+import { useRouter } from "next/navigation"
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Image as ImageIcon,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 type TeamMember = {
@@ -8,53 +20,71 @@ type TeamMember = {
   name: string
   position: string
   qualifications: string | null
+  display_order: number | null
+  image_url: string | null
   short_bio: string | null
-  bio: string | null
-  photo_url: string | null
+  professional_bio: string | null
   linkedin_url: string | null
-  display_order: number
-  is_published: boolean
-  created_at: string
-  updated_at: string
+  published: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 type TeamForm = {
   name: string
   position: string
   qualifications: string
-  short_bio: string
-  bio: string
-  photo_url: string
-  linkedin_url: string
   display_order: string
-  is_published: boolean
+  image_url: string
+  short_bio: string
+  professional_bio: string
+  linkedin_url: string
+  published: boolean
 }
 
 const emptyForm: TeamForm = {
   name: "",
   position: "",
   qualifications: "",
+  display_order: "1",
+  image_url: "",
   short_bio: "",
-  bio: "",
-  photo_url: "",
+  professional_bio: "",
   linkedin_url: "",
-  display_order: "0",
-  is_published: true,
+  published: true,
 }
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]
+
 export default function AdminTeamPage() {
+  const router = useRouter()
   const supabase = createClient()
 
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState<string | null>(null)
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [deletingImage, setDeletingImage] = useState(false)
 
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+
   const [form, setForm] = useState<TeamForm>(emptyForm)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+
+  /*
+   * ============================================================
+   * ADMIN CHECK + INITIAL LOAD
+   * ============================================================
+   */
 
   useEffect(() => {
     checkAdminAndLoad()
@@ -86,63 +116,39 @@ export default function AdminTeamPage() {
       await loadMembers()
     } catch (err) {
       console.error(err)
-      setError("Unable to load the Team management page.")
+      setError("Unable to load team members.")
     } finally {
       setLoading(false)
     }
   }
 
+  /*
+   * ============================================================
+   * LOAD TEAM MEMBERS
+   * ============================================================
+   */
+
   async function loadMembers() {
-    const { data, error: fetchError } = await supabase
+    const { data, error: loadError } = await supabase
       .from("team_members")
       .select("*")
-      .order("display_order", { ascending: true })
-      .order("created_at", { ascending: true })
+      .order("display_order", {
+        ascending: true,
+      })
 
-    if (fetchError) {
-      console.error(fetchError)
-      setError(fetchError.message)
-      return
+    if (loadError) {
+      console.error(loadError)
+      throw loadError
     }
 
     setMembers((data ?? []) as TeamMember[])
   }
 
-  function openAddForm() {
-    setEditingId(null)
-    setForm(emptyForm)
-    setError("")
-    setSuccess("")
-    setShowForm(true)
-  }
-
-  function openEditForm(member: TeamMember) {
-    setEditingId(member.id)
-
-    setForm({
-      name: member.name,
-      position: member.position,
-      qualifications: member.qualifications ?? "",
-      short_bio: member.short_bio ?? "",
-      bio: member.bio ?? "",
-      photo_url: member.photo_url ?? "",
-      linkedin_url: member.linkedin_url ?? "",
-      display_order: String(member.display_order),
-      is_published: member.is_published,
-    })
-
-    setError("")
-    setSuccess("")
-    setShowForm(true)
-  }
-
-  function closeForm() {
-    if (saving) return
-
-    setShowForm(false)
-    setEditingId(null)
-    setForm(emptyForm)
-  }
+  /*
+   * ============================================================
+   * FORM HELPERS
+   * ============================================================
+   */
 
   function updateForm<K extends keyof TeamForm>(
     field: K,
@@ -154,6 +160,240 @@ export default function AdminTeamPage() {
     }))
   }
 
+  function resetForm() {
+    setForm(emptyForm)
+    setImagePreview(null)
+    setEditingId(null)
+    setShowForm(false)
+    setError("")
+  }
+
+  function openAddForm() {
+    setSuccess("")
+    setError("")
+
+    const nextOrder =
+      members.length > 0
+        ? Math.max(
+            ...members.map((member) => member.display_order ?? 0),
+          ) + 1
+        : 1
+
+    setForm({
+      ...emptyForm,
+      display_order: String(nextOrder),
+    })
+
+    setImagePreview(null)
+    setEditingId(null)
+    setShowForm(true)
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
+  }
+
+  function openEditForm(member: TeamMember) {
+    setSuccess("")
+    setError("")
+
+    setEditingId(member.id)
+
+    setForm({
+      name: member.name ?? "",
+      position: member.position ?? "",
+      qualifications: member.qualifications ?? "",
+      display_order: String(member.display_order ?? 1),
+      image_url: member.image_url ?? "",
+      short_bio: member.short_bio ?? "",
+      professional_bio: member.professional_bio ?? "",
+      linkedin_url: member.linkedin_url ?? "",
+      published: member.published ?? false,
+    })
+
+    setImagePreview(member.image_url ?? null)
+    setShowForm(true)
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
+  }
+
+  /*
+   * ============================================================
+   * PROFILE IMAGE UPLOAD
+   * ============================================================
+   */
+
+  async function handleImageChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0]
+
+    // Allow selecting the same file again later.
+    event.target.value = ""
+
+    if (!file) return
+
+    setError("")
+    setSuccess("")
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setError("Please select a JPG, PNG or WEBP image.")
+      return
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError("Profile picture must be 5 MB or smaller.")
+      return
+    }
+
+    const localPreview = URL.createObjectURL(file)
+    setImagePreview(localPreview)
+
+    await uploadProfileImage(file)
+  }
+
+  async function uploadProfileImage(file: File) {
+    setUploadingImage(true)
+    setError("")
+
+    try {
+      const extension =
+        file.name.split(".").pop()?.toLowerCase() || "jpg"
+
+      /*
+       * Each upload gets a unique filename.
+       * This prevents browser/CDN caching problems when replacing
+       * an existing profile picture.
+       */
+      const fileName = `${crypto.randomUUID()}.${extension}`
+      const filePath = `team/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from("team-profiles")
+        .upload(filePath, file, {
+          contentType: file.type,
+          cacheControl: "3600",
+          upsert: false,
+        })
+
+      if (uploadError) {
+        console.error(uploadError)
+        throw new Error(
+          uploadError.message ||
+            "Unable to upload the profile picture.",
+        )
+      }
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage
+        .from("team-profiles")
+        .getPublicUrl(filePath)
+
+      if (!publicUrl) {
+        throw new Error(
+          "The image was uploaded but its public URL could not be created.",
+        )
+      }
+
+      /*
+       * If this is replacing an existing image, remove the old
+       * image from Storage after the new image has successfully
+       * uploaded.
+       */
+      if (form.image_url) {
+        await removeStoredImage(form.image_url)
+      }
+
+      updateForm("image_url", publicUrl)
+      setImagePreview(publicUrl)
+    } catch (err: any) {
+      console.error(err)
+
+      setError(
+        err?.message ||
+          "Unable to upload the profile picture.",
+      )
+
+      /*
+       * If upload fails, restore the previous image.
+       */
+      setImagePreview(form.image_url || null)
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  /*
+   * ============================================================
+   * REMOVE PROFILE IMAGE
+   * ============================================================
+   */
+
+  async function removeStoredImage(imageUrl: string) {
+    if (!imageUrl) return
+
+    try {
+      const marker = "/storage/v1/object/public/team-profiles/"
+
+      const markerIndex = imageUrl.indexOf(marker)
+
+      if (markerIndex === -1) {
+        return
+      }
+
+      const filePath = decodeURIComponent(
+        imageUrl.substring(
+          markerIndex + marker.length,
+        ),
+      )
+
+      if (!filePath) return
+
+      await supabase.storage
+        .from("team-profiles")
+        .remove([filePath])
+    } catch (err) {
+      /*
+       * Do not fail the team-member operation merely because
+       * deletion of an old image failed.
+       */
+      console.error("Unable to remove old image:", err)
+    }
+  }
+
+  async function handleRemoveImage() {
+    if (!form.image_url) {
+      setImagePreview(null)
+      return
+    }
+
+    setDeletingImage(true)
+    setError("")
+
+    try {
+      await removeStoredImage(form.image_url)
+
+      updateForm("image_url", "")
+      setImagePreview(null)
+    } catch (err) {
+      console.error(err)
+      setError("Unable to remove the profile picture.")
+    } finally {
+      setDeletingImage(false)
+    }
+  }
+
+  /*
+   * ============================================================
+   * SAVE TEAM MEMBER
+   * ============================================================
+   */
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -161,31 +401,41 @@ export default function AdminTeamPage() {
     setError("")
     setSuccess("")
 
-    const payload = {
-      name: form.name.trim(),
-      position: form.position.trim(),
-      qualifications: form.qualifications.trim() || null,
-      short_bio: form.short_bio.trim() || null,
-      bio: form.bio.trim() || null,
-      photo_url: form.photo_url.trim() || null,
-      linkedin_url: form.linkedin_url.trim() || null,
-      display_order: Number.parseInt(form.display_order, 10) || 0,
-      is_published: form.is_published,
-    }
-
-    if (!payload.name) {
-      setError("Please enter the team member's name.")
-      setSaving(false)
-      return
-    }
-
-    if (!payload.position) {
-      setError("Please enter the team member's position.")
-      setSaving(false)
-      return
-    }
-
     try {
+      if (!form.name.trim()) {
+        throw new Error("Name is required.")
+      }
+
+      if (!form.position.trim()) {
+        throw new Error("Position is required.")
+      }
+
+      const displayOrder = Number(form.display_order)
+
+      if (
+        !Number.isFinite(displayOrder) ||
+        displayOrder < 1
+      ) {
+        throw new Error(
+          "Display Order must be a valid number.",
+        )
+      }
+
+      const payload = {
+        name: form.name.trim(),
+        position: form.position.trim(),
+        qualifications:
+          form.qualifications.trim() || null,
+        display_order: displayOrder,
+        image_url: form.image_url.trim() || null,
+        short_bio: form.short_bio.trim() || null,
+        professional_bio:
+          form.professional_bio.trim() || null,
+        linkedin_url:
+          form.linkedin_url.trim() || null,
+        published: form.published,
+      }
+
       if (editingId) {
         const { error: updateError } = await supabase
           .from("team_members")
@@ -193,7 +443,11 @@ export default function AdminTeamPage() {
           .eq("id", editingId)
 
         if (updateError) {
-          throw updateError
+          console.error(updateError)
+          throw new Error(
+            updateError.message ||
+              "Unable to update team member.",
+          )
         }
 
         setSuccess("Team member updated successfully.")
@@ -203,7 +457,11 @@ export default function AdminTeamPage() {
           .insert(payload)
 
         if (insertError) {
-          throw insertError
+          console.error(insertError)
+          throw new Error(
+            insertError.message ||
+              "Unable to add team member.",
+          )
         }
 
         setSuccess("Team member added successfully.")
@@ -214,104 +472,119 @@ export default function AdminTeamPage() {
       setShowForm(false)
       setEditingId(null)
       setForm(emptyForm)
+      setImagePreview(null)
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      })
     } catch (err: any) {
       console.error(err)
-      setError(err?.message ?? "Unable to save team member.")
+
+      setError(
+        err?.message ||
+          "Unable to save team member.",
+      )
     } finally {
       setSaving(false)
     }
   }
 
+  /*
+   * ============================================================
+   * DELETE TEAM MEMBER
+   * ============================================================
+   */
+
   async function handleDelete(member: TeamMember) {
     const confirmed = window.confirm(
-      `Are you sure you want to delete ${member.name}? This cannot be undone.`,
+      `Are you sure you want to delete ${member.name}?`,
     )
 
     if (!confirmed) return
 
-    setDeleting(member.id)
     setError("")
     setSuccess("")
 
     try {
+      /*
+       * Remove profile picture first.
+       */
+      if (member.image_url) {
+        await removeStoredImage(member.image_url)
+      }
+
       const { error: deleteError } = await supabase
         .from("team_members")
         .delete()
         .eq("id", member.id)
 
       if (deleteError) {
-        throw deleteError
+        console.error(deleteError)
+        throw new Error(
+          deleteError.message ||
+            "Unable to delete team member.",
+        )
       }
 
-      setMembers((current) =>
-        current.filter((item) => item.id !== member.id),
-      )
+      await loadMembers()
 
-      setSuccess(`${member.name} has been deleted.`)
+      setSuccess(
+        `${member.name} was deleted successfully.`,
+      )
     } catch (err: any) {
       console.error(err)
-      setError(err?.message ?? "Unable to delete team member.")
-    } finally {
-      setDeleting(null)
+
+      setError(
+        err?.message ||
+          "Unable to delete team member.",
+      )
     }
   }
 
-  async function togglePublished(member: TeamMember) {
-    setError("")
-    setSuccess("")
-
-    const { error: updateError } = await supabase
-      .from("team_members")
-      .update({
-        is_published: !member.is_published,
-      })
-      .eq("id", member.id)
-
-    if (updateError) {
-      console.error(updateError)
-      setError(updateError.message)
-      return
-    }
-
-    setMembers((current) =>
-      current.map((item) =>
-        item.id === member.id
-          ? {
-              ...item,
-              is_published: !item.is_published,
-            }
-          : item,
-      ),
-    )
-
-    setSuccess(
-      `${member.name} is now ${
-        !member.is_published ? "published" : "hidden"
-      }.`,
-    )
-  }
+  /*
+   * ============================================================
+   * SIGN OUT
+   * ============================================================
+   */
 
   async function handleSignOut() {
     await supabase.auth.signOut()
     window.location.href = "/admin/login"
   }
 
+  /*
+   * ============================================================
+   * LOADING
+   * ============================================================
+   */
+
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f4f7fb] flex items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-[#f4f7fb]">
         <div className="text-center">
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#18b8ee]" />
+
           <p className="text-sm font-medium text-slate-600">
-            Loading Team Management...
+            Loading CURA Team Management...
           </p>
         </div>
       </main>
     )
   }
 
+  /*
+   * ============================================================
+   * PAGE
+   * ============================================================
+   */
+
   return (
     <main className="min-h-screen bg-[#f4f7fb] text-[#071d41]">
-      {/* HEADER */}
+      {/* ======================================================
+          HEADER
+      ====================================================== */}
+
       <header className="bg-[#061b3d] text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
           <div className="flex items-center gap-5">
@@ -336,19 +609,10 @@ export default function AdminTeamPage() {
 
           <div className="flex items-center gap-3">
             <a
-              href="/admin"
+              href="/"
               className="hidden rounded-lg border border-white/60 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 sm:block"
             >
-              Admin Dashboard
-            </a>
-
-            <a
-              href="/team"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden rounded-lg border border-white/60 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 sm:block"
-            >
-              View Team
+              View Website
             </a>
 
             <button
@@ -362,60 +626,117 @@ export default function AdminTeamPage() {
         </div>
       </header>
 
-      {/* MAIN */}
-      <div className="mx-auto max-w-7xl px-6 py-10 lg:px-8">
-        {/* PAGE HEADER */}
-        <section className="mb-8">
-          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.28em] text-[#18b8ee]">
-                Administration
-              </p>
+      {/* ======================================================
+          MAIN
+      ====================================================== */}
 
+      <div className="mx-auto max-w-7xl px-6 py-10 lg:px-8">
+        {/* BACK */}
+
+        <button
+          type="button"
+          onClick={() => router.push("/admin")}
+          className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-[#087dcc]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Administration
+        </button>
+
+        {/* TITLE */}
+
+        <section className="mb-8">
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.28em] text-[#18b8ee]">
+            Administration
+          </p>
+
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+            <div>
               <h2 className="text-3xl font-bold tracking-tight text-[#071d41] md:text-4xl">
                 Our Team
               </h2>
 
-              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-                Manage the people, qualifications, positions and professional
-                biographies displayed on the CURA Team page.
+              <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
+                Add and manage CURA team profiles, qualifications,
+                positions, biographies and professional information.
+              </p>
+            </div>
+
+            {!showForm && (
+              <button
+                type="button"
+                onClick={openAddForm}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b2a55]"
+              >
+                <Plus className="h-4 w-4" />
+                Add Team Member
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* ALERTS */}
+
+        {success && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+
+            <div className="flex-1">
+              <p className="font-semibold">
+                Success
+              </p>
+
+              <p className="mt-1">
+                {success}
               </p>
             </div>
 
             <button
               type="button"
-              onClick={openAddForm}
-              className="inline-flex items-center justify-center rounded-lg bg-[#061b3d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
+              onClick={() => setSuccess("")}
+              className="text-emerald-600 hover:text-emerald-900"
             >
-              <span className="mr-2 text-lg">+</span>
-              Add Team Member
+              <X className="h-4 w-4" />
             </button>
           </div>
-        </section>
+        )}
 
-        {/* MESSAGES */}
         {error && (
-          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-            {error}
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <div className="flex-1">
+              <p className="font-semibold">
+                Unable to complete request
+              </p>
+
+              <p className="mt-1">
+                {error}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="text-red-600 hover:text-red-900"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
 
-        {success && (
-          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
-            {success}
-          </div>
-        )}
+        {/* ====================================================
+            FORM
+        ==================================================== */}
 
-        {/* FORM */}
         {showForm && (
-          <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-            <div className="mb-6 flex items-start justify-between gap-4">
+          <section className="mb-10 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {/* FORM HEADER */}
+
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#18b8ee]">
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#18b8ee]">
                   {editingId ? "Edit Profile" : "New Profile"}
                 </p>
 
-                <h3 className="mt-2 text-2xl font-bold text-[#071d41]">
+                <h3 className="mt-1 text-2xl font-bold text-[#071d41]">
                   {editingId
                     ? "Edit Team Member"
                     : "Add Team Member"}
@@ -424,184 +745,326 @@ export default function AdminTeamPage() {
 
               <button
                 type="button"
-                onClick={closeForm}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={resetForm}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 Cancel
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            {/* FORM */}
+
+            <form
+              onSubmit={handleSubmit}
+              className="p-6"
+            >
               <div className="grid gap-6 md:grid-cols-2">
                 {/* NAME */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#071d41]">
-                    Name *
+                  <label
+                    htmlFor="name"
+                    className="mb-2 block text-sm font-semibold text-[#071d41]"
+                  >
+                    Name <span className="text-red-500">*</span>
                   </label>
 
                   <input
+                    id="name"
                     type="text"
                     value={form.name}
-                    onChange={(e) =>
-                      updateForm("name", e.target.value)
+                    onChange={(event) =>
+                      updateForm(
+                        "name",
+                        event.target.value,
+                      )
                     }
-                    placeholder="Full name"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
+                    placeholder="e.g. Abdulla Afhaam"
                     required
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
 
                 {/* POSITION */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#071d41]">
-                    Position *
+                  <label
+                    htmlFor="position"
+                    className="mb-2 block text-sm font-semibold text-[#071d41]"
+                  >
+                    Position <span className="text-red-500">*</span>
                   </label>
 
                   <input
+                    id="position"
                     type="text"
                     value={form.position}
-                    onChange={(e) =>
-                      updateForm("position", e.target.value)
+                    onChange={(event) =>
+                      updateForm(
+                        "position",
+                        event.target.value,
+                      )
                     }
                     placeholder="e.g. Director"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                     required
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
 
                 {/* QUALIFICATIONS */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#071d41]">
+                  <label
+                    htmlFor="qualifications"
+                    className="mb-2 block text-sm font-semibold text-[#071d41]"
+                  >
                     Qualifications
                   </label>
 
                   <input
+                    id="qualifications"
                     type="text"
                     value={form.qualifications}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       updateForm(
                         "qualifications",
-                        e.target.value,
+                        event.target.value,
                       )
                     }
                     placeholder="e.g. ACCA, MBA"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
 
                 {/* DISPLAY ORDER */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#071d41]">
+                  <label
+                    htmlFor="display-order"
+                    className="mb-2 block text-sm font-semibold text-[#071d41]"
+                  >
                     Display Order
                   </label>
 
                   <input
+                    id="display-order"
                     type="number"
-                    min="0"
+                    min="1"
                     value={form.display_order}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       updateForm(
                         "display_order",
-                        e.target.value,
+                        event.target.value,
                       )
                     }
                     className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
 
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-2 text-xs text-slate-500">
                     Lower numbers appear first.
                   </p>
                 </div>
 
-                {/* PHOTO URL */}
+                {/* ==================================================
+                    PROFILE PICTURE
+                ================================================== */}
+
                 <div className="md:col-span-2">
                   <label className="mb-2 block text-sm font-semibold text-[#071d41]">
-                    Profile Photo URL
+                    Profile Picture
                   </label>
 
-                  <input
-                    type="url"
-                    value={form.photo_url}
-                    onChange={(e) =>
-                      updateForm("photo_url", e.target.value)
-                    }
-                    placeholder="https://..."
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
-                  />
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                    <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                      {/* IMAGE PREVIEW */}
 
-                  <p className="mt-1 text-xs text-slate-400">
-                    You can add image storage/upload functionality later
-                    without changing the team management structure.
-                  </p>
+                      <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        {imagePreview ? (
+                          <img
+                            src={imagePreview}
+                            alt="Profile preview"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full flex-col items-center justify-center text-slate-400">
+                            <ImageIcon className="mb-2 h-8 w-8" />
+
+                            <span className="text-xs">
+                              No photo
+                            </span>
+                          </div>
+                        )}
+
+                        {uploadingImage && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#061b3d]/80 text-white">
+                            <Loader2 className="mb-2 h-6 w-6 animate-spin" />
+
+                            <span className="text-xs font-semibold">
+                              Uploading...
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* UPLOAD CONTROLS */}
+
+                      <div className="flex-1">
+                        <div className="flex flex-wrap gap-3">
+                          <label
+                            htmlFor="profile-picture"
+                            className={`inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#061b3d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0b2a55] ${
+                              uploadingImage
+                                ? "pointer-events-none opacity-60"
+                                : ""
+                            }`}
+                          >
+                            {uploadingImage ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4" />
+                                {imagePreview
+                                  ? "Replace Image"
+                                  : "Choose Image"}
+                              </>
+                            )}
+                          </label>
+
+                          <input
+                            id="profile-picture"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={handleImageChange}
+                            disabled={uploadingImage}
+                            className="hidden"
+                          />
+
+                          {imagePreview && !uploadingImage && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              disabled={deletingImage}
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                            >
+                              {deletingImage ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+
+                              Remove
+                            </button>
+                          )}
+                        </div>
+
+                        <p className="mt-3 text-xs leading-5 text-slate-500">
+                          Upload a professional profile picture.
+                          JPG, PNG or WEBP. Maximum file size:
+                          5 MB.
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-400">
+                          The image will be stored securely in
+                          CURA's image storage and displayed on
+                          the public Team page.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* SHORT BIO */}
+                {/* SHORT BIOGRAPHY */}
+
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-[#071d41]">
+                  <label
+                    htmlFor="short-bio"
+                    className="mb-2 block text-sm font-semibold text-[#071d41]"
+                  >
                     Short Biography
                   </label>
 
                   <textarea
-                    value={form.short_bio}
-                    onChange={(e) =>
-                      updateForm("short_bio", e.target.value)
-                    }
+                    id="short-bio"
                     rows={3}
-                    placeholder="Short introduction shown on the Team page."
-                    className="w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
+                    value={form.short_bio}
+                    onChange={(event) =>
+                      updateForm(
+                        "short_bio",
+                        event.target.value,
+                      )
+                    }
+                    placeholder="A short introduction shown on the Team page."
+                    className="w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
 
-                {/* FULL BIO */}
+                {/* PROFESSIONAL BIOGRAPHY */}
+
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-[#071d41]">
+                  <label
+                    htmlFor="professional-bio"
+                    className="mb-2 block text-sm font-semibold text-[#071d41]"
+                  >
                     Professional Biography
                   </label>
 
                   <textarea
-                    value={form.bio}
-                    onChange={(e) =>
-                      updateForm("bio", e.target.value)
+                    id="professional-bio"
+                    rows={7}
+                    value={form.professional_bio}
+                    onChange={(event) =>
+                      updateForm(
+                        "professional_bio",
+                        event.target.value,
+                      )
                     }
-                    rows={6}
-                    placeholder="Full professional biography."
-                    className="w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
+                    placeholder="Detailed professional biography..."
+                    className="w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
 
                 {/* LINKEDIN */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#071d41]">
+                  <label
+                    htmlFor="linkedin"
+                    className="mb-2 block text-sm font-semibold text-[#071d41]"
+                  >
                     LinkedIn URL
                   </label>
 
                   <input
+                    id="linkedin"
                     type="url"
                     value={form.linkedin_url}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       updateForm(
                         "linkedin_url",
-                        e.target.value,
+                        event.target.value,
                       )
                     }
                     placeholder="https://www.linkedin.com/in/..."
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
 
                 {/* PUBLISHED */}
-                <div className="flex items-center md:justify-end">
-                  <label className="flex cursor-pointer items-center gap-3">
+
+                <div className="flex items-center">
+                  <label className="flex cursor-pointer items-start gap-3">
                     <input
                       type="checkbox"
-                      checked={form.is_published}
-                      onChange={(e) =>
+                      checked={form.published}
+                      onChange={(event) =>
                         updateForm(
-                          "is_published",
-                          e.target.checked,
+                          "published",
+                          event.target.checked,
                         )
                       }
-                      className="h-5 w-5 rounded border-slate-300 text-[#087dcc] focus:ring-[#18b8ee]"
+                      className="mt-1 h-5 w-5 rounded border-slate-300 text-[#087dcc] focus:ring-[#18b8ee]"
                     />
 
                     <span>
@@ -609,7 +1072,7 @@ export default function AdminTeamPage() {
                         Published
                       </span>
 
-                      <span className="block text-xs text-slate-500">
+                      <span className="mt-1 block text-xs text-slate-500">
                         Show this member on the public Team page.
                       </span>
                     </span>
@@ -618,21 +1081,26 @@ export default function AdminTeamPage() {
               </div>
 
               {/* FORM ACTIONS */}
-              <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
+
+              <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={closeForm}
-                  disabled={saving}
-                  className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  onClick={resetForm}
+                  disabled={saving || uploadingImage}
+                  className="rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="rounded-lg bg-[#061b3d] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0b2a55] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saving || uploadingImage}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b2a55] disabled:cursor-not-allowed disabled:opacity-60"
                 >
+                  {saving && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+
                   {saving
                     ? "Saving..."
                     : editingId
@@ -644,173 +1112,199 @@ export default function AdminTeamPage() {
           </section>
         )}
 
-        {/* TEAM MEMBERS */}
-        <section>
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#18b8ee]">
-                Team Profiles
-              </p>
+        {/* ====================================================
+            TEAM LIST
+        ==================================================== */}
 
-              <h3 className="mt-2 text-2xl font-bold text-[#071d41]">
-                {members.length}{" "}
-                {members.length === 1 ? "Member" : "Members"}
-              </h3>
-            </div>
-          </div>
+        {!showForm && (
+          <section>
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#18b8ee]">
+                  Team Profiles
+                </p>
 
-          {members.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf8fd] text-2xl text-[#087dcc]">
-                ♙
+                <h3 className="mt-2 text-2xl font-bold text-[#071d41]">
+                  Current Team
+                </h3>
               </div>
 
-              <h4 className="mt-5 text-lg font-bold text-[#071d41]">
-                No team members yet
-              </h4>
-
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                Add your first CURA team member to start building the
-                public Team page.
-              </p>
-
-              <button
-                type="button"
-                onClick={openAddForm}
-                className="mt-5 rounded-lg bg-[#061b3d] px-5 py-2.5 text-sm font-semibold text-white"
-              >
-                Add Team Member
-              </button>
+              <span className="rounded-full bg-[#eaf8fd] px-3 py-1.5 text-xs font-bold text-[#087dcc]">
+                {members.length}{" "}
+                {members.length === 1
+                  ? "Member"
+                  : "Members"}
+              </span>
             </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {members.map((member) => (
-                <article
-                  key={member.id}
-                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+
+            {members.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf8fd] text-[#087dcc]">
+                  <ImageIcon className="h-7 w-7" />
+                </div>
+
+                <h4 className="mt-5 text-lg font-bold text-[#071d41]">
+                  No team members yet
+                </h4>
+
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                  Add your first CURA team member to begin
+                  building the public Team page.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={openAddForm}
+                  className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#061b3d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
                 >
-                  {/* PHOTO */}
-                  <div className="aspect-[4/3] bg-slate-100">
-                    {member.photo_url ? (
-                      <img
-                        src={member.photo_url}
-                        alt={member.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-4xl text-slate-300">
-                        ♙
-                      </div>
-                    )}
-                  </div>
+                  <Plus className="h-4 w-4" />
+                  Add Team Member
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    {/* MEMBER IMAGE */}
 
-                  {/* DETAILS */}
-                  <div className="p-6">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-[#087dcc]">
-                          {member.position}
+                    <div className="relative h-64 bg-slate-100">
+                      {member.image_url ? (
+                        <img
+                          src={member.image_url}
+                          alt={member.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center text-slate-400">
+                          <ImageIcon className="h-12 w-12" />
+
+                          <span className="mt-2 text-sm">
+                            No profile picture
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="absolute right-4 top-4">
+                        <span
+                          className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] shadow-sm ${
+                            member.published
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {member.published
+                            ? "Published"
+                            : "Draft"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* MEMBER DETAILS */}
+
+                    <div className="p-5">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#18b8ee]">
+                        Order{" "}
+                        {member.display_order ?? "-"}
+                      </p>
+
+                      <h4 className="mt-2 text-xl font-bold text-[#071d41]">
+                        {member.name}
+                      </h4>
+
+                      <p className="mt-1 text-sm font-semibold text-[#087dcc]">
+                        {member.position}
+                      </p>
+
+                      {member.qualifications && (
+                        <p className="mt-3 text-sm text-slate-500">
+                          {member.qualifications}
                         </p>
+                      )}
 
-                        <h4 className="mt-1 text-xl font-bold text-[#071d41]">
-                          {member.name}
-                        </h4>
+                      {member.short_bio && (
+                        <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">
+                          {member.short_bio}
+                        </p>
+                      )}
+
+                      {/* ACTIONS */}
+
+                      <div className="mt-5 flex gap-2 border-t border-slate-100 pt-4">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openEditForm(member)
+                          }
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDelete(member)
+                          }
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </button>
                       </div>
-
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${
-                          member.is_published
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {member.is_published
-                          ? "Published"
-                          : "Hidden"}
-                      </span>
-                    </div>
-
-                    {member.qualifications && (
-                      <p className="mt-2 text-sm font-medium text-slate-500">
-                        {member.qualifications}
-                      </p>
-                    )}
-
-                    {member.short_bio && (
-                      <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">
-                        {member.short_bio}
-                      </p>
-                    )}
-
-                    <div className="mt-6 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditForm(member)}
-                        className="rounded-lg bg-[#061b3d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => togglePublished(member)}
-                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-                      >
-                        {member.is_published
-                          ? "Hide"
-                          : "Publish"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(member)}
-                        disabled={deleting === member.id}
-                        className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                      >
-                        {deleting === member.id
-                          ? "Deleting..."
-                          : "Delete"}
-                      </button>
                     </div>
                   </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
-        {/* NOTICE */}
+        {/* ====================================================
+            INFORMATION NOTICE
+        ==================================================== */}
+
         <section className="mt-10 rounded-2xl border border-[#b9e8f7] bg-[#effbff] p-6">
           <div className="flex gap-4">
-            <div className="mt-0.5 text-xl text-[#087dcc]">ⓘ</div>
+            <div className="mt-0.5 text-xl text-[#087dcc]">
+              ⓘ
+            </div>
 
             <div>
               <h4 className="font-bold text-[#071d41]">
-                Team page management
+                Profile picture storage
               </h4>
 
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Changes made here are reflected on the public CURA Team
-                page. Hidden profiles remain in the system but are not
-                displayed publicly.
+                Profile pictures are uploaded directly to
+                Supabase Storage. The image URL is then saved
+                with the team member profile. You do not need
+                to enter an image URL manually.
               </p>
             </div>
           </div>
         </section>
       </div>
 
-      {/* FOOTER */}
+      {/* ======================================================
+          FOOTER
+      ====================================================== */}
+
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {new Date().getFullYear()} CURA. All rights reserved.
+            © {new Date().getFullYear()} CURA. All rights
+            reserved.
           </p>
 
           <a
-            href="/admin"
+            href="/"
             className="font-semibold text-[#071d41] transition hover:text-[#087dcc]"
           >
-            ← Back to Administration
+            Return to CURA →
           </a>
         </div>
       </footer>
