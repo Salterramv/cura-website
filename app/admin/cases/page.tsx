@@ -295,7 +295,7 @@ export default function AdminCasesPage() {
     )
   }
 
-  async function saveCase() {
+  async function saveCase(): Promise<string | null> {
     setSaving(true)
     setError("")
     setSuccess("")
@@ -303,13 +303,13 @@ export default function AdminCasesPage() {
     if (!title.trim()) {
       setError("Case title is required.")
       setSaving(false)
-      return
+      return null
     }
 
     if (!slug.trim()) {
       setError("Slug is required.")
       setSaving(false)
-      return
+      return null
     }
 
     const payload = {
@@ -342,7 +342,7 @@ export default function AdminCasesPage() {
       if (error) {
         setError(error.message)
         setSaving(false)
-        return
+        return null
       }
     } else {
       const { data, error } = await supabase
@@ -358,7 +358,7 @@ export default function AdminCasesPage() {
       if (error || !data) {
         setError(error?.message || "Unable to create case.")
         setSaving(false)
-        return
+        return null
       }
 
       caseId = data.id
@@ -382,7 +382,7 @@ export default function AdminCasesPage() {
     if (existingError) {
       setError(existingError.message)
       setSaving(false)
-      return
+      return null
     }
 
     const currentIds = proceedings
@@ -402,7 +402,7 @@ export default function AdminCasesPage() {
       if (error) {
         setError(error.message)
         setSaving(false)
-        return
+        return null
       }
     }
 
@@ -438,7 +438,7 @@ export default function AdminCasesPage() {
         if (error) {
           setError(error.message)
           setSaving(false)
-          return
+          return null
         }
       } else {
         const { data, error } = await supabase
@@ -450,7 +450,7 @@ export default function AdminCasesPage() {
         if (error) {
           setError(error.message)
           setSaving(false)
-          return
+          return null
         }
 
         if (data) {
@@ -472,6 +472,7 @@ export default function AdminCasesPage() {
     )
 
     setSaving(false)
+    return caseId
   }
 
   function getProceedingKey(proceeding: Proceeding) {
@@ -685,11 +686,6 @@ export default function AdminCasesPage() {
   }
 
   async function analyzeCase() {
-    if (!selectedId) {
-      setError("Save the case before running AI analysis.")
-      return
-    }
-
     setAnalyzing(true)
     setError("")
     setSuccess("")
@@ -703,13 +699,19 @@ export default function AdminCasesPage() {
        * A judgment/source URL is NOT mandatory. CURA can analyse the
        * information already available in the case record and proceedings.
        */
-      await saveCase()
+      const caseId = await saveCase()
+
+      if (!caseId) {
+        throw new Error(
+          "The case could not be saved, so CURA AI cannot start the analysis.",
+        )
+      }
 
       const { data, error } = await supabase.functions.invoke(
         "analyze-legal-case",
         {
           body: {
-            case_id: selectedId,
+            case_id: caseId,
           },
         },
       )
@@ -737,7 +739,7 @@ export default function AdminCasesPage() {
           await supabase
             .from("legal_case_analyses")
             .select("generated_data, version, status")
-            .eq("case_id", selectedId)
+            .eq("case_id", caseId)
             .order("version", { ascending: false })
             .limit(1)
             .maybeSingle()
@@ -799,7 +801,7 @@ export default function AdminCasesPage() {
       }
 
       await loadCases()
-      await loadProceedings(selectedId)
+      await loadProceedings(caseId)
 
       const version = data?.analysis?.version
 
@@ -1590,7 +1592,12 @@ export default function AdminCasesPage() {
                   <button
                     type="button"
                     onClick={analyzeCase}
-                    disabled={selectedId === null || saving || analyzing}
+                    disabled={
+                      !title.trim() ||
+                      !slug.trim() ||
+                      saving ||
+                      analyzing
+                    }
                     className="shrink-0 rounded-xl bg-gradient-to-r from-[#18b8ee] to-[#087dcc] px-7 py-4 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {analyzing
@@ -1604,12 +1611,11 @@ export default function AdminCasesPage() {
 
                 </div>
 
-                {!selectedId && (
+                {(!title.trim() || !slug.trim()) && (
                   <p className="mt-4 text-xs font-medium text-slate-500">
-                    Save the case first. Official proceedings and source
-                    documents should be added whenever available, but a case
-                    can still be analyzed from the information already in
-                    CURA.
+                    Enter the case title and slug first. CURA AI will save the
+                    case automatically and then analyze all information
+                    currently available.
                   </p>
                 )}
 
