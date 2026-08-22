@@ -9,10 +9,10 @@ type TeamMember = {
   position: string
   qualifications: string | null
   short_bio: string | null
-  bio: string | null
-  photo_url: string | null
+  professional_bio: string | null
+  image_url: string | null
   linkedin_url: string | null
-  display_order: number
+  display_order: number | null
 }
 
 export default function TeamPage() {
@@ -26,11 +26,16 @@ export default function TeamPage() {
       const { data, error } = await supabase
         .from("team_members")
         .select(
-          "id, name, position, qualifications, short_bio, bio, photo_url, linkedin_url, display_order",
+          "id, name, position, qualifications, short_bio, professional_bio, image_url, linkedin_url, display_order, created_at",
         )
-        .eq("is_published", true)
-        .order("display_order", { ascending: true })
-        .order("created_at", { ascending: true })
+        .eq("published", true)
+        .order("display_order", {
+          ascending: true,
+          nullsFirst: false,
+        })
+        .order("created_at", {
+          ascending: true,
+        })
 
       if (error) {
         console.error("Unable to load team:", error)
@@ -43,7 +48,7 @@ export default function TeamPage() {
     }
 
     loadTeam()
-  }, [])
+  }, [supabase])
 
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
@@ -113,9 +118,9 @@ export default function TeamPage() {
               >
                 {/* PHOTO */}
                 <div className="aspect-[4/3] overflow-hidden bg-slate-100">
-                  {member.photo_url ? (
+                  {member.image_url ? (
                     <img
-                      src={member.photo_url}
+                      src={member.image_url}
                       alt={member.name}
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                     />
@@ -148,14 +153,14 @@ export default function TeamPage() {
                     </p>
                   )}
 
-                  {member.bio && (
+                  {member.professional_bio && (
                     <details className="mt-5">
                       <summary className="cursor-pointer text-sm font-semibold text-[#071B49] transition-colors hover:text-[#1B5DBF]">
                         View profile
                       </summary>
 
-                      <p className="mt-4 text-sm leading-7 text-slate-600">
-                        {member.bio}
+                      <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600">
+                        {member.professional_bio}
                       </p>
                     </details>
                   )}
