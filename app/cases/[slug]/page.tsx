@@ -27,6 +27,8 @@ type LegalCase = {
   claim: string | null
   mira_status: string | null
   mira_remarks: string | null
+  ai_analysis_status: string | null
+  ai_analyzed_at: string | null
   legal_matter_id: string | null
   is_primary: boolean
   published: boolean
@@ -387,6 +389,22 @@ function analysisList(data: Record<string, any>, ...keys: string[]) {
   return []
 }
 
+function isHumanVerified(
+  caseStatus: string | null,
+  analysisStatus: string | null,
+) {
+  const status = (analysisStatus || caseStatus || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_")
+
+  return [
+    "verified",
+    "human_verified",
+    "approved",
+  ].includes(status)
+}
+
 export default async function CasePage({
   params,
 }: PageProps) {
@@ -407,7 +425,6 @@ export default async function CasePage({
     .from("legal_cases")
     .select("*")
     .eq("slug", slug)
-    .eq("published", true)
     .single()
 
   if (caseError || !legalCase) {
@@ -585,6 +602,14 @@ export default async function CasePage({
 
   const aiAnalysis =
     (analysisResult.data || null) as LegalCaseAnalysis | null
+
+  const humanVerified = isHumanVerified(
+    typedCase.ai_analysis_status,
+    aiAnalysis?.status || null,
+  )
+
+  const humanVerificationPending =
+    Boolean(aiAnalysis) && !humanVerified
 
   /*
    * CURA AI stores the main case analysis inside
@@ -1145,6 +1170,12 @@ export default async function CasePage({
                   </span>
                 )}
 
+                {humanVerificationPending && (
+                  <span className="rounded-full bg-amber-50 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-700">
+                    HUMAN VERIFICATION PENDING
+                  </span>
+                )}
+
               </div>
 
               <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#071B49] md:text-4xl">
@@ -1165,7 +1196,9 @@ export default async function CasePage({
                     month: "long",
                     year: "numeric",
                   })}
-                  . This analysis is provided for human verification.
+                  {humanVerificationPending
+                    ? ". This analysis is pending human verification."
+                    : ". This analysis has been human verified."}
                 </p>
               )}
 

@@ -13,6 +13,12 @@ type LegalCase = {
   published: boolean
 }
 
+type LegalCaseAnalysis = {
+  case_id: string
+  version: number | null
+  status: string | null
+}
+
 type CaseIssue = {
   id: string
   case_id: string
@@ -32,6 +38,8 @@ type DisplayCase = LegalCase & {
   caseNumber: string
   date: string
   issues: string[]
+  analysisStatus: string | null
+  hasAnalysis: boolean
 }
 
 const COURTS = [
@@ -70,6 +78,18 @@ function normalizeCourt(court: string | null): string | null {
   return null
 }
 
+function isHumanVerified(status: string | null) {
+  if (!status) return false
+
+  const normalized = status.trim().toLowerCase()
+
+  return [
+    "verified",
+    "human_verified",
+    "approved",
+  ].includes(normalized)
+}
+
 export default function CasesPage() {
   const [cases, setCases] = useState<DisplayCase[]>([])
   const [search, setSearch] = useState("")
@@ -93,7 +113,6 @@ export default function CasesPage() {
         .select(
           "id, slug, title, category, description, published"
         )
-        .eq("published", true)
 
       console.log("LEGAL CASES:", legalCases)
       console.log("LEGAL CASES ERROR:", casesError)
@@ -139,6 +158,32 @@ export default function CasesPage() {
           "id, case_id, issue, sort_order"
         )
         .order("sort_order", { ascending: true })
+
+      /*
+       * Load the latest CURA AI analysis for every case.
+       *
+       * Verification is tracked on the analysis record. A case remains
+       * publicly visible before human verification; the listing simply
+       * shows a pending-verification tag when its latest analysis has
+       * not yet been verified.
+       */
+      const {
+        data: caseAnalyses,
+        error: analysesError,
+      } = await supabase
+        .from("legal_case_analyses")
+        .select("case_id, version, status")
+        .order("version", { ascending: false })
+
+      console.log("CASE ANALYSES:", caseAnalyses)
+      console.log("CASE ANALYSES ERROR:", analysesError)
+
+      if (analysesError) {
+        console.error(
+          "Error loading legal case analyses:",
+          analysesError
+        )
+      }
 
       console.log("CASE ISSUES:", caseIssues)
       console.log(
@@ -204,6 +249,20 @@ export default function CasesPage() {
       )
 
       /*
+       * Keep only the latest analysis for each case.
+       */
+      const analysisMap =
+        new Map<string, LegalCaseAnalysis>()
+
+      ;(caseAnalyses || []).forEach(
+        (analysis: LegalCaseAnalysis) => {
+          if (!analysisMap.has(analysis.case_id)) {
+            analysisMap.set(analysis.case_id, analysis)
+          }
+        }
+      )
+
+      /*
        * Build the cases shown on the website.
        */
       const formattedCases: DisplayCase[] = (
@@ -260,6 +319,12 @@ export default function CasesPage() {
 
           issues:
             issueMap.get(item.id) || [],
+
+          analysisStatus:
+            analysisMap.get(item.id)?.status || null,
+
+          hasAnalysis:
+            analysisMap.has(item.id),
         }
       })
 
@@ -596,7 +661,7 @@ export default function CasesPage() {
                   >
 
                     {/* COURT TAGS + DATE */}
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
 
                       <div className="flex flex-wrap gap-2">
 
@@ -629,6 +694,12 @@ export default function CasesPage() {
                         )}
 
                       </div>
+
+                      {item.hasAnalysis && !isHumanVerified(item.analysisStatus) && (
+                        <span className="shrink-0 rounded-full bg-[#FFF4E5] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#B26A00]">
+                          Human verification pending
+                        </span>
+                      )}
 
                       {item.date && (
                         <span className="shrink-0 text-xs text-slate-400">
