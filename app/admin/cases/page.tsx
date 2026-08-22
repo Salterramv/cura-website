@@ -568,14 +568,48 @@ export default function AdminCasesPage() {
         [proceedingId]: candidates,
       }))
 
-      setSourceFinderMessage(
-        candidates.length > 0
-          ? `Found ${candidates.length} official source candidate${
-              candidates.length === 1 ? "" : "s"
-            }. Select the correct document, then verify it.`
-          : data?.message ||
-              "No matching official source was found. You can enter the official URL manually.",
-      )
+      // The first result is automatically placed into the Official Source URL
+      // field. The admin can still replace it by selecting another candidate.
+      if (candidates.length > 0 && candidates[0]?.url) {
+        const candidate = candidates[0]
+
+        setProceedings((current) =>
+          current.map((item) =>
+            getProceedingKey(item) === proceedingId
+              ? {
+                  ...item,
+                  source_url: candidate.url,
+                  source_title:
+                    candidate.title || item.source_title || "Official source",
+                  source_type:
+                    candidate.source_type ||
+                    item.source_type ||
+                    "Official source",
+                  source_status: "needs_verification",
+                  source_notes:
+                    candidate.notes ||
+                    item.source_notes ||
+                    "Found by CURA official source finder. Human verification required.",
+                }
+              : item,
+          ),
+        )
+
+        setSourceFinderMessage(
+          `Official source found and placed in the URL field. Verify it before saving. ${
+            candidates.length > 1
+              ? `${candidates.length - 1} additional candidate${
+                  candidates.length - 1 === 1 ? "" : "s"
+                } available below.`
+              : ""
+          }`,
+        )
+      } else {
+        setSourceFinderMessage(
+          data?.message ||
+            "No matching official source was found. You can enter the official URL manually.",
+        )
+      }
     } catch (sourceError) {
       setError(
         sourceError instanceof Error
