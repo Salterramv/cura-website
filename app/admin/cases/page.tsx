@@ -474,51 +474,85 @@ export default function AdminCasesPage() {
     setSaving(false)
   }
 
-  async function findOfficialSource(
-    proceeding: Proceeding,
-  ) {
+  function getProceedingKey(proceeding: Proceeding) {
+    return (
+      proceeding.id ||
+      `new-${proceeding.court}-${proceeding.case_number.trim()}`
+    )
+  }
+
+  async function findOfficialSource(proceeding: Proceeding) {
+    const caseNumber = proceeding.case_number.trim()
+
     if (!selectedId) {
-      setError("Save the case before finding official sources.")
+      setError("Select or save the legal case before finding an official source.")
       return
     }
 
-    if (!proceeding.case_number?.trim()) {
+    if (!caseNumber) {
       setError(
-        "Enter the court proceeding case number before finding the official source.",
+        "Enter the proceeding case number before finding the official source.",
       )
       return
     }
 
-    /*
-     * Source discovery does not require the proceeding to have a database ID.
-     * New proceedings can be searched immediately; the result is kept in the
-     * current editor state and can be saved with the case afterward.
-     */
-    const proceedingId =
-      proceeding.id || `new-${proceeding.court}-${proceeding.case_number.trim()}`
+    const proceedingId = getProceedingKey(proceeding)
 
     setFindingSourceId(proceedingId)
     setError("")
     setSuccess("")
     setSourceFinderMessage(
-      `Searching official sources for ${proceeding.case_number}...`,
+      `Searching MIRA first, then the relevant court website for ${caseNumber}...`,
     )
+    setSourceCandidates((current) => ({
+      ...current,
+      [proceedingId]: [],
+    }))
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "find-official-legal-source",
-        {
+      // Get the current authenticated session explicitly. This avoids relying
+      // on the browser client's implicit function-auth header and gives the
+      // admin a useful error when the session has expired.
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession()
+
+      if (sessionError) throw new Error(sessionError.message)
+
+      const accessToken = sessionData.session?.access_token
+
+      if (!accessToken) {
+        window.location.href = "/admin/login"
+        return
+      }
+
+      /*
+       * Use Supabase's own function client rather than constructing the
+       * Edge Function URL manually. supabase.functions.invoke() automatically
+       * carries the signed-in user's JWT and project API key, which is the
+       * supported browser invocation path for a JWT-protected function.
+       */
+      const { data, error: functionError } =
+        await supabase.functions.invoke("find-official-legal-source", {
           body: {
             case_id: selectedId,
             court: proceeding.court,
-            case_number: proceeding.case_number.trim(),
+            case_number: caseNumber,
+            search_court_by_reference: true,
             party_name: title.trim(),
           },
-        },
-      )
+        })
 
-      if (error) {
-        throw new Error(error.message)
+      if (functionError) {
+        throw new Error(
+          functionError.message ||
+            "CURA could not connect to the official source finder.",
+        )
+      }
+
+      if (!data) {
+        throw new Error(
+          "The official source finder returned no response. Please try again.",
+        )
       }
 
       if (data?.error) {
@@ -538,8 +572,9 @@ export default function AdminCasesPage() {
         candidates.length > 0
           ? `Found ${candidates.length} official source candidate${
               candidates.length === 1 ? "" : "s"
-            }. Verify the result before using it.`
-          : "No matching official source was found. You can enter the URL manually.",
+            }. Select the correct document, then verify it.`
+          : data?.message ||
+              "No matching official source was found. You can enter the official URL manually.",
       )
     } catch (sourceError) {
       setError(
@@ -559,9 +594,7 @@ export default function AdminCasesPage() {
   ) {
     setProceedings((current) =>
       current.map((item) =>
-        (item.id === proceedingId ||
-          (!item.id &&
-            `new-${item.court}-${item.case_number.trim()}` === proceedingId))
+        getProceedingKey(item) === proceedingId
           ? {
               ...item,
               source_url: candidate.url || "",
@@ -1216,7 +1249,7 @@ export default function AdminCasesPage() {
                                   />
 
                                   <p className="mt-2 text-xs text-slate-400">
-                                    Use the official MIRA, TAT, High Court or
+                                    Use the official MIRA, Civil Court, TAT, High Court or
                                     Supreme Court source.
                                   </p>
 
@@ -1224,19 +1257,28 @@ export default function AdminCasesPage() {
 
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        findOfficialSource(item)
-                                      }
+                                      onClick={(event) => {
+                                        event.preventDefault()
+                                        void findOfficialSource(item)
+                                      }}
+                                      aria-label={`Find official source for ${item.case_number}`}
                                       disabled={
-                                        findingSourceId === item.id ||
+                                        findingSourceId ===
+                                          getProceedingKey(item) ||
                                         !item.case_number.trim()
                                       }
                                       className="rounded-lg border border-[#18b8ee] bg-[#eafaff] px-4 py-2 text-xs font-bold text-[#087dcc] transition hover:bg-[#d9f6ff] disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                      {findingSourceId === item.id
+                                      {findingSourceId === getProceedingKey(item)
                                         ? "Searching official sources..."
                                         : "🔎 Find Official Source"}
                                     </button>
+
+                                    {findingSourceId === getProceedingKey(item) && (
+                                      <span className="text-xs font-medium text-[#087dcc]">
+                                        Searching MIRA and the relevant court website...
+                                      </span>
+                                    )}
 
                                     {!item.case_number.trim() && (
                                       <span className="text-xs text-slate-400">
@@ -1246,7 +1288,7 @@ export default function AdminCasesPage() {
 
                                   </div>
 
-                                  {sourceCandidates[item.id || ""]?.length > 0 && (
+                                  {sourceCandidates[getProceedingKey(item)]?.length > 0 && (
                                     <div className="mt-4 space-y-3 rounded-xl border border-[#18b8ee]/20 bg-[#f4fbfe] p-4">
 
                                       <div>
@@ -1260,7 +1302,7 @@ export default function AdminCasesPage() {
                                         </p>
                                       </div>
 
-                                      {sourceCandidates[item.id || ""].map(
+                                      {sourceCandidates[getProceedingKey(item)].map(
                                         (candidate, candidateIndex) => (
                                           <div
                                             key={
