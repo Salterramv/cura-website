@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
@@ -44,6 +45,7 @@ const emptyForm: TeamForm = {
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+
 const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -68,12 +70,6 @@ export default function AdminTeamPage() {
 
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-
-  /*
-   * ============================================================
-   * ADMIN CHECK + INITIAL LOAD
-   * ============================================================
-   */
 
   useEffect(() => {
     checkAdminAndLoad()
@@ -111,12 +107,6 @@ export default function AdminTeamPage() {
     }
   }
 
-  /*
-   * ============================================================
-   * LOAD TEAM MEMBERS
-   * ============================================================
-   */
-
   async function loadMembers() {
     const { data, error: loadError } = await supabase
       .from("team_members")
@@ -132,12 +122,6 @@ export default function AdminTeamPage() {
 
     setMembers((data ?? []) as TeamMember[])
   }
-
-  /*
-   * ============================================================
-   * FORM HELPERS
-   * ============================================================
-   */
 
   function updateForm<K extends keyof TeamForm>(
     field: K,
@@ -164,7 +148,9 @@ export default function AdminTeamPage() {
     const nextOrder =
       members.length > 0
         ? Math.max(
-            ...members.map((member) => member.display_order ?? 0),
+            ...members.map(
+              (member) => member.display_order ?? 0,
+            ),
           ) + 1
         : 1
 
@@ -210,18 +196,11 @@ export default function AdminTeamPage() {
     })
   }
 
-  /*
-   * ============================================================
-   * PROFILE IMAGE UPLOAD
-   * ============================================================
-   */
-
   async function handleImageChange(
     event: ChangeEvent<HTMLInputElement>,
   ) {
     const file = event.target.files?.[0]
 
-    // Allow selecting the same file again later.
     event.target.value = ""
 
     if (!file) return
@@ -253,21 +232,17 @@ export default function AdminTeamPage() {
       const extension =
         file.name.split(".").pop()?.toLowerCase() || "jpg"
 
-      /*
-       * Each upload gets a unique filename.
-       * This prevents browser/CDN caching problems when replacing
-       * an existing profile picture.
-       */
       const fileName = `${crypto.randomUUID()}.${extension}`
       const filePath = `team/${fileName}`
 
-      const { error: uploadError } = await supabase.storage
-        .from("team-profiles")
-        .upload(filePath, file, {
-          contentType: file.type,
-          cacheControl: "3600",
-          upsert: false,
-        })
+      const { error: uploadError } =
+        await supabase.storage
+          .from("team-profiles")
+          .upload(filePath, file, {
+            contentType: file.type,
+            cacheControl: "3600",
+            upsert: false,
+          })
 
       if (uploadError) {
         console.error(uploadError)
@@ -289,11 +264,6 @@ export default function AdminTeamPage() {
         )
       }
 
-      /*
-       * If this is replacing an existing image, remove the old
-       * image from Storage after the new image has successfully
-       * uploaded.
-       */
       if (form.image_url) {
         await removeStoredImage(form.image_url)
       }
@@ -308,26 +278,18 @@ export default function AdminTeamPage() {
           "Unable to upload the profile picture.",
       )
 
-      /*
-       * If upload fails, restore the previous image.
-       */
       setImagePreview(form.image_url || null)
     } finally {
       setUploadingImage(false)
     }
   }
 
-  /*
-   * ============================================================
-   * REMOVE PROFILE IMAGE
-   * ============================================================
-   */
-
   async function removeStoredImage(imageUrl: string) {
     if (!imageUrl) return
 
     try {
-      const marker = "/storage/v1/object/public/team-profiles/"
+      const marker =
+        "/storage/v1/object/public/team-profiles/"
 
       const markerIndex = imageUrl.indexOf(marker)
 
@@ -347,11 +309,10 @@ export default function AdminTeamPage() {
         .from("team-profiles")
         .remove([filePath])
     } catch (err) {
-      /*
-       * Do not fail the team-member operation merely because
-       * deletion of an old image failed.
-       */
-      console.error("Unable to remove old image:", err)
+      console.error(
+        "Unable to remove old image:",
+        err,
+      )
     }
   }
 
@@ -371,19 +332,17 @@ export default function AdminTeamPage() {
       setImagePreview(null)
     } catch (err) {
       console.error(err)
-      setError("Unable to remove the profile picture.")
+      setError(
+        "Unable to remove the profile picture.",
+      )
     } finally {
       setDeletingImage(false)
     }
   }
 
-  /*
-   * ============================================================
-   * SAVE TEAM MEMBER
-   * ============================================================
-   */
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault()
 
     setSaving(true)
@@ -399,7 +358,9 @@ export default function AdminTeamPage() {
         throw new Error("Position is required.")
       }
 
-      const displayOrder = Number(form.display_order)
+      const displayOrder = Number(
+        form.display_order,
+      )
 
       if (
         !Number.isFinite(displayOrder) ||
@@ -416,8 +377,10 @@ export default function AdminTeamPage() {
         qualifications:
           form.qualifications.trim() || null,
         display_order: displayOrder,
-        image_url: form.image_url.trim() || null,
-        short_bio: form.short_bio.trim() || null,
+        image_url:
+          form.image_url.trim() || null,
+        short_bio:
+          form.short_bio.trim() || null,
         professional_bio:
           form.professional_bio.trim() || null,
         linkedin_url:
@@ -426,34 +389,42 @@ export default function AdminTeamPage() {
       }
 
       if (editingId) {
-        const { error: updateError } = await supabase
-          .from("team_members")
-          .update(payload)
-          .eq("id", editingId)
+        const { error: updateError } =
+          await supabase
+            .from("team_members")
+            .update(payload)
+            .eq("id", editingId)
 
         if (updateError) {
           console.error(updateError)
+
           throw new Error(
             updateError.message ||
               "Unable to update team member.",
           )
         }
 
-        setSuccess("Team member updated successfully.")
+        setSuccess(
+          "Team member updated successfully.",
+        )
       } else {
-        const { error: insertError } = await supabase
-          .from("team_members")
-          .insert(payload)
+        const { error: insertError } =
+          await supabase
+            .from("team_members")
+            .insert(payload)
 
         if (insertError) {
           console.error(insertError)
+
           throw new Error(
             insertError.message ||
               "Unable to add team member.",
           )
         }
 
-        setSuccess("Team member added successfully.")
+        setSuccess(
+          "Team member added successfully.",
+        )
       }
 
       await loadMembers()
@@ -479,13 +450,9 @@ export default function AdminTeamPage() {
     }
   }
 
-  /*
-   * ============================================================
-   * DELETE TEAM MEMBER
-   * ============================================================
-   */
-
-  async function handleDelete(member: TeamMember) {
+  async function handleDelete(
+    member: TeamMember,
+  ) {
     const confirmed = window.confirm(
       `Are you sure you want to delete ${member.name}?`,
     )
@@ -496,20 +463,21 @@ export default function AdminTeamPage() {
     setSuccess("")
 
     try {
-      /*
-       * Remove profile picture first.
-       */
       if (member.image_url) {
-        await removeStoredImage(member.image_url)
+        await removeStoredImage(
+          member.image_url,
+        )
       }
 
-      const { error: deleteError } = await supabase
-        .from("team_members")
-        .delete()
-        .eq("id", member.id)
+      const { error: deleteError } =
+        await supabase
+          .from("team_members")
+          .delete()
+          .eq("id", member.id)
 
       if (deleteError) {
         console.error(deleteError)
+
         throw new Error(
           deleteError.message ||
             "Unable to delete team member.",
@@ -531,22 +499,10 @@ export default function AdminTeamPage() {
     }
   }
 
-  /*
-   * ============================================================
-   * SIGN OUT
-   * ============================================================
-   */
-
   async function handleSignOut() {
     await supabase.auth.signOut()
     window.location.href = "/admin/login"
   }
-
-  /*
-   * ============================================================
-   * LOADING
-   * ============================================================
-   */
 
   if (loading) {
     return (
@@ -562,18 +518,8 @@ export default function AdminTeamPage() {
     )
   }
 
-  /*
-   * ============================================================
-   * PAGE
-   * ============================================================
-   */
-
   return (
     <main className="min-h-screen bg-[#f4f7fb] text-[#071d41]">
-      {/* ======================================================
-          HEADER
-      ====================================================== */}
-
       <header className="bg-[#061b3d] text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
           <div className="flex items-center gap-5">
@@ -615,13 +561,7 @@ export default function AdminTeamPage() {
         </div>
       </header>
 
-      {/* ======================================================
-          MAIN
-      ====================================================== */}
-
       <div className="mx-auto max-w-7xl px-6 py-10 lg:px-8">
-        {/* BACK */}
-
         <button
           type="button"
           onClick={() => router.push("/admin")}
@@ -630,8 +570,6 @@ export default function AdminTeamPage() {
           ←
           Back to Administration
         </button>
-
-        {/* TITLE */}
 
         <section className="mb-8">
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.28em] text-[#18b8ee]">
@@ -645,8 +583,9 @@ export default function AdminTeamPage() {
               </h2>
 
               <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-                Add and manage CURA team profiles, qualifications,
-                positions, biographies and professional information.
+                Add and manage CURA team profiles,
+                qualifications, positions, biographies
+                and professional information.
               </p>
             </div>
 
@@ -663,11 +602,11 @@ export default function AdminTeamPage() {
           </div>
         </section>
 
-        {/* ALERTS */}
-
         {success && (
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            <span className="mt-0.5 shrink-0">✓</span>
+            <span className="mt-0.5 shrink-0">
+              ✓
+            </span>
 
             <div className="flex-1">
               <p className="font-semibold">
@@ -711,18 +650,14 @@ export default function AdminTeamPage() {
           </div>
         )}
 
-        {/* ====================================================
-            FORM
-        ==================================================== */}
-
         {showForm && (
           <section className="mb-10 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            {/* FORM HEADER */}
-
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#18b8ee]">
-                  {editingId ? "Edit Profile" : "New Profile"}
+                  {editingId
+                    ? "Edit Profile"
+                    : "New Profile"}
                 </p>
 
                 <h3 className="mt-1 text-2xl font-bold text-[#071d41]">
@@ -741,21 +676,20 @@ export default function AdminTeamPage() {
               </button>
             </div>
 
-            {/* FORM */}
-
             <form
               onSubmit={handleSubmit}
               className="p-6"
             >
               <div className="grid gap-6 md:grid-cols-2">
-                {/* NAME */}
-
                 <div>
                   <label
                     htmlFor="name"
                     className="mb-2 block text-sm font-semibold text-[#071d41]"
                   >
-                    Name <span className="text-red-500">*</span>
+                    Name{" "}
+                    <span className="text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -774,14 +708,15 @@ export default function AdminTeamPage() {
                   />
                 </div>
 
-                {/* POSITION */}
-
                 <div>
                   <label
                     htmlFor="position"
                     className="mb-2 block text-sm font-semibold text-[#071d41]"
                   >
-                    Position <span className="text-red-500">*</span>
+                    Position{" "}
+                    <span className="text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -799,8 +734,6 @@ export default function AdminTeamPage() {
                     className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
-
-                {/* QUALIFICATIONS */}
 
                 <div>
                   <label
@@ -824,8 +757,6 @@ export default function AdminTeamPage() {
                     className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
-
-                {/* DISPLAY ORDER */}
 
                 <div>
                   <label
@@ -854,10 +785,6 @@ export default function AdminTeamPage() {
                   </p>
                 </div>
 
-                {/* ==================================================
-                    PROFILE PICTURE
-                ================================================== */}
-
                 <div className="md:col-span-2">
                   <label className="mb-2 block text-sm font-semibold text-[#071d41]">
                     Profile Picture
@@ -865,8 +792,6 @@ export default function AdminTeamPage() {
 
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                      {/* IMAGE PREVIEW */}
-
                       <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         {imagePreview ? (
                           <img
@@ -876,7 +801,9 @@ export default function AdminTeamPage() {
                           />
                         ) : (
                           <div className="flex h-full w-full flex-col items-center justify-center text-slate-400">
-                            <span className="mb-2 text-2xl">▧</span>
+                            <span className="mb-2 text-2xl">
+                              ▧
+                            </span>
 
                             <span className="text-xs">
                               No photo
@@ -886,7 +813,9 @@ export default function AdminTeamPage() {
 
                         {uploadingImage && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#061b3d]/80 text-white">
-                            <span className="mb-2 text-lg animate-pulse">⟳</span>
+                            <span className="mb-2 text-lg animate-pulse">
+                              ⟳
+                            </span>
 
                             <span className="text-xs font-semibold">
                               Uploading...
@@ -894,8 +823,6 @@ export default function AdminTeamPage() {
                           </div>
                         )}
                       </div>
-
-                      {/* UPLOAD CONTROLS */}
 
                       <div className="flex-1">
                         <div className="flex flex-wrap gap-3">
@@ -909,7 +836,9 @@ export default function AdminTeamPage() {
                           >
                             {uploadingImage ? (
                               <>
-                                <span className="animate-pulse">⟳</span>
+                                <span className="animate-pulse">
+                                  ⟳
+                                </span>
                                 Uploading...
                               </>
                             ) : (
@@ -931,41 +860,48 @@ export default function AdminTeamPage() {
                             className="hidden"
                           />
 
-                          {imagePreview && !uploadingImage && (
-                            <button
-                              type="button"
-                              onClick={handleRemoveImage}
-                              disabled={deletingImage}
-                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                            >
-                              {deletingImage ? (
-                                <span className="animate-pulse">⟳</span>
-                              ) : (
-                                <span>Delete</span>
-                              )}
+                          {imagePreview &&
+                            !uploadingImage && (
+                              <button
+                                type="button"
+                                onClick={
+                                  handleRemoveImage
+                                }
+                                disabled={
+                                  deletingImage
+                                }
+                                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                              >
+                                {deletingImage ? (
+                                  <span className="animate-pulse">
+                                    ⟳
+                                  </span>
+                                ) : (
+                                  <span>
+                                    Delete
+                                  </span>
+                                )}
 
-                              Remove
-                            </button>
-                          )}
+                                Remove
+                              </button>
+                            )}
                         </div>
 
                         <p className="mt-3 text-xs leading-5 text-slate-500">
-                          Upload a professional profile picture.
-                          JPG, PNG or WEBP. Maximum file size:
-                          5 MB.
+                          Upload a professional profile
+                          picture. JPG, PNG or WEBP.
+                          Maximum file size: 5 MB.
                         </p>
 
                         <p className="mt-1 text-xs text-slate-400">
-                          The image will be stored securely in
-                          CURA's image storage and displayed on
-                          the public Team page.
+                          The image will be stored securely
+                          in CURA&apos;s image storage and
+                          displayed on the public Team page.
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                {/* SHORT BIOGRAPHY */}
 
                 <div className="md:col-span-2">
                   <label
@@ -990,8 +926,6 @@ export default function AdminTeamPage() {
                   />
                 </div>
 
-                {/* PROFESSIONAL BIOGRAPHY */}
-
                 <div className="md:col-span-2">
                   <label
                     htmlFor="professional-bio"
@@ -1014,8 +948,6 @@ export default function AdminTeamPage() {
                     className="w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-slate-400 focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                   />
                 </div>
-
-                {/* LINKEDIN */}
 
                 <div>
                   <label
@@ -1040,8 +972,6 @@ export default function AdminTeamPage() {
                   />
                 </div>
 
-                {/* PUBLISHED */}
-
                 <div className="flex items-center">
                   <label className="flex cursor-pointer items-start gap-3">
                     <input
@@ -1062,20 +992,21 @@ export default function AdminTeamPage() {
                       </span>
 
                       <span className="mt-1 block text-xs text-slate-500">
-                        Show this member on the public Team page.
+                        Show this member on the public Team
+                        page.
                       </span>
                     </span>
                   </label>
                 </div>
               </div>
 
-              {/* FORM ACTIONS */}
-
               <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={resetForm}
-                  disabled={saving || uploadingImage}
+                  disabled={
+                    saving || uploadingImage
+                  }
                   className="rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
@@ -1083,11 +1014,15 @@ export default function AdminTeamPage() {
 
                 <button
                   type="submit"
-                  disabled={saving || uploadingImage}
+                  disabled={
+                    saving || uploadingImage
+                  }
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b2a55] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving && (
-                    <span className="animate-pulse">⟳</span>
+                    <span className="animate-pulse">
+                      ⟳
+                    </span>
                   )}
 
                   {saving
@@ -1100,10 +1035,6 @@ export default function AdminTeamPage() {
             </form>
           </section>
         )}
-
-        {/* ====================================================
-            TEAM LIST
-        ==================================================== */}
 
         {!showForm && (
           <section>
@@ -1129,7 +1060,9 @@ export default function AdminTeamPage() {
             {members.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf8fd] text-[#087dcc]">
-                  <span className="text-2xl">▧</span>
+                  <span className="text-2xl">
+                    ▧
+                  </span>
                 </div>
 
                 <h4 className="mt-5 text-lg font-bold text-[#071d41]">
@@ -1137,8 +1070,8 @@ export default function AdminTeamPage() {
                 </h4>
 
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                  Add your first CURA team member to begin
-                  building the public Team page.
+                  Add your first CURA team member to
+                  begin building the public Team page.
                 </p>
 
                 <button
@@ -1157,8 +1090,6 @@ export default function AdminTeamPage() {
                     key={member.id}
                     className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                   >
-                    {/* MEMBER IMAGE */}
-
                     <div className="relative h-64 bg-slate-100">
                       {member.image_url ? (
                         <img
@@ -1168,7 +1099,9 @@ export default function AdminTeamPage() {
                         />
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center text-slate-400">
-                          <span className="text-4xl">▧</span>
+                          <span className="text-4xl">
+                            ▧
+                          </span>
 
                           <span className="mt-2 text-sm">
                             No profile picture
@@ -1190,8 +1123,6 @@ export default function AdminTeamPage() {
                         </span>
                       </div>
                     </div>
-
-                    {/* MEMBER DETAILS */}
 
                     <div className="p-5">
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#18b8ee]">
@@ -1219,27 +1150,32 @@ export default function AdminTeamPage() {
                         </p>
                       )}
 
-                      {/* ACTIONS */}
-
-                      <div className="mt-5 flex gap-2 border-t border-slate-100 pt-4">
+                      <div className="mt-5 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4">
                         <button
                           type="button"
                           onClick={() =>
                             openEditForm(member)
                           }
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
+                          className="inline-flex items-center justify-center rounded-lg bg-[#061b3d] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
                         >
                           Edit
                         </button>
+
+                        <Link
+                          href={`/admin/team/${member.id}`}
+                          className="inline-flex items-center justify-center rounded-lg border border-[#b9e8f7] bg-[#effbff] px-4 py-2.5 text-sm font-semibold text-[#087dcc] transition hover:bg-[#e2f8ff]"
+                        >
+                          Professional Details
+                        </Link>
 
                         <button
                           type="button"
                           onClick={() =>
                             handleDelete(member)
                           }
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                          className="col-span-2 inline-flex items-center justify-center rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                         >
-                          <span>Delete</span>
+                          Remove Team Member
                         </button>
                       </div>
                     </div>
@@ -1249,10 +1185,6 @@ export default function AdminTeamPage() {
             )}
           </section>
         )}
-
-        {/* ====================================================
-            INFORMATION NOTICE
-        ==================================================== */}
 
         <section className="mt-10 rounded-2xl border border-[#b9e8f7] bg-[#effbff] p-6">
           <div className="flex gap-4">
@@ -1266,25 +1198,22 @@ export default function AdminTeamPage() {
               </h4>
 
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Profile pictures are uploaded directly to
-                Supabase Storage. The image URL is then saved
-                with the team member profile. You do not need
-                to enter an image URL manually.
+                Profile pictures are uploaded directly
+                to Supabase Storage. The image URL is
+                then saved with the team member profile.
+                You do not need to enter an image URL
+                manually.
               </p>
             </div>
           </div>
         </section>
       </div>
 
-      {/* ======================================================
-          FOOTER
-      ====================================================== */}
-
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {new Date().getFullYear()} CURA. All rights
-            reserved.
+            © {new Date().getFullYear()} CURA. All
+            rights reserved.
           </p>
 
           <a

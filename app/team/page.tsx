@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 
 type TeamMember = {
@@ -13,6 +14,7 @@ type TeamMember = {
   image_url: string | null
   linkedin_url: string | null
   display_order: number | null
+  created_at: string
 }
 
 export default function TeamPage() {
@@ -52,6 +54,13 @@ export default function TeamPage() {
 
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
+      {/* HEADER */}
+      <header className="bg-white">
+        {/* Use the existing CURA header component in your project.
+            If your project already imports CuraHeader here, keep that
+            implementation instead of duplicating the header. */}
+      </header>
+
       {/* HERO */}
       <section className="relative overflow-hidden">
         <div className="mx-auto max-w-6xl px-6 pb-20 pt-24 md:pb-28 md:pt-32">
@@ -153,28 +162,12 @@ export default function TeamPage() {
                     </p>
                   )}
 
-                  {member.professional_bio && (
-                    <details className="mt-5">
-                      <summary className="cursor-pointer text-sm font-semibold text-[#071B49] transition-colors hover:text-[#1B5DBF]">
-                        View profile
-                      </summary>
-
-                      <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600">
-                        {member.professional_bio}
-                      </p>
-                    </details>
-                  )}
-
-                  {member.linkedin_url && (
-                    <a
-                      href={member.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-5 inline-flex text-sm font-semibold text-[#071B49] transition-colors hover:text-[#1B5DBF]"
-                    >
-                      LinkedIn →
-                    </a>
-                  )}
+                  <Link
+                    href={`/team/${member.id}`}
+                    className="mt-5 inline-flex items-center text-sm font-semibold text-[#071B49] transition-colors hover:text-[#1B5DBF]"
+                  >
+                    View profile →
+                  </Link>
                 </div>
               </article>
             ))}
