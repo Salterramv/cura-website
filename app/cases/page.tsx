@@ -40,9 +40,11 @@ type DisplayCase = LegalCase & {
   issues: string[]
   analysisStatus: string | null
   hasAnalysis: boolean
+  isCivilCourt: boolean
 }
 
 const COURTS = [
+  "Civil Court",
   "Tax Appeal Tribunal",
   "High Court",
   "Supreme Court",
@@ -76,6 +78,36 @@ function normalizeCourt(court: string | null): string | null {
   }
 
   return null
+}
+
+/*
+ * Civil Court cases are identified by the MIRA case reference.
+ *
+ * Examples:
+ *   3928/Cv-C/2021
+ *   227/Cv-C-HD/2020
+ *   4853-CVC-2025
+ *
+ * The database category is also checked as a fallback, but the
+ * case-reference pattern is the primary identifier because some
+ * older records were previously stored as "Tax Legal Case".
+ */
+function isCivilCourtCase(
+  caseNumber: string | null,
+  category: string | null,
+): boolean {
+  const reference = (caseNumber || "").trim()
+
+  const hasCivilReference =
+    /(?:^|[\/\-\s])cv(?:c)?(?:[\/\-\s]|$)/i.test(
+      reference,
+    )
+
+  const hasCivilCategory =
+    (category || "").trim().toLowerCase() ===
+    "civil court case"
+
+  return hasCivilReference || hasCivilCategory
 }
 
 function isHumanVerified(status: string | null) {
@@ -325,6 +357,11 @@ export default function CasesPage() {
 
           hasAnalysis:
             analysisMap.has(item.id),
+
+          isCivilCourt: isCivilCourtCase(
+            firstProceeding?.case_number || null,
+            item.category,
+          ),
         }
       })
 
@@ -426,9 +463,11 @@ export default function CasesPage() {
        */
       const matchesCategory =
         selectedCategory === "All" ||
-        item.courts.includes(
-          selectedCategory
-        )
+        (selectedCategory === "Civil Court"
+          ? item.isCivilCourt
+          : item.courts.includes(
+              selectedCategory
+            ))
 
       /*
        * Issue filter remains independent
@@ -665,33 +704,52 @@ export default function CasesPage() {
 
                       <div className="flex flex-wrap gap-2">
 
-                        {item.courts.length >
-                        0 ? (
-                          item.courts.map(
-                            (court) => (
-                              <button
-                                key={court}
-                                onClick={() =>
-                                  setSelectedCategory(
-                                    court
-                                  )
-                                }
-                                className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition ${
-                                  selectedCategory ===
-                                  court
-                                    ? "bg-[#071B49] text-white"
-                                    : "bg-red-50 text-[#D71920] hover:bg-red-100"
-                                }`}
-                              >
-                                {court}
-                              </button>
-                            )
-                          )
-                        ) : (
-                          <span className="rounded-full bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[#D71920]">
-                            Tax Legal Case
-                          </span>
+                        {item.isCivilCourt && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedCategory(
+                                "Civil Court"
+                              )
+                            }
+                            className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition ${
+                              selectedCategory ===
+                              "Civil Court"
+                                ? "bg-[#071B49] text-white"
+                                : "bg-blue-50 text-[#168BC4] hover:bg-blue-100"
+                            }`}
+                          >
+                            Civil Court Case
+                          </button>
                         )}
+
+                        {item.courts.map(
+                          (court) => (
+                            <button
+                              key={court}
+                              onClick={() =>
+                                setSelectedCategory(
+                                  court
+                                )
+                              }
+                              className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition ${
+                                selectedCategory ===
+                                court
+                                  ? "bg-[#071B49] text-white"
+                                  : "bg-red-50 text-[#D71920] hover:bg-red-100"
+                              }`}
+                            >
+                              {court}
+                            </button>
+                          )
+                        )}
+
+                        {!item.isCivilCourt &&
+                          item.courts.length === 0 && (
+                            <span className="rounded-full bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[#D71920]">
+                              Tax Legal Case
+                            </span>
+                          )}
 
                       </div>
 
