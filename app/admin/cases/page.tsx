@@ -489,12 +489,13 @@ export default function AdminCasesPage() {
       return
     }
 
-    if (!proceeding.id) {
-      setError("This proceeding has not been saved yet. Save the case before finding its official source.")
-      return
-    }
-
-    const proceedingId = proceeding.id
+    /*
+     * Source discovery does not require the proceeding to have a database ID.
+     * New proceedings can be searched immediately; the result is kept in the
+     * current editor state and can be saved with the case afterward.
+     */
+    const proceedingId =
+      proceeding.id || `new-${proceeding.court}-${proceeding.case_number.trim()}`
 
     setFindingSourceId(proceedingId)
     setError("")
@@ -558,7 +559,9 @@ export default function AdminCasesPage() {
   ) {
     setProceedings((current) =>
       current.map((item) =>
-        item.id === proceedingId
+        (item.id === proceedingId ||
+          (!item.id &&
+            `new-${item.court}-${item.case_number.trim()}` === proceedingId))
           ? {
               ...item,
               source_url: candidate.url || "",
@@ -628,11 +631,38 @@ export default function AdminCasesPage() {
         throw new Error(data.error)
       }
 
-      const generatedData = data?.analysis?.generated_data
+      /*
+       * The Edge Function returns the analysis version/id after saving the
+       * generated JSON to legal_case_analyses. Fetch that saved version
+       * directly instead of expecting the whole generated_data object in
+       * the function response.
+       */
+      const analysisVersion = data?.analysis?.version
+
+      let generatedData = data?.analysis?.generated_data ?? null
+
+      if (!generatedData) {
+        const { data: savedAnalysis, error: savedAnalysisError } =
+          await supabase
+            .from("legal_case_analyses")
+            .select("generated_data, version, status")
+            .eq("case_id", selectedId)
+            .order("version", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (savedAnalysisError) {
+          throw new Error(savedAnalysisError.message)
+        }
+
+        generatedData = savedAnalysis?.generated_data ?? null
+      }
 
       if (!generatedData) {
         throw new Error(
-          "CURA AI completed the analysis but returned no case data.",
+          analysisVersion
+            ? `CURA AI completed Version ${analysisVersion}, but the saved analysis could not be loaded.`
+            : "CURA AI completed the analysis but the saved analysis could not be loaded.",
         )
       }
 
