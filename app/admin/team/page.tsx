@@ -2,17 +2,6 @@
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Image as ImageIcon,
-  Loader2,
-  Pencil,
-  Plus,
-  Trash2,
-  Upload,
-  X,
-} from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 type TeamMember = {
@@ -638,7 +627,7 @@ export default function AdminTeamPage() {
           onClick={() => router.push("/admin")}
           className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-[#087dcc]"
         >
-          <ArrowLeft className="h-4 w-4" />
+          ←
           Back to Administration
         </button>
 
@@ -667,7 +656,7 @@ export default function AdminTeamPage() {
                 onClick={openAddForm}
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b2a55]"
               >
-                <Plus className="h-4 w-4" />
+                +
                 Add Team Member
               </button>
             )}
@@ -678,7 +667,7 @@ export default function AdminTeamPage() {
 
         {success && (
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+            <span className="mt-0.5 shrink-0">✓</span>
 
             <div className="flex-1">
               <p className="font-semibold">
@@ -695,7 +684,7 @@ export default function AdminTeamPage() {
               onClick={() => setSuccess("")}
               className="text-emerald-600 hover:text-emerald-900"
             >
-              <X className="h-4 w-4" />
+              ×
             </button>
           </div>
         )}
@@ -717,7 +706,7 @@ export default function AdminTeamPage() {
               onClick={() => setError("")}
               className="text-red-600 hover:text-red-900"
             >
-              <X className="h-4 w-4" />
+              ×
             </button>
           </div>
         )}
@@ -887,7 +876,7 @@ export default function AdminTeamPage() {
                           />
                         ) : (
                           <div className="flex h-full w-full flex-col items-center justify-center text-slate-400">
-                            <ImageIcon className="mb-2 h-8 w-8" />
+                            <span className="mb-2 text-2xl">▧</span>
 
                             <span className="text-xs">
                               No photo
@@ -897,7 +886,7 @@ export default function AdminTeamPage() {
 
                         {uploadingImage && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#061b3d]/80 text-white">
-                            <Loader2 className="mb-2 h-6 w-6 animate-spin" />
+                            <span className="mb-2 text-lg animate-pulse">⟳</span>
 
                             <span className="text-xs font-semibold">
                               Uploading...
@@ -920,12 +909,12 @@ export default function AdminTeamPage() {
                           >
                             {uploadingImage ? (
                               <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span className="animate-pulse">⟳</span>
                                 Uploading...
                               </>
                             ) : (
                               <>
-                                <Upload className="h-4 w-4" />
+                                ↑
                                 {imagePreview
                                   ? "Replace Image"
                                   : "Choose Image"}
@@ -950,9 +939,9 @@ export default function AdminTeamPage() {
                               className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                             >
                               {deletingImage ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span className="animate-pulse">⟳</span>
                               ) : (
-                                <Trash2 className="h-4 w-4" />
+                                <span>Delete</span>
                               )}
 
                               Remove
@@ -1098,7 +1087,7 @@ export default function AdminTeamPage() {
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b2a55] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="animate-pulse">⟳</span>
                   )}
 
                   {saving
@@ -1140,7 +1129,7 @@ export default function AdminTeamPage() {
             {members.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf8fd] text-[#087dcc]">
-                  <ImageIcon className="h-7 w-7" />
+                  <span className="text-2xl">▧</span>
                 </div>
 
                 <h4 className="mt-5 text-lg font-bold text-[#071d41]">
@@ -1157,7 +1146,7 @@ export default function AdminTeamPage() {
                   onClick={openAddForm}
                   className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#061b3d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
                 >
-                  <Plus className="h-4 w-4" />
+                  +
                   Add Team Member
                 </button>
               </div>
@@ -1179,7 +1168,7 @@ export default function AdminTeamPage() {
                         />
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center text-slate-400">
-                          <ImageIcon className="h-12 w-12" />
+                          <span className="text-4xl">▧</span>
 
                           <span className="mt-2 text-sm">
                             No profile picture
@@ -1240,7 +1229,7 @@ export default function AdminTeamPage() {
                           }
                           className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#061b3d] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0b2a55]"
                         >
-                          <Pencil className="h-4 w-4" />
+                          Edit
                           Edit
                         </button>
 
@@ -1251,8 +1240,8 @@ export default function AdminTeamPage() {
                           }
                           className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                         >
-                          <Trash2 className="h-4 w-4" />
-                          Delete
+                                <span>Delete</span>
+                                <span>Delete</span>
                         </button>
                       </div>
                     </div>
