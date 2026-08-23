@@ -173,7 +173,13 @@ export default function Home() {
           {services.map((service, index) => (
             <a
               key={service.title}
-              href={service.title === "Exchange Rates" ? "/exchange-rate" : "/articles"}
+              href={
+  service.title === "Education"
+    ? "/education"
+    : service.title === "Exchange Rates"
+      ? "/exchange-rate"
+      : "/articles"
+}
               className={`group p-7 transition hover:bg-slate-50 ${
                 index !== services.length - 1
                   ? "border-b border-slate-200 md:border-b-0 md:border-r"
