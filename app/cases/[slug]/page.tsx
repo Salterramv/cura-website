@@ -1377,11 +1377,9 @@ export default async function CasePage({
 
       {sources.length > 0 && (
         <section className="bg-[#061936]">
-
           <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
 
             <div className="max-w-3xl">
-
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#62C4EA]">
                 OFFICIAL SOURCES
               </p>
@@ -1391,124 +1389,80 @@ export default async function CasePage({
               </h2>
 
               <p className="mt-4 text-sm leading-7 text-slate-400">
-                Official MIRA case records and court proceedings used
-                in preparing the information presented on this page.
+                Official judgments, decisions, case records and court
+                proceedings used in preparing the information presented
+                on this page.
               </p>
-
             </div>
 
-            <div className="mt-10 space-y-8">
+            <div className="mt-10 grid gap-4 md:grid-cols-2">
+              {sources.map((source) => {
+                const sourceType =
+                  source.source_type?.trim() || "Official Source"
 
-              {/* MIRA CASE RECORD */}
+                const normalizedType = sourceType.toLowerCase()
 
-              {sources
-                .filter(
-                  (source) =>
-                    source.source_type === "Official MIRA Case Record",
-                )
-                .map((source) => (
-                  <div key={source.id}>
+                const isMiraRecord =
+                  normalizedType === "official mira case record"
 
-                    <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#62C4EA]">
-                      MIRA CASE RECORD
-                    </p>
+                const isJudgment =
+                  normalizedType.includes("judgment") ||
+                  normalizedType.includes("decision") ||
+                  normalizedType.includes("judgement")
 
-                    <a
-                      href={source.url || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group block rounded-xl border border-white/10 bg-white/5 p-5 transition hover:border-[#62C4EA]/40 hover:bg-white/10"
-                    >
+                const label = isMiraRecord
+                  ? "MIRA CASE RECORD"
+                  : isJudgment
+                    ? "JUDGMENT / DECISION"
+                    : "OFFICIAL PROCEEDING"
 
-                      <div className="flex items-center justify-between gap-5">
+                const description = isMiraRecord
+                  ? "Official MIRA case record / case listing"
+                  : isJudgment
+                    ? "Official judgment or decision document"
+                    : sourceType
 
-                        <div>
-                          <p className="text-base font-semibold text-white">
-                            MIRA Case Record
-                          </p>
-
-                          <p className="mt-1 text-sm text-slate-400">
-                            Official MIRA case record / case listing
-                          </p>
-                        </div>
-
-                        <span className="shrink-0 text-sm font-semibold text-[#62C4EA] transition group-hover:translate-x-1">
-                          View record ↗
+                return (
+                  <a
+                    key={source.id}
+                    href={source.url || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group block rounded-xl border border-white/10 bg-white/5 p-5 transition hover:border-[#62C4EA]/40 hover:bg-white/10"
+                  >
+                    <div className="flex items-start justify-between gap-5">
+                      <div className="min-w-0">
+                        <span
+                          className={`inline-flex rounded px-2 py-1 text-[8px] font-bold uppercase tracking-[0.13em] ${
+                            isJudgment
+                              ? "bg-[#D71920]/15 text-[#FF7B82]"
+                              : isMiraRecord
+                                ? "bg-[#62C4EA]/10 text-[#62C4EA]"
+                                : "bg-white/10 text-slate-300"
+                          }`}
+                        >
+                          {label}
                         </span>
 
+                        <p className="mt-3 text-sm font-semibold leading-6 text-white">
+                          {source.title || "Official source"}
+                        </p>
+
+                        <p className="mt-2 text-xs leading-5 text-slate-400">
+                          {description}
+                        </p>
                       </div>
 
-                    </a>
-
-                  </div>
-                ))}
-
-              {/* PROCEEDINGS AND DOCUMENTS */}
-
-              {sources.some(
-                (source) =>
-                  source.source_type !== "Official MIRA Case Record",
-              ) && (
-                <div>
-
-                  <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#62C4EA]">
-                    OFFICIAL PROCEEDINGS &amp; DOCUMENTS
-                  </p>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-
-                    {sources
-                      .filter(
-                        (source) =>
-                          source.source_type !==
-                          "Official MIRA Case Record",
-                      )
-                      .map((source) => (
-                        <a
-                          key={source.id}
-                          href={source.url || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group rounded-xl border border-white/10 bg-white/5 p-5 transition hover:border-[#62C4EA]/40 hover:bg-white/10"
-                        >
-
-                          <div className="flex items-start justify-between gap-4">
-
-                            <div>
-
-                              <span className="inline-flex rounded bg-white/10 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.13em] text-[#62C4EA]">
-                                {source.source_type ||
-                                  "Official Source"}
-                              </span>
-
-                              <p className="mt-3 text-sm font-semibold leading-6 text-white">
-                                {source.title}
-                              </p>
-
-                            </div>
-
-                            <span className="mt-1 shrink-0 text-sm text-slate-500 transition group-hover:text-[#62C4EA]">
-                              ↗
-                            </span>
-
-                          </div>
-
-                          <p className="mt-3 text-xs text-slate-500">
-                            Open official source
-                          </p>
-
-                        </a>
-                      ))}
-
-                  </div>
-
-                </div>
-              )}
-
+                      <span className="mt-1 shrink-0 text-sm font-semibold text-[#62C4EA] transition group-hover:translate-x-1">
+                        ↗
+                      </span>
+                    </div>
+                  </a>
+                )
+              })}
             </div>
 
           </div>
-
         </section>
       )}
 
