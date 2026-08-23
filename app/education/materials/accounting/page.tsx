@@ -276,7 +276,7 @@ export default function AccountingMaterialsPage() {
               <div className="mt-8 flex flex-wrap gap-3">
                 <a
                   href="#learning-path"
-                  className="rounded-full bg-white px-6 py-3 text-sm font-bold text-[#071B49] transition hover:bg-slate-100"
+                  className="rounded-full bg-white px-6 py-3 text-sm font-bold !text-[#071B49] transition hover:bg-slate-100"
                 >
                   Start exploring
                 </a>
