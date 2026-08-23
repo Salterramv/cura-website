@@ -3,167 +3,251 @@
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useMemo, useState } from "react"
-import CuraHeader from "@/components/CuraHeader"
-import CuraFooter from "@/components/CuraFooter"
-import { accountingTopics, type SourceDocument, type SourceSection } from "../data/accountingTopics"
-
-function normalise(value: string) {
-  return value.toLowerCase().replace(/\s+/g, " ").trim()
-}
-
-function isTechnical(text: string) {
-  return /(?:=|×|\*|÷|\+|−|-|%|£|\$|PV|NPV|EPS|NCI|FV|OCI|ROCE|ROE|EBIT)/i.test(text) && text.length < 360
-}
-
-function LessonSection({ section, open, onToggle, search }: { section: SourceSection; open: boolean; onToggle: () => void; search: string }) {
-  const q = normalise(search)
-  const matches = !q || normalise(section.label).includes(q) || section.content.some((line) => normalise(line).includes(q))
-  if (!matches) return null
-
-  const content = q
-    ? section.content.filter((line) => normalise(line).includes(q) || normalise(section.label).includes(q))
-    : section.content
-
-  return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center justify-between gap-4 bg-[#F8FAFD] px-5 py-5 text-left md:px-7">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#168BC4]">Source learning section</p>
-          <h2 className="mt-1 text-base font-semibold md:text-lg">{section.label}</h2>
-        </div>
-        <span className="shrink-0 text-2xl text-[#168BC4]">{open ? "−" : "+"}</span>
-      </button>
-      {open && (
-        <div className="space-y-3 px-5 py-6 md:px-7">
-          {content.map((text, index) => (
-            <div key={`${section.label}-${index}`} className={`rounded-xl p-4 text-[15px] leading-7 ${isTechnical(text) ? "border border-[#BFE6F5] bg-[#EAF6FC] text-[#071B49]" : "bg-[#F8FAFD] text-slate-700"}`}>
-              {isTechnical(text) && <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#168BC4]">Calculation / technical point</p>}
-              <p className="whitespace-pre-wrap">{text}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </article>
-  )
-}
-
-function SourceDocument({ document }: { document: SourceDocument }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <article className="rounded-2xl border border-slate-200 bg-white">
-      <button type="button" onClick={() => setOpen((value) => !value)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#168BC4]">{document.type}</p>
-          <p className="mt-1 break-words text-sm font-semibold text-[#071B49]">{document.path}</p>
-        </div>
-        <span className="shrink-0 text-xl text-[#168BC4]">{open ? "−" : "+"}</span>
-      </button>
-      {open && (
-        <div className="border-t border-slate-100 p-4 md:p-6">
-          <div className="space-y-3">
-            {document.sections.map((section) => (
-              <div key={`${document.path}-${section.label}`} className="rounded-xl bg-[#F8FAFD] p-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#168BC4]">{section.label}</p>
-                <div className="mt-3 space-y-2">
-                  {section.content.map((line, index) => <p key={index} className="whitespace-pre-wrap text-sm leading-7 text-slate-700">{line}</p>)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </article>
-  )
-}
+import { accountingTopics } from "../data/accountingTopics"
 
 export default function AccountingTopicPage() {
-  const params = useParams()
-  const slug = String(params?.slug ?? "")
-  const topic = accountingTopics.find((item) => item.slug === slug)
-  const [search, setSearch] = useState("")
-  const [expandAll, setExpandAll] = useState(false)
-  const [practiceOpen, setPracticeOpen] = useState(false)
+  const params = useParams<{ slug: string }>()
+  const topic = accountingTopics.find((item) => item.slug === params.slug)
+  const [open, setOpen] = useState<number | null>(0)
+  const [answers, setAnswers] = useState<Record<number, number>>({})
+  const [submitted, setSubmitted] = useState(false)
 
-  const visibleCount = useMemo(() => {
+  const score = useMemo(() => {
     if (!topic) return 0
-    const q = normalise(search)
-    if (!q) return topic.sections.length
-    return topic.sections.filter((section) => normalise(section.label).includes(q) || section.content.some((line) => normalise(line).includes(q))).length
-  }, [topic, search])
+    return topic.quiz.reduce(
+      (total, question, index) => total + (answers[index] === question.answer ? 1 : 0),
+      0,
+    )
+  }, [answers, topic])
 
   if (!topic) {
     return (
-      <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]"><CuraHeader /><section className="mx-auto max-w-4xl px-6 py-24 text-center"><p className="text-xs font-bold uppercase tracking-[0.3em] text-[#168BC4]">CURA Education</p><h1 className="mt-4 text-4xl font-semibold">Topic not found</h1><Link href="/education/materials/accounting" className="mt-8 inline-flex rounded-md bg-[#071B49] px-6 py-3 text-sm font-semibold text-white">Back to Accounting</Link></section><CuraFooter /></main>
+      <main className="min-h-screen bg-[#F5F8FC] px-6 py-24 text-[#071B49]">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#168BC4]">CURA Education</p>
+          <h1 className="mt-3 text-3xl font-semibold">Material not found</h1>
+          <Link href="/education/materials/accounting" className="mt-6 inline-block font-semibold text-[#168BC4]">
+            ← Back to Accounting
+          </Link>
+        </div>
+      </main>
     )
   }
 
+  const answered = Object.keys(answers).length
+  const progress = topic.blocks.length ? Math.round(((open ?? 0) + 1) / topic.blocks.length * 100) : 0
+
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
-      <CuraHeader />
-
-      <section className="bg-[#071B49]">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
-          <Link href="/education/materials/accounting" className="text-sm text-[#8FD8F2] hover:text-white">← Accounting Educational Materials</Link>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <span className="rounded-full bg-[#168BC4] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white">CURA Education</span>
-            <span className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200">Topic {String(topic.chapter).padStart(2, "0")}</span>
-          </div>
-          <h1 className="mt-6 max-w-5xl text-4xl font-semibold tracking-tight text-white md:text-6xl">{topic.title}</h1>
-          <p className="mt-6 max-w-4xl text-lg leading-8 text-slate-300">{topic.description}</p>
-        </div>
-      </section>
-
-      <section className="sticky top-0 z-20 border-b border-[#DCE5EF] bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-4 md:flex-row md:items-center md:px-8">
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search this topic…" className="flex-1 rounded-xl border border-slate-200 bg-[#F8FAFD] px-4 py-3 text-sm outline-none focus:border-[#168BC4]" />
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setExpandAll((value) => !value)} className="rounded-xl border border-slate-200 px-4 py-3 text-xs font-semibold">{expandAll ? "Collapse all" : "Expand all"}</button>
-            <span className="rounded-xl bg-[#EAF6FC] px-4 py-3 text-xs font-semibold text-[#168BC4]">{visibleCount} sections</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
-        <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
-          <div className="space-y-4">
-            {topic.sections.map((section, index) => <LessonSection key={`${section.label}-${index}`} section={section} search={search} open={expandAll || Boolean(search)} onToggle={() => setExpandAll(false)} />)}
-          </div>
-          <aside className="h-fit space-y-4 lg:sticky lg:top-24">
-            <div className="rounded-2xl bg-[#071B49] p-6 text-white">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#35B5E5]">Learning map</p>
-              <p className="mt-3 text-3xl font-bold">{topic.sections.length}</p><p className="text-sm text-slate-300">source learning sections</p>
-              <p className="mt-5 text-3xl font-bold">{topic.sourceDocuments.length}</p><p className="text-sm text-slate-300">teaching/source documents</p>
-              <p className="mt-5 text-3xl font-bold">{topic.practiceDocuments.length}</p><p className="text-sm text-slate-300">practice documents</p>
+      <header className="bg-[#071B49] text-white">
+        <div className="mx-auto max-w-6xl px-6 py-14 lg:px-8 lg:py-20">
+          <Link href="/education/materials/accounting" className="text-sm font-semibold text-[#35B5E5]">
+            ← Accounting
+          </Link>
+          <p className="mt-8 text-xs font-bold uppercase tracking-[0.3em] text-[#35B5E5]">CURA Education</p>
+          <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight md:text-6xl">{topic.title}</h1>
+              <p className="mt-4 text-lg text-slate-300">{topic.standard}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">CURA format</p>
-              <p className="mt-3 text-sm leading-7 text-slate-600">The supplied teaching material is presented inside the website as searchable, expandable lessons. Supplementary material is integrated into the relevant topic rather than displayed as a separate source-file chapter.</p>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-slate-200">
+              <div className="font-semibold text-white">Interactive study material</div>
+              <div className="mt-1">{topic.blocks.length} learning sections · {topic.quiz.length} knowledge checks</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section className="mx-auto max-w-6xl px-6 py-10 lg:px-8">
+        <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+          <div>
+            <div className="mb-6 rounded-2xl border border-[#168BC4]/15 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-4 text-sm font-semibold">
+                <span>Study path</span>
+                <span className="text-[#168BC4]">{progress}%</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-[#168BC4] transition-all" style={{ width: `${progress}%` }} />
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Work through the source-derived sections at your own pace. Examples, calculations and explanations are presented as expandable study cards.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {topic.blocks.map((block, index) => {
+                const isOpen = open === index
+                return (
+                  <article key={`${block.title}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setOpen(isOpen ? null : index)}
+                      className="flex w-full items-center justify-between gap-5 px-6 py-5 text-left"
+                    >
+                      <div className="flex min-w-0 items-start gap-4">
+                        <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F1F7FB] text-xs font-bold text-[#168BC4]">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <h2 className="text-lg font-semibold leading-7 text-[#071B49]">{block.title}</h2>
+                      </div>
+                      <span className="shrink-0 text-2xl font-light text-[#168BC4]">{isOpen ? "−" : "+"}</span>
+                    </button>
+
+                    {isOpen && (
+                      <div className="border-t border-slate-100 px-6 pb-7 pt-5">
+                        <div className="space-y-3">
+                          {block.items.map((item, itemIndex) => (
+                            <div key={itemIndex} className="rounded-xl bg-[#F7FAFD] px-4 py-3 text-[15px] leading-7 text-slate-700">
+                              {item}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          </div>
+
+          <aside className="lg:sticky lg:top-6 lg:h-fit">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">Quick navigation</p>
+              <div className="mt-4 max-h-[55vh] space-y-1 overflow-auto pr-1">
+                {topic.blocks.map((block, index) => (
+                  <button
+                    key={`${block.title}-nav-${index}`}
+                    type="button"
+                    onClick={() => {
+                      setOpen(index)
+                      window.scrollTo({ top: Math.max(0, 250 + index * 90), behavior: "smooth" })
+                    }}
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${open === index ? "bg-[#F1F7FB] font-semibold text-[#168BC4]" : "text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    {block.title}
+                  </button>
+                ))}
+              </div>
             </div>
           </aside>
         </div>
       </section>
 
-      <section className="border-t border-[#DCE5EF] bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
-          <button type="button" onClick={() => setPracticeOpen((value) => !value)} className="flex w-full items-center justify-between rounded-2xl bg-[#071B49] px-6 py-5 text-left text-white">
-            <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#35B5E5]">Practice material</p><p className="mt-1 text-xl font-semibold">Practice questions and answer material</p></div>
-            <span className="text-2xl">{practiceOpen ? "−" : "+"}</span>
-          </button>
-          {practiceOpen && <div className="mt-5 space-y-4">{topic.practiceDocuments.map((document) => <SourceDocument key={document.path} document={document} />)}</div>}
-        </div>
-      </section>
+      {topic.practice.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-12 lg:px-8">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-10">
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#168BC4]">Practice material</p>
+            <h2 className="mt-2 text-3xl font-semibold">Work through the supplied questions</h2>
+            <p className="mt-3 max-w-3xl leading-7 text-slate-600">These practice questions and solutions come from the supplied study material. Open the solution only after attempting the question.</p>
+            <div className="mt-7 space-y-3">
+              {topic.practice.map((practice, index) => (
+                <details key={index} className="group rounded-2xl border border-slate-200 bg-[#F7FAFD] p-5">
+                  <summary className="cursor-pointer list-none font-semibold">
+                    <span className="mr-3 text-[#168BC4]">{String(index + 1).padStart(2, "0")}</span>
+                    Practice question
+                    <span className="float-right text-[#168BC4] group-open:rotate-45 transition">+</span>
+                  </summary>
+                  <div className="mt-5 space-y-4 text-sm leading-7 text-slate-700">
+                    <div className="rounded-xl bg-white p-4 whitespace-pre-wrap">{practice.question}</div>
+                    {practice.answer && (
+                      <details className="rounded-xl border border-[#168BC4]/20 bg-white p-4">
+                        <summary className="cursor-pointer font-semibold text-[#168BC4]">Reveal solution</summary>
+                        <div className="mt-4 whitespace-pre-wrap text-slate-700">{practice.answer}</div>
+                      </details>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
-      <section className="bg-[#F5F8FC]">
-        <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">Source reconciliation</p>
-            <h2 className="mt-2 text-2xl font-semibold">Documents included in this topic</h2>
-            <div className="mt-5 flex flex-wrap gap-2">{topic.sourceDocuments.map((doc) => <span key={doc} className="rounded-full bg-[#F1F7FB] px-3 py-2 text-xs font-medium text-slate-700">{doc}</span>)}</div>
+      <section className="mx-auto max-w-6xl px-6 pb-24 lg:px-8">
+        <div className="rounded-3xl bg-[#071B49] p-6 text-white md:p-10">
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#35B5E5]">Knowledge check</p>
+              <h2 className="mt-2 text-3xl font-semibold">Test what you have studied</h2>
+              <p className="mt-3 max-w-2xl leading-7 text-slate-300">
+                These checks are built only from statements contained in the supplied study material. Submit when you are ready to see correct and incorrect answers.
+              </p>
+            </div>
+            {submitted && (
+              <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-center">
+                <div className="text-3xl font-semibold">{score}/{topic.quiz.length}</div>
+                <div className="text-sm text-slate-300">Score</div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-8 space-y-5">
+            {topic.quiz.map((question, index) => {
+              const selected = answers[index]
+              const correct = selected === question.answer
+              return (
+                <div key={index} className="rounded-2xl bg-white p-5 text-[#071B49] md:p-6">
+                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">Question {index + 1}</div>
+                  <h3 className="mt-2 text-lg font-semibold leading-7">{question.question}</h3>
+                  <div className="mt-4 space-y-2">
+                    {question.options.map((option, optionIndex) => {
+                      const isSelected = selected === optionIndex
+                      const isCorrect = submitted && optionIndex === question.answer
+                      const isWrong = submitted && isSelected && !correct
+                      return (
+                        <label
+                          key={optionIndex}
+                          className={`flex cursor-pointer gap-3 rounded-xl border p-4 text-sm leading-6 transition ${
+                            isCorrect ? "border-emerald-400 bg-emerald-50" : isWrong ? "border-red-300 bg-red-50" : isSelected ? "border-[#168BC4] bg-[#F1F7FB]" : "border-slate-200 hover:border-[#168BC4]/50"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={`question-${index}`}
+                            checked={isSelected}
+                            disabled={submitted}
+                            onChange={() => setAnswers((current) => ({ ...current, [index]: optionIndex }))}
+                            className="mt-1"
+                          />
+                          <span>{option}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  {submitted && (
+                    <div className={`mt-4 rounded-xl px-4 py-3 text-sm leading-6 ${correct ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}>
+                      {correct ? "Correct." : `Incorrect. The correct answer is option ${question.answer + 1}.`}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={answered < topic.quiz.length}
+              onClick={() => setSubmitted(true)}
+              className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#071B49] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Submit quiz
+            </button>
+            {submitted && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitted(false)
+                  setAnswers({})
+                }}
+                className="rounded-xl border border-white/20 px-5 py-3 text-sm font-semibold text-white"
+              >
+                Try again
+              </button>
+            )}
           </div>
         </div>
       </section>
-
-      <CuraFooter />
     </main>
   )
 }
