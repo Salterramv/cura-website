@@ -5,9 +5,11 @@ import Link from "next/link"
 
 export default function CuraHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [educationOpen, setEducationOpen] = useState(false)
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false)
+    setEducationOpen(false)
   }
 
   return (
@@ -60,12 +62,90 @@ export default function CuraHeader() {
               Tax Updates
             </Link>
 
-            <Link
-              href="/education"
-              className="text-[#071B49] transition hover:text-[#18b8ee]"
-            >
-              Education
-            </Link>
+            {/* EDUCATION DROPDOWN */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setEducationOpen(!educationOpen)}
+                aria-expanded={educationOpen}
+                className="flex items-center gap-1.5 text-[#071B49] transition hover:text-[#18b8ee]"
+              >
+                <span>Education</span>
+
+                <svg
+                  className={`h-3.5 w-3.5 transition-transform ${
+                    educationOpen ? "rotate-180" : ""
+                  }`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+
+              {educationOpen && (
+                <div className="absolute left-1/2 top-full z-50 mt-4 w-64 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+
+                  <Link
+                    href="/education/materials"
+                    onClick={() => setEducationOpen(false)}
+                    className="block rounded-lg px-4 py-3 text-sm text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
+                  >
+                    <span className="font-semibold">
+                      Educational Materials
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      Study resources and learning materials
+                    </span>
+                  </Link>
+
+                  <Link
+                    href="/education/test"
+                    onClick={() => setEducationOpen(false)}
+                    className="block rounded-lg px-4 py-3 text-sm text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
+                  >
+                    <span className="font-semibold">
+                      Test Your Knowledge
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      Take a timed professional test
+                    </span>
+                  </Link>
+
+                  <Link
+                    href="/articles"
+                    onClick={() => setEducationOpen(false)}
+                    className="block rounded-lg px-4 py-3 text-sm text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
+                  >
+                    <span className="font-semibold">
+                      Technical Articles
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      Tax and professional articles
+                    </span>
+                  </Link>
+
+                  <Link
+                    href="/education/leaderboard"
+                    onClick={() => setEducationOpen(false)}
+                    className="block rounded-lg px-4 py-3 text-sm text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
+                  >
+                    <span className="font-semibold">
+                      Leaderboard
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      See the top test scores
+                    </span>
+                  </Link>
+
+                </div>
+              )}
+            </div>
 
             <Link
               href="/careers"
@@ -145,13 +225,74 @@ export default function CuraHeader() {
                 Tax Updates
               </Link>
 
-              <Link
-                href="/education"
-                onClick={closeMobileMenu}
-                className="border-b border-slate-100 py-3.5 text-sm font-medium text-[#071B49]"
-              >
-                Education
-              </Link>
+              {/* MOBILE EDUCATION */}
+              <div className="border-b border-slate-100">
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEducationOpen(!educationOpen)
+                  }
+                  aria-expanded={educationOpen}
+                  className="flex w-full items-center justify-between py-3.5 text-left text-sm font-medium text-[#071B49]"
+                >
+                  <span>Education</span>
+
+                  <svg
+                    className={`h-4 w-4 transition-transform ${
+                      educationOpen ? "rotate-180" : ""
+                    }`}
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25-4.5a.75.75 0 01-1.08 1.04l-4.25-4.5a.75.75 0 01.02-1.06z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+
+                {educationOpen && (
+                  <div className="pb-3 pl-4">
+
+                    <Link
+                      href="/education/materials"
+                      onClick={closeMobileMenu}
+                      className="block py-2.5 text-sm text-slate-600 hover:text-[#168BC4]"
+                    >
+                      Educational Materials
+                    </Link>
+
+                    <Link
+                      href="/education/test"
+                      onClick={closeMobileMenu}
+                      className="block py-2.5 text-sm text-slate-600 hover:text-[#168BC4]"
+                    >
+                      Test Your Knowledge
+                    </Link>
+
+                    <Link
+                      href="/articles"
+                      onClick={closeMobileMenu}
+                      className="block py-2.5 text-sm text-slate-600 hover:text-[#168BC4]"
+                    >
+                      Technical Articles
+                    </Link>
+
+                    <Link
+                      href="/education/leaderboard"
+                      onClick={closeMobileMenu}
+                      className="block py-2.5 text-sm text-slate-600 hover:text-[#168BC4]"
+                    >
+                      Leaderboard
+                    </Link>
+
+                  </div>
+                )}
+
+              </div>
 
               <Link
                 href="/careers"
