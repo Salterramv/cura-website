@@ -11,47 +11,34 @@ function normalise(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim()
 }
 
-function isFormula(text: string) {
-  return /(?:=|×|\*|÷|\-|\+|£|\$|%|PV|NPV|EPS|NCI|FV|OCI|ROCE|ROE)/i.test(text) && text.length < 320
+function isTechnical(text: string) {
+  return /(?:=|×|\*|÷|\+|−|-|%|£|\$|PV|NPV|EPS|NCI|FV|OCI|ROCE|ROE|EBIT)/i.test(text) && text.length < 360
 }
 
-function Section({ section, open, onToggle, search }: { section: SourceSection; open: boolean; onToggle: () => void; search: string }) {
-  const visible = search
-    ? section.content.filter((item) => normalise(item).includes(normalise(search)))
-    : section.content
+function LessonSection({ section, open, onToggle, search }: { section: SourceSection; open: boolean; onToggle: () => void; search: string }) {
+  const q = normalise(search)
+  const matches = !q || normalise(section.label).includes(q) || section.content.some((line) => normalise(line).includes(q))
+  if (!matches) return null
 
-  if (search && !visible.length && !normalise(section.label).includes(normalise(search))) return null
+  const content = q
+    ? section.content.filter((line) => normalise(line).includes(q) || normalise(section.label).includes(q))
+    : section.content
 
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between gap-5 bg-[#F8FAFD] px-5 py-5 text-left md:px-7"
-        aria-expanded={open}
-      >
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EAF6FC] text-xs font-bold text-[#168BC4]">
-            {section.label.match(/\d+/)?.[0] ?? "•"}
-          </span>
-          <span className="truncate text-base font-semibold md:text-lg">{section.label}</span>
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center justify-between gap-4 bg-[#F8FAFD] px-5 py-5 text-left md:px-7">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#168BC4]">Source learning section</p>
+          <h2 className="mt-1 text-base font-semibold md:text-lg">{section.label}</h2>
         </div>
-        <span className="shrink-0 text-xl text-[#168BC4]">{open ? "−" : "+"}</span>
+        <span className="shrink-0 text-2xl text-[#168BC4]">{open ? "−" : "+"}</span>
       </button>
-
       {open && (
         <div className="space-y-3 px-5 py-6 md:px-7">
-          {visible.map((text, index) => (
-            <div
-              key={`${section.label}-${index}`}
-              className={`rounded-xl p-4 text-[15px] leading-7 ${
-                isFormula(text)
-                  ? "border border-[#BFE6F5] bg-[#EAF6FC] font-medium text-[#071B49]"
-                  : "bg-[#F8FAFD] text-slate-700"
-              }`}
-            >
-              {isFormula(text) && <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#168BC4]">Calculation / key technical point</div>}
-              {text}
+          {content.map((text, index) => (
+            <div key={`${section.label}-${index}`} className={`rounded-xl p-4 text-[15px] leading-7 ${isTechnical(text) ? "border border-[#BFE6F5] bg-[#EAF6FC] text-[#071B49]" : "bg-[#F8FAFD] text-slate-700"}`}>
+              {isTechnical(text) && <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#168BC4]">Calculation / technical point</p>}
+              <p className="whitespace-pre-wrap">{text}</p>
             </div>
           ))}
         </div>
@@ -60,25 +47,25 @@ function Section({ section, open, onToggle, search }: { section: SourceSection; 
   )
 }
 
-function DocumentBlock({ document }: { document: SourceDocument }) {
+function SourceDocument({ document }: { document: SourceDocument }) {
   const [open, setOpen] = useState(false)
   return (
     <article className="rounded-2xl border border-slate-200 bg-white">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">{document.type}</p>
-          <p className="mt-1 text-sm font-semibold text-[#071B49]">{document.path}</p>
+      <button type="button" onClick={() => setOpen((value) => !value)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#168BC4]">{document.type}</p>
+          <p className="mt-1 break-words text-sm font-semibold text-[#071B49]">{document.path}</p>
         </div>
-        <span className="text-xl text-[#168BC4]">{open ? "−" : "+"}</span>
+        <span className="shrink-0 text-xl text-[#168BC4]">{open ? "−" : "+"}</span>
       </button>
       {open && (
         <div className="border-t border-slate-100 p-4 md:p-6">
           <div className="space-y-3">
             {document.sections.map((section) => (
               <div key={`${document.path}-${section.label}`} className="rounded-xl bg-[#F8FAFD] p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#168BC4]">{section.label}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#168BC4]">{section.label}</p>
                 <div className="mt-3 space-y-2">
-                  {section.content.map((line, i) => <p key={i} className="text-sm leading-7 text-slate-700">{line}</p>)}
+                  {section.content.map((line, index) => <p key={index} className="whitespace-pre-wrap text-sm leading-7 text-slate-700">{line}</p>)}
                 </div>
               </div>
             ))}
@@ -91,17 +78,17 @@ function DocumentBlock({ document }: { document: SourceDocument }) {
 
 export default function AccountingTopicPage() {
   const params = useParams()
-  const slug = String(params?.slug || "")
+  const slug = String(params?.slug ?? "")
   const topic = accountingTopics.find((item) => item.slug === slug)
   const [search, setSearch] = useState("")
-  const [openAll, setOpenAll] = useState(false)
+  const [expandAll, setExpandAll] = useState(false)
   const [practiceOpen, setPracticeOpen] = useState(false)
 
   const visibleCount = useMemo(() => {
     if (!topic) return 0
-    if (!search) return topic.sections.length
     const q = normalise(search)
-    return topic.sections.filter((s) => normalise(s.label).includes(q) || s.content.some((x) => normalise(x).includes(q))).length
+    if (!q) return topic.sections.length
+    return topic.sections.filter((section) => normalise(section.label).includes(q) || section.content.some((line) => normalise(line).includes(q))).length
   }, [topic, search])
 
   if (!topic) {
@@ -117,22 +104,20 @@ export default function AccountingTopicPage() {
       <section className="bg-[#071B49]">
         <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
           <Link href="/education/materials/accounting" className="text-sm text-[#8FD8F2] hover:text-white">← Accounting Educational Materials</Link>
-          <div className="mt-9 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap gap-3">
             <span className="rounded-full bg-[#168BC4] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white">CURA Education</span>
-            <span className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200">Chapter {topic.chapter}</span>
+            <span className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200">Topic {String(topic.chapter).padStart(2, "0")}</span>
           </div>
           <h1 className="mt-6 max-w-5xl text-4xl font-semibold tracking-tight text-white md:text-6xl">{topic.title}</h1>
-          <p className="mt-6 max-w-4xl text-lg leading-8 text-slate-300">This learning page preserves the complete source material supplied for this topic and presents it as an interactive web lesson rather than a downloadable slide deck.</p>
+          <p className="mt-6 max-w-4xl text-lg leading-8 text-slate-300">{topic.description}</p>
         </div>
       </section>
 
       <section className="sticky top-0 z-20 border-b border-[#DCE5EF] bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-4 md:flex-row md:items-center md:px-8">
-          <div className="relative flex-1">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search this topic…" className="w-full rounded-xl border border-slate-200 bg-[#F8FAFD] px-4 py-3 text-sm outline-none focus:border-[#168BC4]" />
-          </div>
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search this topic…" className="flex-1 rounded-xl border border-slate-200 bg-[#F8FAFD] px-4 py-3 text-sm outline-none focus:border-[#168BC4]" />
           <div className="flex gap-2">
-            <button type="button" onClick={() => setOpenAll((v) => !v)} className="rounded-xl border border-slate-200 px-4 py-3 text-xs font-semibold text-[#071B49]">{openAll ? "Collapse all" : "Expand all"}</button>
+            <button type="button" onClick={() => setExpandAll((value) => !value)} className="rounded-xl border border-slate-200 px-4 py-3 text-xs font-semibold">{expandAll ? "Collapse all" : "Expand all"}</button>
             <span className="rounded-xl bg-[#EAF6FC] px-4 py-3 text-xs font-semibold text-[#168BC4]">{visibleCount} sections</span>
           </div>
         </div>
@@ -141,22 +126,18 @@ export default function AccountingTopicPage() {
       <section className="mx-auto max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
         <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
           <div className="space-y-4">
-            {topic.sections.map((section, index) => (
-              <Section key={`${section.label}-${index}`} section={section} search={search} open={openAll || Boolean(search)} onToggle={() => setOpenAll(false)} />
-            ))}
+            {topic.sections.map((section, index) => <LessonSection key={`${section.label}-${index}`} section={section} search={search} open={expandAll || Boolean(search)} onToggle={() => setExpandAll(false)} />)}
           </div>
-
           <aside className="h-fit space-y-4 lg:sticky lg:top-24">
             <div className="rounded-2xl bg-[#071B49] p-6 text-white">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#35B5E5]">Learning map</p>
-              <p className="mt-3 text-3xl font-bold">{topic.sections.length}</p>
-              <p className="mt-1 text-sm text-slate-300">source sections</p>
-              <p className="mt-5 text-3xl font-bold">{topic.practiceDocuments.length}</p>
-              <p className="mt-1 text-sm text-slate-300">practice source documents</p>
+              <p className="mt-3 text-3xl font-bold">{topic.sections.length}</p><p className="text-sm text-slate-300">source learning sections</p>
+              <p className="mt-5 text-3xl font-bold">{topic.sourceDocuments.length}</p><p className="text-sm text-slate-300">teaching/source documents</p>
+              <p className="mt-5 text-3xl font-bold">{topic.practiceDocuments.length}</p><p className="text-sm text-slate-300">practice documents</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">Source integrity</p>
-              <p className="mt-3 text-sm leading-7 text-slate-600">The content is generated from the supplied source documents. The site restructures the material for reading and interaction but does not silently replace it with unrelated summaries.</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">CURA format</p>
+              <p className="mt-3 text-sm leading-7 text-slate-600">The supplied teaching material is presented inside the website as searchable, expandable lessons. Supplementary material is integrated into the relevant topic rather than displayed as a separate source-file chapter.</p>
             </div>
           </aside>
         </div>
@@ -164,26 +145,20 @@ export default function AccountingTopicPage() {
 
       <section className="border-t border-[#DCE5EF] bg-white">
         <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
-          <button type="button" onClick={() => setPracticeOpen((v) => !v)} className="flex w-full items-center justify-between rounded-2xl bg-[#071B49] px-6 py-5 text-left text-white">
-            <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#35B5E5]">Practice material</p><p className="mt-1 text-xl font-semibold">Practice questions and answer material from the supplied files</p></div>
+          <button type="button" onClick={() => setPracticeOpen((value) => !value)} className="flex w-full items-center justify-between rounded-2xl bg-[#071B49] px-6 py-5 text-left text-white">
+            <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#35B5E5]">Practice material</p><p className="mt-1 text-xl font-semibold">Practice questions and answer material</p></div>
             <span className="text-2xl">{practiceOpen ? "−" : "+"}</span>
           </button>
-          {practiceOpen && (
-            <div className="mt-5 space-y-4">
-              {topic.practiceDocuments.map((doc) => <DocumentBlock key={doc.path} document={doc} />)}
-            </div>
-          )}
+          {practiceOpen && <div className="mt-5 space-y-4">{topic.practiceDocuments.map((document) => <SourceDocument key={document.path} document={document} />)}</div>}
         </div>
       </section>
 
       <section className="bg-[#F5F8FC]">
         <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">Complete source set</p>
-            <h2 className="mt-2 text-2xl font-semibold">Documents used for this topic</h2>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {topic.sourceDocuments.map((doc) => <span key={doc} className="rounded-full bg-[#F1F7FB] px-3 py-2 text-xs font-medium text-slate-700">{doc}</span>)}
-            </div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">Source reconciliation</p>
+            <h2 className="mt-2 text-2xl font-semibold">Documents included in this topic</h2>
+            <div className="mt-5 flex flex-wrap gap-2">{topic.sourceDocuments.map((doc) => <span key={doc} className="rounded-full bg-[#F1F7FB] px-3 py-2 text-xs font-medium text-slate-700">{doc}</span>)}</div>
           </div>
         </div>
       </section>
