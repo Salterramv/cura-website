@@ -451,26 +451,26 @@ export default function EducationTestPage() {
 
             <div className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row">
               <Link
-                href="/education/leaderboard"
-                className="rounded-md bg-[#071B49] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#0B285E]"
-              >
-                View Leaderboard
-              </Link>
+  href="/education/leaderboard"
+  className="rounded-md bg-[#071B49] px-6 py-3 text-center text-sm font-semibold !text-white hover:bg-[#0B285E]"
+>
+    View Leaderboard
+  </Link>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setResult(null)
-                  setSession(null)
-                  setAnswers({})
-                  setName("")
-                  loadQuiz()
-                }}
-                className="rounded-md border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-[#071B49] hover:bg-slate-50"
-              >
-                Take Another Test
-              </button>
-            </div>
+  <button
+    type="button"
+    onClick={() => {
+      setResult(null)
+      setSession(null)
+      setAnswers({})
+      setName("")
+      loadQuiz()
+    }}
+    className="rounded-md border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-[#071B49] hover:bg-slate-50"
+  >
+    Take Another Test
+  </button>
+</div>
           </div>
         </section>
 
