@@ -61,7 +61,7 @@ export default function CuraHeader() {
             </Link>
 
             <Link
-              href="/#education"
+              href="/education"
               className="text-[#071B49] transition hover:text-[#18b8ee]"
             >
               Education
@@ -146,7 +146,7 @@ export default function CuraHeader() {
               </Link>
 
               <Link
-                href="/#education"
+                href="/education"
                 onClick={closeMobileMenu}
                 className="border-b border-slate-100 py-3.5 text-sm font-medium text-[#071B49]"
               >
