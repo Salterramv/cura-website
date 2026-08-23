@@ -15,7 +15,7 @@ const materials = [
     title: "Accounting",
     description:
       "Practical accounting and financial reporting learning materials.",
-    href: "#accounting",
+    href: "/education/materials/accounting",
   },
   {
     title: "Audit",
