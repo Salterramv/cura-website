@@ -417,7 +417,7 @@ export default function Home() {
             </p>
 
             <a
-              href="#"
+              href="/education"
               className="mt-9 inline-block rounded-md bg-white px-7 py-3.5 text-sm font-semibold text-[#071B49] hover:bg-slate-100"
             >
               Explore Education →
