@@ -26,18 +26,19 @@ type Category = {
 
 const categories: Category[] = [
   {
-    id: "foundations",
-    eyebrow: "01 · Foundations",
-    title: "Build the accounting picture",
-    description:
-      "Start with the concepts that explain why financial statements look the way they do and how accounting decisions are made.",
-    slugs: [
-      "conceptual-framework-fair-value",
-      "published-accounts",
-      "accounting-policies-estimates-errors",
-    ],
-    visual: "foundation",
-  },
+  id: "foundations",
+  eyebrow: "01 · Foundations",
+  title: "Build the accounting picture",
+  description:
+    "Start with the concepts that explain why financial statements look the way they do and how accounting decisions are made.",
+  slugs: [
+    "conceptual-framework-fair-value",
+    "published-accounts",
+    "accounting-policies-estimates-errors",
+    "first-time-adoption-new-standards-ifrs-for-smes",
+  ],
+  visual: "foundation",
+},
   {
     id: "assets",
     eyebrow: "02 · Assets & measurement",
@@ -63,9 +64,10 @@ const categories: Category[] = [
       "revenue",
       "foreign-currency",
       "leases",
-      "financial-assets-liabilities",
       "employee-benefits",
       "share-based-payments",
+      "financial-assets-liabilities",
+      "provisions-contingencies-events-after-reporting-period",
     ],
     visual: "transaction",
   },
@@ -86,31 +88,29 @@ const categories: Category[] = [
   },
   {
     id: "groups",
-    eyebrow: "05 · Group reporting",
-    title: "Think like a group",
-    description:
-      "Move from individual company accounts to control, consolidation, associates, acquisitions and changes in group structure.",
-    slugs: [
-      "consolidated-principles",
-      "consolidated-statement-financial-position",
-      "consolidated-profit-or-loss",
-      "associates",
-      "group-disposals",
-    ],
-    visual: "group",
-  },
+  eyebrow: "05 · Group reporting",
+  title: "Think like a group",
+  description:
+    "Move from individual company accounts to control, consolidation, associates, acquisitions and changes in group structure.",
+  slugs: [
+    "consolidated-financial-statements",
+    "consolidated-statement-financial-position",
+    "consolidated-statement-profit-or-loss",
+    "associates-joint-ventures",
+    "changes-group-structure",
+    "group-disposals",
+  ],
+  visual: "group",
+},
   {
-    id: "transition",
-    eyebrow: "06 · Standards & transition",
-    title: "When the rules change",
-    description:
-      "Understand first-time adoption, new standards and the simplified IFRS for SMEs reporting pathway.",
-    slugs: [
-      "adopting-new-accounting-standards",
-      "ifrs-for-smes",
-    ],
-    visual: "transition",
-  },
+     id: "transition",
+  eyebrow: "06 · Standards & transition",
+  title: "When the rules change",
+  description:
+    "Understand standards transition and implementation issues.",
+  slugs: [],
+  visual: "transition",
+},
 ]
 
 function topicBySlug(slug: string) {
