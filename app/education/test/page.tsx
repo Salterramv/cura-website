@@ -12,6 +12,7 @@ type Quiz = {
   description: string
   category: string
   time_limit_seconds: number
+  question_count: number
 }
 
 type Question = {
@@ -94,6 +95,15 @@ export default function EducationTestPage() {
     [answers],
   )
 
+  /*
+   * Load the available test only.
+   *
+   * IMPORTANT:
+   * Questions are NOT loaded here.
+   *
+   * The Supabase start_education_test function is responsible
+   * for selecting the 10 random questions for this attempt.
+   */
   const loadQuiz = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -123,33 +133,10 @@ export default function EducationTestPage() {
       return
     }
 
-    const { data: questionData, error: questionError } =
-      await supabase
-        .from("education_quiz_questions")
-        .select(
-          "id,quiz_id,question_text,options,points,sort_order",
-        )
-        .eq("quiz_id", quizData.id)
-        .order("sort_order", {
-          ascending: true,
-        })
-
-    if (questionError) {
-      console.error(questionError)
-      setError("Unable to load the test questions.")
-      setLoading(false)
-      return
-    }
-
-    setQuiz(quizData)
-    setQuestions(
-      (questionData ?? []).map((question) => ({
-        ...question,
-        options: Array.isArray(question.options)
-          ? question.options
-          : [],
-      })),
-    )
+    setQuiz({
+      ...quizData,
+      question_count: 10,
+    })
 
     setLoading(false)
   }, [supabase])
@@ -158,6 +145,12 @@ export default function EducationTestPage() {
     loadQuiz()
   }, [loadQuiz])
 
+  /*
+   * Start the test.
+   *
+   * Supabase selects exactly 10 questions randomly and
+   * creates a test session containing those questions.
+   */
   const startTest = async () => {
     const participantName = name.trim()
 
@@ -181,19 +174,66 @@ export default function EducationTestPage() {
 
     if (startError) {
       console.error(startError)
+
       setError(
-        startError.message || "Unable to start the test.",
+        startError.message ||
+          "Unable to start the test.",
       )
+
       setStarting(false)
       return
     }
 
-    setSession(data as TestSession)
+    /*
+     * Expected response from Supabase:
+     *
+     * {
+     *   session_id,
+     *   quiz_id,
+     *   participant_name,
+     *   started_at,
+     *   expires_at,
+     *   time_limit_seconds,
+     *   questions
+     * }
+     */
+
+    const returnedSession =
+      data as TestSession & {
+        questions: Question[]
+      }
+
+    setSession({
+      session_id: returnedSession.session_id,
+      quiz_id: returnedSession.quiz_id,
+      participant_name:
+        returnedSession.participant_name,
+      started_at: returnedSession.started_at,
+      expires_at: returnedSession.expires_at,
+      time_limit_seconds:
+        returnedSession.time_limit_seconds,
+    })
+
+    /*
+     * These are the 10 questions selected by Supabase.
+     */
+    setQuestions(
+      (returnedSession.questions ?? []).map(
+        (question, index) => ({
+          ...question,
+          sort_order: index,
+          options: Array.isArray(question.options)
+            ? question.options
+            : [],
+        }),
+      ),
+    )
+
     setAnswers({})
     setResult(null)
 
     setTimeRemaining(
-      Number(data.time_limit_seconds),
+      Number(returnedSession.time_limit_seconds),
     )
 
     setStarting(false)
@@ -207,36 +247,48 @@ export default function EducationTestPage() {
     setSubmitting(true)
     setError("")
 
-    const answerPayload = questions.map((question) => ({
-      question_id: question.id,
-      selected_option:
-        answers[question.id] ?? null,
-    }))
+    const answerPayload = questions.map(
+      (question) => ({
+        question_id: question.id,
+        selected_option:
+          answers[question.id] ?? null,
+      }),
+    )
 
     const elapsedSeconds = Math.max(
       0,
       Math.floor(
         (Date.now() -
-          new Date(session.started_at).getTime()) /
+          new Date(
+            session.started_at,
+          ).getTime()) /
           1000,
       ),
     )
 
     const { data, error: submitError } =
-      await supabase.rpc("submit_education_attempt", {
-        p_quiz_id: quiz.id,
-        p_participant_name: session.participant_name,
-        p_answers: answerPayload,
-        p_duration_seconds: elapsedSeconds,
-        p_session_id: session.session_id,
-      })
+      await supabase.rpc(
+        "submit_education_attempt",
+        {
+          p_quiz_id: quiz.id,
+          p_participant_name:
+            session.participant_name,
+          p_answers: answerPayload,
+          p_duration_seconds:
+            elapsedSeconds,
+          p_session_id:
+            session.session_id,
+        },
+      )
 
     if (submitError) {
       console.error(submitError)
+
       setError(
         submitError.message ||
           "Unable to submit your test.",
       )
+
       setSubmitting(false)
       return
     }
@@ -254,6 +306,9 @@ export default function EducationTestPage() {
     supabase,
   ])
 
+  /*
+   * Countdown timer.
+   */
   useEffect(() => {
     if (!session || result) return
 
@@ -261,7 +316,9 @@ export default function EducationTestPage() {
       const remaining = Math.max(
         0,
         Math.ceil(
-          (new Date(session.expires_at).getTime() -
+          (new Date(
+            session.expires_at,
+          ).getTime() -
             Date.now()) /
             1000,
         ),
@@ -278,7 +335,11 @@ export default function EducationTestPage() {
     return () => {
       window.clearInterval(interval)
     }
-  }, [session, result, submitTest])
+  }, [
+    session,
+    result,
+    submitTest,
+  ])
 
   const setAnswer = (
     questionId: string,
@@ -292,6 +353,9 @@ export default function EducationTestPage() {
     }))
   }
 
+  /*
+   * Loading screen
+   */
   if (loading) {
     return (
       <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
@@ -310,6 +374,9 @@ export default function EducationTestPage() {
     )
   }
 
+  /*
+   * RESULT SCREEN
+   */
   if (result) {
     return (
       <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
@@ -333,7 +400,9 @@ export default function EducationTestPage() {
 
         <section className="mx-auto max-w-5xl px-6 py-12 lg:px-8 lg:py-20">
           <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-12">
+
             <div className="grid gap-6 text-center sm:grid-cols-3">
+
               <div>
                 <p className="text-sm text-slate-500">
                   Score
@@ -365,9 +434,11 @@ export default function EducationTestPage() {
                   )}
                 </p>
               </div>
+
             </div>
 
             <div className="mt-10 border-t border-slate-200 pt-8">
+
               <h2 className="text-2xl font-semibold">
                 Review your answers
               </h2>
@@ -379,98 +450,112 @@ export default function EducationTestPage() {
                   </p>
 
                   <p className="mt-2 text-sm text-emerald-700">
-                    You answered every question
-                    correctly.
+                    You answered every question correctly.
                   </p>
                 </div>
               ) : (
                 <div className="mt-6 space-y-6">
-                  {result.review.map((item, index) => (
-                    <div
-                      key={item.question_id}
-                      className="rounded-xl border border-red-200 bg-red-50 p-6"
-                    >
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-600">
-                        Question {index + 1} · Incorrect
-                      </p>
 
-                      <h3 className="mt-3 font-semibold leading-7 text-[#071B49]">
-                        {item.question}
-                      </h3>
+                  {result.review.map(
+                    (item, index) => (
+                      <div
+                        key={item.question_id}
+                        className="rounded-xl border border-red-200 bg-red-50 p-6"
+                      >
 
-                      <div className="mt-5 grid gap-4 md:grid-cols-2">
-                        <div className="rounded-lg bg-white p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                            Your answer
-                          </p>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-600">
+                          Question {index + 1} · Incorrect
+                        </p>
 
-                          <p className="mt-2 font-medium text-red-600">
-                            {item.your_answer ??
-                              "Not answered"}
-                          </p>
+                        <h3 className="mt-3 font-semibold leading-7 text-[#071B49]">
+                          {item.question}
+                        </h3>
+
+                        <div className="mt-5 grid gap-4 md:grid-cols-2">
+
+                          <div className="rounded-lg bg-white p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                              Your answer
+                            </p>
+
+                            <p className="mt-2 font-medium text-red-600">
+                              {item.your_answer ??
+                                "Not answered"}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg bg-white p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                              Correct answer
+                            </p>
+
+                            <p className="mt-2 font-medium text-emerald-700">
+                              {item.correct_answer}
+                            </p>
+                          </div>
+
                         </div>
 
-                        <div className="rounded-lg bg-white p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                            Correct answer
-                          </p>
+                        {item.reason && (
+                          <div className="mt-5 rounded-lg bg-white p-5">
 
-                          <p className="mt-2 font-medium text-emerald-700">
-                            {item.correct_answer}
-                          </p>
-                        </div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                              Why?
+                            </p>
+
+                            <p className="mt-2 leading-7 text-slate-700">
+                              {item.reason}
+                            </p>
+
+                            {item.source_url && (
+                              <a
+                                href={item.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-4 inline-block text-sm font-semibold text-[#168BC4] hover:underline"
+                              >
+                                View source →
+                              </a>
+                            )}
+
+                          </div>
+                        )}
+
                       </div>
+                    ),
+                  )}
 
-                      {item.reason && (
-                        <div className="mt-5 rounded-lg bg-white p-5">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                            Why?
-                          </p>
-
-                          <p className="mt-2 leading-7 text-slate-700">
-                            {item.reason}
-                          </p>
-
-                          {item.source_url && (
-                            <a
-                              href={item.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-4 inline-block text-sm font-semibold text-[#168BC4] hover:underline"
-                            >
-                              View source →
-                            </a>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
                 </div>
               )}
+
             </div>
 
             <div className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row">
-              <Link
-  href="/education/leaderboard"
-  className="rounded-md bg-[#071B49] px-6 py-3 text-center text-sm font-semibold !text-white hover:bg-[#0B285E]"
->
-    View Leaderboard
-  </Link>
 
-  <button
-    type="button"
-    onClick={() => {
-      setResult(null)
-      setSession(null)
-      setAnswers({})
-      setName("")
-      loadQuiz()
-    }}
-    className="rounded-md border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-[#071B49] hover:bg-slate-50"
-  >
-    Take Another Test
-  </button>
-</div>
+              <Link
+                href="/education/leaderboard"
+                className="rounded-md bg-[#071B49] px-6 py-3 text-center text-sm font-semibold !text-white hover:bg-[#0B285E]"
+              >
+                View Leaderboard
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setResult(null)
+                  setSession(null)
+                  setAnswers({})
+                  setQuestions([])
+                  setName("")
+                  loadQuiz()
+                }}
+                className="rounded-md border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-[#071B49] hover:bg-slate-50"
+              >
+                Take Another Test
+              </button>
+
+            </div>
+
           </div>
         </section>
 
@@ -479,6 +564,9 @@ export default function EducationTestPage() {
     )
   }
 
+  /*
+   * START SCREEN
+   */
   if (!session) {
     return (
       <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
@@ -486,6 +574,7 @@ export default function EducationTestPage() {
 
         <section className="bg-[#071B49]">
           <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#35B5E5]">
               CURA Education
             </p>
@@ -495,15 +584,19 @@ export default function EducationTestPage() {
             </h1>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-              Challenge yourself with practical questions based
-              on Maldives taxation and CURA learning materials.
+              Challenge yourself with practical questions
+              based on Maldives taxation, accounting standards
+              and CURA learning materials.
             </p>
+
           </div>
         </section>
 
         <section className="mx-auto max-w-3xl px-6 py-12 lg:px-8 lg:py-20">
+
           {quiz && (
             <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-12">
+
               <span className="rounded-full bg-[#E7F4FA] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#0876A8]">
                 {quiz.category}
               </span>
@@ -517,13 +610,14 @@ export default function EducationTestPage() {
               </p>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
+
                 <div className="rounded-xl bg-[#F5F8FC] p-5">
                   <p className="text-xs uppercase tracking-wider text-slate-400">
                     Questions
                   </p>
 
                   <p className="mt-2 text-2xl font-semibold">
-                    {questions.length}
+                    10
                   </p>
                 </div>
 
@@ -549,9 +643,11 @@ export default function EducationTestPage() {
                     MCQ
                   </p>
                 </div>
+
               </div>
 
               <div className="mt-10 border-t border-slate-200 pt-8">
+
                 <label
                   htmlFor="participant-name"
                   className="block text-sm font-semibold"
@@ -560,8 +656,7 @@ export default function EducationTestPage() {
                 </label>
 
                 <p className="mt-2 text-sm text-slate-500">
-                  Your name will appear on the CURA
-                  leaderboard.
+                  Your name will appear on the CURA leaderboard.
                 </p>
 
                 <input
@@ -585,18 +680,23 @@ export default function EducationTestPage() {
                 <button
                   type="button"
                   onClick={startTest}
-                  disabled={starting || questions.length === 0}
-                  className="mt-6 w-full rounded-xl bg-[#071B49] px-6 py-4 text-sm font-semibold text-white transition hover:bg-[#0B285E] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={
+                    starting ||
+                    !quiz
+                  }
+                  className="mt-6 w-full rounded-xl bg-[#071B49] px-6 py-4 text-sm font-semibold !text-white transition hover:bg-[#0B285E] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {starting
-                    ? "Starting..."
+                    ? "Preparing your test..."
                     : "Start Test →"}
                 </button>
 
                 <p className="mt-4 text-center text-xs text-slate-400">
-                  The timer begins when you start the test.
+                  Each test contains 10 randomly selected questions.
                 </p>
+
               </div>
+
             </div>
           )}
 
@@ -613,6 +713,7 @@ export default function EducationTestPage() {
               </p>
             </div>
           )}
+
         </section>
 
         <CuraFooter />
@@ -620,12 +721,18 @@ export default function EducationTestPage() {
     )
   }
 
+  /*
+   * ACTIVE TEST
+   */
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
+
       <CuraHeader />
 
       <section className="sticky top-0 z-40 border-b border-white/10 bg-[#071B49] shadow-lg">
+
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4 lg:px-8">
+
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#35B5E5]">
               {quiz?.category}
@@ -643,6 +750,7 @@ export default function EducationTestPage() {
                 : "bg-white/10 text-white"
             }`}
           >
+
             <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">
               Time remaining
             </p>
@@ -650,13 +758,19 @@ export default function EducationTestPage() {
             <p className="mt-1 text-2xl font-bold tabular-nums">
               {formatTime(timeRemaining)}
             </p>
+
           </div>
+
         </div>
+
       </section>
 
       <section className="mx-auto max-w-4xl px-6 py-10 lg:px-8 lg:py-16">
+
         <div className="mb-8 rounded-xl border border-slate-200 bg-white p-5">
+
           <div className="flex items-center justify-between text-sm">
+
             <span className="font-medium">
               Progress
             </span>
@@ -664,9 +778,11 @@ export default function EducationTestPage() {
             <span className="text-slate-500">
               {answeredCount} / {questions.length} answered
             </span>
+
           </div>
 
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+
             <div
               className="h-full rounded-full bg-[#168BC4] transition-all"
               style={{
@@ -679,77 +795,93 @@ export default function EducationTestPage() {
                 }%`,
               }}
             />
+
           </div>
+
         </div>
 
         <div className="space-y-6">
-          {questions.map((question, index) => (
-            <article
-              key={question.id}
-              className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm md:p-9"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-                  Question {index + 1}
-                </p>
 
-                <span className="text-xs text-slate-400">
-                  {question.points}{" "}
-                  {question.points === 1
-                    ? "mark"
-                    : "marks"}
-                </span>
-              </div>
+          {questions.map(
+            (question, index) => (
+              <article
+                key={question.id}
+                className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm md:p-9"
+              >
 
-              <h2 className="mt-4 text-xl font-semibold leading-8 text-[#071B49]">
-                {question.question_text}
-              </h2>
+                <div className="flex items-start justify-between gap-4">
 
-              <div className="mt-6 space-y-3">
-                {question.options.map(
-                  (option, optionIndex) => {
-                    const selected =
-                      answers[question.id] ===
-                      optionIndex
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+                    Question {index + 1} of 10
+                  </p>
 
-                    return (
-                      <button
-                        key={optionIndex}
-                        type="button"
-                        onClick={() =>
-                          setAnswer(
-                            question.id,
-                            optionIndex,
-                          )
-                        }
-                        className={`flex w-full items-start gap-4 rounded-xl border p-4 text-left transition ${
-                          selected
-                            ? "border-[#168BC4] bg-[#E7F4FA]"
-                            : "border-slate-200 bg-white hover:border-[#168BC4]/50 hover:bg-slate-50"
-                        }`}
-                      >
-                        <span
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  <span className="text-xs text-slate-400">
+                    {question.points}{" "}
+                    {question.points === 1
+                      ? "mark"
+                      : "marks"}
+                  </span>
+
+                </div>
+
+                <h2 className="mt-4 text-xl font-semibold leading-8 text-[#071B49]">
+                  {question.question_text}
+                </h2>
+
+                <div className="mt-6 space-y-3">
+
+                  {question.options.map(
+                    (option, optionIndex) => {
+
+                      const selected =
+                        answers[
+                          question.id
+                        ] === optionIndex
+
+                      return (
+                        <button
+                          key={optionIndex}
+                          type="button"
+                          onClick={() =>
+                            setAnswer(
+                              question.id,
+                              optionIndex,
+                            )
+                          }
+                          className={`flex w-full items-start gap-4 rounded-xl border p-4 text-left transition ${
                             selected
-                              ? "bg-[#168BC4] text-white"
-                              : "bg-slate-100 text-slate-500"
+                              ? "border-[#168BC4] bg-[#E7F4FA]"
+                              : "border-slate-200 bg-white hover:border-[#168BC4]/50 hover:bg-slate-50"
                           }`}
                         >
-                          {String.fromCharCode(
-                            65 + optionIndex,
-                          )}
-                        </span>
 
-                        <span className="pt-1 text-sm leading-6">
-                          {option}
-                        </span>
-                      </button>
-                    )
-                  },
-                )}
-              </div>
-            </article>
-          ))}
+                          <span
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                              selected
+                                ? "bg-[#168BC4] text-white"
+                                : "bg-slate-100 text-slate-500"
+                            }`}
+                          >
+                            {String.fromCharCode(
+                              65 + optionIndex,
+                            )}
+                          </span>
+
+                          <span className="pt-1 text-sm leading-6">
+                            {option}
+                          </span>
+
+                        </button>
+                      )
+                    },
+                  )}
+
+                </div>
+
+              </article>
+            ),
+          )}
+
         </div>
 
         {error && (
@@ -759,15 +891,16 @@ export default function EducationTestPage() {
         )}
 
         <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+
             <div>
               <p className="font-semibold">
                 Ready to submit?
               </p>
 
               <p className="mt-1 text-sm text-slate-500">
-                Unanswered questions will be marked
-                incorrect.
+                Unanswered questions will be marked incorrect.
               </p>
             </div>
 
@@ -775,17 +908,21 @@ export default function EducationTestPage() {
               type="button"
               onClick={submitTest}
               disabled={submitting}
-              className="rounded-xl bg-[#D71920] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[#B9151B] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-[#D71920] px-7 py-3.5 text-sm font-semibold !text-white transition hover:bg-[#B9151B] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting
                 ? "Submitting..."
                 : "Submit Test"}
             </button>
+
           </div>
+
         </div>
+
       </section>
 
       <CuraFooter />
+
     </main>
   )
 }
