@@ -159,6 +159,37 @@ const topics = [
       "A separate learning pathway for entities applying the IFRS for SMEs Standard.",
     slug: "ifrs-for-smes",
   },
+
+  // NEW TOPICS
+
+  {
+    title: "Government Grants & Assistance",
+    standard: "IAS 20",
+    description:
+      "Learn recognition, presentation, repayment and disclosure of government grants.",
+    slug: "government-grants",
+  },
+  {
+    title: "Borrowing Costs",
+    standard: "IAS 23",
+    description:
+      "Understand the capitalisation of borrowing costs for qualifying assets.",
+    slug: "borrowing-costs",
+  },
+  {
+    title: "Investment Property",
+    standard: "IAS 40",
+    description:
+      "Learn the recognition, classification and subsequent measurement of investment property.",
+    slug: "investment-property",
+  },
+  {
+    title: "Interim Financial Reporting",
+    standard: "IAS 34",
+    description:
+      "Understand the principles and presentation requirements for interim financial reporting.",
+    slug: "interim-financial-reporting",
+  },
 ]
 
 export default function AccountingMaterialsPage() {
@@ -178,9 +209,8 @@ export default function AccountingMaterialsPage() {
           </h1>
 
           <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-            Explore structured accounting and financial reporting
-            materials covering key accounting standards and practical
-            applications.
+            Explore structured accounting and financial reporting materials
+            covering key accounting standards and practical applications.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -215,9 +245,9 @@ export default function AccountingMaterialsPage() {
           </h2>
 
           <p className="mt-4 leading-7 text-slate-600">
-            Select a topic to begin studying. Each topic will combine
-            explanations, illustrations, practical examples and a quiz
-            designed around the material.
+            Select a topic to begin studying. Each topic combines explanations,
+            illustrations, practical examples and a quiz designed around the
+            material.
           </p>
         </div>
       </section>
@@ -285,8 +315,7 @@ export default function AccountingMaterialsPage() {
               </h3>
 
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Clear explanations of accounting principles and
-                requirements.
+                Clear explanations of accounting principles and requirements.
               </p>
             </div>
 
@@ -300,8 +329,7 @@ export default function AccountingMaterialsPage() {
               </h3>
 
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Practical examples, calculations, diagrams and
-                scenarios.
+                Practical examples, calculations, diagrams and scenarios.
               </p>
             </div>
 
@@ -315,8 +343,8 @@ export default function AccountingMaterialsPage() {
               </h3>
 
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Complete a quiz at the end of each topic to reinforce
-                your learning.
+                Complete a quiz at the end of each topic to reinforce your
+                learning.
               </p>
             </div>
           </div>
