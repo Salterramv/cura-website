@@ -19,23 +19,25 @@ export default function ServiceInquiryForm({
     event.preventDefault()
 
     setSubmitting(true)
-    setError("")
     setSuccess(false)
+    setError("")
 
     const form = event.currentTarget
     const formData = new FormData(form)
 
     const payload = {
-      service_category: category,
-      service_name: service,
-      name: formData.get("name"),
-      business_name: formData.get("business_name"),
-      position: formData.get("position"),
+      service: service.toLowerCase(),
+      full_name: formData.get("name"),
       email: formData.get("email"),
       phone: formData.get("phone"),
-      industry: formData.get("industry"),
-      circumstances: formData.get("circumstances"),
-      assistance: formData.get("assistance"),
+      business_name: formData.get("business_name"),
+      business_type: formData.get("industry"),
+      business_location: "",
+      website: "",
+      current_circumstance: formData.get("circumstances"),
+      assistance_required: formData.get("assistance"),
+      urgency: "Not urgent",
+      preferred_contact_method: "Email",
     }
 
     try {
@@ -49,19 +51,24 @@ export default function ServiceInquiryForm({
 
       const result = await response.json()
 
-      if (!response.ok) {
+      if (!response.ok || !result.ok) {
         throw new Error(
-          result?.error || "Unable to submit your inquiry.",
+          result?.error || "Unable to submit your enquiry.",
         )
       }
 
-      setSuccess(true)
       form.reset()
+      setSuccess(true)
+
+      // Keep the success message visible for a few seconds.
+      window.setTimeout(() => {
+        setSuccess(false)
+      }, 4000)
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to submit your inquiry.",
+          : "Unable to submit your enquiry. Please try again.",
       )
     } finally {
       setSubmitting(false)
@@ -85,7 +92,7 @@ export default function ServiceInquiryForm({
 
           <p className="mt-5 leading-7 text-slate-300">
             Tell us about your business and current circumstances.
-            A member of the CURA team can review your inquiry and
+            A member of the CURA team can review your enquiry and
             get in touch with you.
           </p>
         </div>
@@ -109,7 +116,6 @@ export default function ServiceInquiryForm({
               <label className="text-sm font-semibold">
                 Full name *
               </label>
-
               <input
                 required
                 name="name"
@@ -123,7 +129,6 @@ export default function ServiceInquiryForm({
               <label className="text-sm font-semibold">
                 Business / Company
               </label>
-
               <input
                 name="business_name"
                 type="text"
@@ -136,7 +141,6 @@ export default function ServiceInquiryForm({
               <label className="text-sm font-semibold">
                 Position
               </label>
-
               <input
                 name="position"
                 type="text"
@@ -149,7 +153,6 @@ export default function ServiceInquiryForm({
               <label className="text-sm font-semibold">
                 Industry
               </label>
-
               <input
                 name="industry"
                 type="text"
@@ -162,7 +165,6 @@ export default function ServiceInquiryForm({
               <label className="text-sm font-semibold">
                 Email *
               </label>
-
               <input
                 required
                 name="email"
@@ -176,7 +178,6 @@ export default function ServiceInquiryForm({
               <label className="text-sm font-semibold">
                 Phone
               </label>
-
               <input
                 name="phone"
                 type="tel"
@@ -221,8 +222,8 @@ export default function ServiceInquiryForm({
           )}
 
           {success && (
-            <div className="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-              Thank you. Your inquiry has been submitted to CURA.
+            <div className="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm font-semibold text-green-700">
+              ✓ Enquiry submitted
             </div>
           )}
 
@@ -231,7 +232,7 @@ export default function ServiceInquiryForm({
             disabled={submitting}
             className="mt-8 inline-flex rounded-md bg-[#071B49] px-7 py-3.5 text-sm font-semibold !text-white transition hover:bg-[#0B2A69] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? "Submitting..." : "Submit inquiry →"}
+            {submitting ? "Submitting..." : "Submit enquiry →"}
           </button>
         </form>
       </div>
