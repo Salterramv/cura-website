@@ -234,104 +234,125 @@ const VISUALS: Record<
 }
 
 function clean(text: string) {
-  return text
-    .replace(/\s+/g, " ")
-    .replace(/\s+\d+$/g, "")
-    .replace(/^[-•✓✔–—]\s*/, "")
-    .trim()
+ return text
+   .replace(/\r/g, "")
+   .replace(/[ \t]+/g, " ")
+   .replace(/\s+\d+$/g, "")
+   .trim()
 }
-
 function isNoise(text: string) {
-  const value = clean(text)
-  return (
-    !value ||
-    /^(TUU(?:\s+\d+)?|Homework|FR Knowledge|SBR New Knowledge|Reference\s*-\s*Page)$/i.test(
-      value
-    )
-  )
+ const value = clean(text)
+ return (
+   !value ||
+   /^(TUU(?:\s+\d+)?|Homework|FR Knowledge|SBR New Knowledge|Reference\s*-\s*Page)$/i.test(
+     value
+   )
+ )
 }
-
 function isBullet(text: string) {
-  return /^(?:[-•✓✔–—]|\d+[.)]|[a-zA-Z][.)])\s+/.test(text.trim())
+ return /^(?:[-•✓✔–—]|○|◦|▪|▫|‣|▸)\s+/.test(text.trim()) ||
+   /^\d+[.)]\s+/.test(text.trim()) ||
+   /^[a-zA-Z][.)]\s+/.test(text.trim())
 }
-
+function bulletLevel(text: string) {
+ const value = text.trim()
+ if (/^(?:[-•✓✔–—])\s+/.test(value)) return 0
+ if (/^\d+[.)]\s+/.test(value)) return 0
+ if (/^[a-zA-Z][.)]\s+/.test(value)) return 1
+ if (/^(?:○|◦|▪|▫|‣|▸)\s+/.test(value)) return 1
+ return -1
+}
+function removeBulletMarker(text: string) {
+ return text
+   .trim()
+   .replace(/^(?:[-•✓✔–—]|○|◦|▪|▫|‣|▸)\s+/, "")
+   .replace(/^\d+[.)]\s+/, "")
+   .replace(/^[a-zA-Z][.)]\s+/, "")
+   .trim()
+}
 function isLikelyHeading(text: string) {
-  const value = clean(text)
-  if (!value || value.length > 90) return false
-  if (/[.!?]$/.test(value)) return false
-  if (isBullet(value)) return false
-  if (value.split(" ").length > 11) return false
-
-  return (
-    /^(assets?|liabilities?|equity|income|expenses?|recognition|measurement|initial measurement|subsequent measurement|depreciation|revaluation|impairment|derecognition|obligation|fair value|journal|illustration|example|solution|calculation|summary|key points?|purpose|objective|scope|definitions?|presentation|disclosure|accounting treatment|investor perspective|control|goodwill|non-controlling interest|revenue|leases?|taxation|foreign currency|cash flows?|accounting policies?|accounting estimates?|errors?|provisions?|contingent)/i.test(
-      value
-    ) ||
-    value === value.toUpperCase()
-  )
+ const value = clean(text)
+ if (!value || value.length > 90) return false
+ if (/[.!?]$/.test(value)) return false
+ if (isBullet(value)) return false
+ if (value.split(" ").length > 11) return false
+ return (
+   /^(assets?|liabilities?|equity|income|expenses?|recognition|measurement|initial measurement|subsequent measurement|depreciation|revaluation|impairment|derecognition|obligation|fair value|journal|illustration|example|solution|calculation|summary|key points?|purpose|objective|scope|definitions?|presentation|disclosure|accounting treatment|investor perspective|control|goodwill|non-controlling interest|revenue|leases?|taxation|foreign currency|cash flows?|accounting policies?|accounting estimates?|errors?|provisions?|contingent)/i.test(
+     value
+   ) ||
+   value === value.toUpperCase()
+ )
 }
-
-function sourceBlocks(topic: RawTopic): { title: string; items: string[] }[] {
-  const result: { title: string; items: string[] }[] = []
-
-  const add = (title: string, items: string[]) => {
-    const cleanTitle = clean(title)
-    const cleanItems = items.map(clean).filter((x) => !isNoise(x))
-    if (!cleanTitle && !cleanItems.length) return
-
-    const last = result[result.length - 1]
-    if (last && last.title.toLowerCase() === cleanTitle.toLowerCase()) {
-      last.items.push(...cleanItems)
-    } else {
-      result.push({ title: cleanTitle || "Understanding the topic", items: cleanItems })
-    }
-  }
-
-  if (Array.isArray(topic.blocks)) {
-    for (const block of topic.blocks) {
-      const items = [
-        ...(block.items ?? []),
-        ...(block.content ?? []),
-        ...(block.text ? [block.text] : []),
-      ]
-      add(block.title ?? block.label ?? "", items)
-    }
-  }
-
-  if (Array.isArray(topic.sections)) {
-    for (const block of topic.sections) {
-      const items = [
-        ...(block.items ?? []),
-        ...(block.content ?? []),
-        ...(block.text ? [block.text] : []),
-      ]
-      add(block.title ?? block.label ?? "", items)
-    }
-  }
-
-  if (Array.isArray(topic.slides)) {
-    for (const slide of topic.slides) {
-      const items: string[] = []
-      let currentHeading = clean(slide.title ?? "Understanding the topic")
-
-      for (const item of slide.blocks ?? []) {
-        const text = clean(item.text ?? "")
-        if (isNoise(text)) continue
-
-        // Slide headings become visual sub-headings rather than separate cards.
-        if (isLikelyHeading(text) && !items.length) {
-          currentHeading = text
-        } else {
-          items.push(text)
-        }
-      }
-
-      add(currentHeading, items)
-    }
-  }
-
-  return result
+function sourceBlocks(topic: RawTopic): {
+ title: string
+ items: string[]
+}[] {
+ const result: { title: string; items: string[] }[] = []
+ const add = (title: string, items: string[]) => {
+   const cleanTitle = clean(title)
+   const cleanItems = items
+     .map(clean)
+     .filter((x) => !isNoise(x))
+   if (!cleanTitle && !cleanItems.length) return
+   const last = result[result.length - 1]
+   if (
+     last &&
+     last.title.toLowerCase() === cleanTitle.toLowerCase()
+   ) {
+     last.items.push(...cleanItems)
+   } else {
+     result.push({
+       title: cleanTitle || "Understanding the Topic",
+       items: cleanItems,
+     })
+   }
+ }
+ if (Array.isArray(topic.blocks)) {
+   for (const block of topic.blocks) {
+     const items = [
+       ...(block.items ?? []),
+       ...(block.content ?? []),
+       ...(block.text ? [block.text] : []),
+     ]
+     add(block.title ?? block.label ?? "", items)
+   }
+ }
+ if (Array.isArray(topic.sections)) {
+   for (const block of topic.sections) {
+     const items = [
+       ...(block.items ?? []),
+       ...(block.content ?? []),
+       ...(block.text ? [block.text] : []),
+     ]
+     add(block.title ?? block.label ?? "", items)
+   }
+ }
+ if (Array.isArray(topic.slides)) {
+   for (const slide of topic.slides) {
+     const items: string[] = []
+     let currentHeading = clean(
+       slide.title ?? "Understanding the Topic"
+     )
+     for (const item of slide.blocks ?? []) {
+       /*
+        * IMPORTANT:
+        * Preserve the original bullet marker.
+        * The old renderer removed it here and therefore
+        * could no longer distinguish bullets from paragraphs.
+        */
+       const text = clean(item.text ?? "")
+       if (isNoise(text)) continue
+       if (isLikelyHeading(text) && !items.length) {
+         currentHeading = text
+       } else {
+         items.push(text)
+       }
+     }
+     add(currentHeading, items)
+   }
+ }
+ return result
 }
-
 function findTopic(slug: string): RawTopic | undefined {
   const source = accountingTopics as unknown
 
@@ -491,98 +512,185 @@ function Figure({
 }
 
 function ReadingBlock({
+
   title,
+
   items,
+
   index,
+
 }: {
+
   title: string
+
   items: string[]
+
   index: number
+
 }) {
-  const [open, setOpen] = useState(true)
 
   const paragraphs: string[] = []
+
   const bullets: string[] = []
 
-  for (const raw of items) {
-    const text = clean(raw)
-    if (!text || isNoise(text)) continue
+  const nestedBullets: string[] = []
 
-    if (isBullet(text)) {
-      bullets.push(text.replace(/^(?:[-•✓✔–—]|\d+[.)]|[a-zA-Z][.)])\s+/, ""))
+  const numbered: string[] = []
+
+  for (const raw of items) {
+
+    const item = clean(raw)
+
+    if (!item || isNoise(item)) continue
+
+    if (/^\d+[.)]\s+/.test(item)) {
+
+      numbered.push(item.replace(/^\d+[.)]\s+/, "").trim())
+
+    } else if (/^[a-zA-Z][.)]\s+/.test(item)) {
+
+      nestedBullets.push(item.replace(/^[a-zA-Z][.)]\s+/, "").trim())
+
+    } else if (/^(?:[-•✓✔–—])\s+/.test(item)) {
+
+      bullets.push(removeBulletMarker(item))
+
+    } else if (/^(?:○|◦|▪|▫|‣|▸)\s+/.test(item)) {
+
+      nestedBullets.push(removeBulletMarker(item))
+
     } else {
-      paragraphs.push(text)
+
+      paragraphs.push(item)
+
     }
+
   }
 
-  if (!paragraphs.length && !bullets.length) return null
-
-  const special = /^(journal|illustration|example|solution|calculation)$/i.test(title)
-
   return (
-    <section id={`lesson-${index}`} className="scroll-mt-28 py-8 md:py-10">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="group flex w-full items-start justify-between gap-6 text-left"
-      >
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#168BC4]">
-            {special ? "Applied example" : "Concept"}
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071B49] md:text-3xl">
+<section
+
+      id={`lesson-${index}`}
+
+      className="scroll-mt-28 border-b border-slate-200 py-10 first:pt-2 last:border-b-0"
+>
+<div className="flex items-start gap-4">
+<div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F1F7FB] text-xs font-bold text-[#168BC4]">
+
+          {String(index + 1).padStart(2, "0")}
+</div>
+<div className="min-w-0 flex-1">
+<h2 className="text-2xl font-bold leading-tight tracking-tight text-[#071B49] md:text-3xl">
+
             {title}
-          </h2>
-        </div>
+</h2>
 
-        <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-xl text-[#168BC4] transition group-hover:border-[#168BC4]">
-          {open ? "−" : "+"}
-        </span>
-      </button>
+          {paragraphs.length > 0 && (
+<div className="mt-5 space-y-4">
 
-      {open && (
-        <div className="mt-6">
-          {paragraphs.map((paragraph, index) => (
-            <p
-              key={index}
-              className="mb-5 max-w-4xl text-[16px] leading-8 text-slate-700 md:text-[17px]"
-            >
-              {paragraph}
-            </p>
-          ))}
+              {paragraphs.map((paragraph, itemIndex) => (
+<p
+
+                  key={`paragraph-${itemIndex}`}
+
+                  className="text-[15px] leading-7 text-slate-700 md:text-[16px] md:leading-8"
+>
+
+                  {paragraph}
+</p>
+
+              ))}
+</div>
+
+          )}
 
           {bullets.length > 0 && (
-            <div className="mt-6 grid gap-3 md:grid-cols-2">
-              {bullets.map((bullet, index) => (
-                <div
-                  key={index}
-                  className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                >
-                  <div className="absolute left-0 top-5 h-7 w-1 rounded-r-full bg-[#168BC4]" />
-                  <p className="pl-3 text-[15px] leading-7 text-slate-700">
-                    {bullet}
-                  </p>
-                </div>
-              ))}
-            </div>
+<div className="mt-6 rounded-2xl border border-slate-200 bg-[#F8FBFD] p-5 md:p-6">
+<ul className="space-y-4">
+
+                {bullets.map((bullet, itemIndex) => (
+<li
+
+                    key={`bullet-${itemIndex}`}
+
+                    className="flex items-start gap-3 text-[15px] leading-7 text-slate-700"
+>
+<span className="mt-[9px] h-2 w-2 shrink-0 rounded-full bg-[#168BC4]" />
+<span className="min-w-0">{bullet}</span>
+</li>
+
+                ))}
+</ul>
+</div>
+
           )}
 
-          {special && (
-            <div className="mt-7 rounded-3xl bg-[#071B49] p-6 text-white">
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#35B5E5]">
-                Work it through
-              </p>
-              <p className="mt-2 text-sm leading-7 text-slate-300">
-                Pause here before moving on. Identify the accounting decision,
-                the measurement basis and the resulting financial statement
-                effect.
-              </p>
-            </div>
+          {nestedBullets.length > 0 && (
+<div className="mt-4 ml-3 border-l-2 border-[#35B5E5]/30 pl-5">
+<ul className="space-y-3">
+
+                {nestedBullets.map((bullet, itemIndex) => (
+<li
+
+                    key={`nested-${itemIndex}`}
+
+                    className="flex items-start gap-3 text-[14px] leading-6 text-slate-600 md:text-[15px] md:leading-7"
+>
+<span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#35B5E5]" />
+<span className="min-w-0">{bullet}</span>
+</li>
+
+                ))}
+</ul>
+</div>
+
           )}
-        </div>
-      )}
-    </section>
+
+          {numbered.length > 0 && (
+<div className="mt-6 rounded-2xl border border-[#168BC4]/15 bg-white p-5 shadow-sm md:p-6">
+<ol className="space-y-4">
+
+                {numbered.map((item, itemIndex) => (
+<li
+
+                    key={`numbered-${itemIndex}`}
+
+                    className="flex items-start gap-4 text-[15px] leading-7 text-slate-700"
+>
+<span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#071B49] text-xs font-bold text-white">
+
+                      {itemIndex + 1}
+</span>
+<span className="min-w-0 pt-0.5">{item}</span>
+</li>
+
+                ))}
+</ol>
+</div>
+
+          )}
+
+          {paragraphs.length === 0 &&
+
+            bullets.length === 0 &&
+
+            nestedBullets.length === 0 &&
+
+            numbered.length === 0 && (
+<p className="mt-4 text-sm leading-6 text-slate-500">
+
+                Further detail is provided in the source material for this
+
+                section.
+</p>
+
+            )}
+</div>
+</div>
+</section>
+
   )
+
 }
 
 function Quiz({
