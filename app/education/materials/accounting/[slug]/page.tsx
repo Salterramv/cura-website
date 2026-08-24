@@ -512,186 +512,402 @@ function Figure({
 }
 
 function ReadingBlock({
-
   title,
-
   items,
-
   index,
-
 }: {
-
   title: string
-
   items: string[]
-
   index: number
-
 }) {
+  type TableRow = {
+    label: string
+    amount?: string
+  }
 
   const paragraphs: string[] = []
-
   const bullets: string[] = []
-
   const nestedBullets: string[] = []
-
   const numbered: string[] = []
+  const tableRows: TableRow[] = []
+  const formulaLines: string[] = []
+
+  const isAmount = (value: string) =>
+    /(?:[$£€]\s*)?\(?-?\d[\d,]*(?:\.\d+)?%?\)?$/.test(value.trim())
+
+  const splitTableRow = (value: string): TableRow | null => {
+    const cleaned = value.trim()
+
+    // Explicit table separators from source material
+    if (cleaned.includes("|")) {
+      const parts = cleaned
+        .split("|")
+        .map((part) => part.trim())
+        .filter(Boolean)
+
+      if (parts.length >= 2) {
+        return {
+          label: parts.slice(0, -1).join(" "),
+          amount: parts[parts.length - 1],
+        }
+      }
+    }
+
+    // Tab-separated source tables
+    if (cleaned.includes("\t")) {
+      const parts = cleaned
+        .split(/\t+/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+
+      if (parts.length >= 2) {
+        return {
+          label: parts.slice(0, -1).join(" "),
+          amount: parts[parts.length - 1],
+        }
+      }
+    }
+
+    /*
+     * Accounting calculations commonly arrive from slides as:
+     *
+     * Cost 20,000
+     * Depreciation year 1 (2,000)
+     * Depreciation year 2 (2,000)
+     *
+     * Detect the numeric value at the end and separate it
+     * from the description.
+     */
+    const amountMatch = cleaned.match(
+      /^(.*?)(?:\s+)(\(?[$£€]?\s*-?\d[\d,]*(?:\.\d+)?%?\)?)$/
+    )
+
+    if (amountMatch && amountMatch[1].trim().length > 1) {
+      return {
+        label: amountMatch[1].trim(),
+        amount: amountMatch[2].trim(),
+      }
+    }
+
+    return null
+  }
+
+  const looksLikeCalculationTable = (rows: TableRow[]) => {
+    if (rows.length < 2) return false
+
+    const numericRows = rows.filter((row) => row.amount).length
+
+    return numericRows >= 2 && numericRows / rows.length >= 0.6
+  }
+
+  const pushTableRows = (rows: TableRow[]) => {
+    if (!looksLikeCalculationTable(rows)) return false
+
+    tableRows.push(...rows)
+    return true
+  }
+
+  const pendingRows: TableRow[] = []
 
   for (const raw of items) {
-
     const item = clean(raw)
 
     if (!item || isNoise(item)) continue
 
-    if (/^\d+[.)]\s+/.test(item)) {
-
-      numbered.push(item.replace(/^\d+[.)]\s+/, "").trim())
-
-    } else if (/^[a-zA-Z][.)]\s+/.test(item)) {
-
-      nestedBullets.push(item.replace(/^[a-zA-Z][.)]\s+/, "").trim())
-
-    } else if (/^(?:[-•✓✔–—])\s+/.test(item)) {
-
-      bullets.push(removeBulletMarker(item))
-
-    } else if (/^(?:○|◦|▪|▫|‣|▸)\s+/.test(item)) {
-
-      nestedBullets.push(removeBulletMarker(item))
-
-    } else {
-
-      paragraphs.push(item)
-
+    if (/^[$£€]\s*$/.test(item)) {
+      continue
     }
 
+    if (/^(?:question|solution)$/i.test(item)) {
+      paragraphs.push(item)
+      continue
+    }
+
+    if (
+      /(?:fair value less costs to sell|net realisable value|recoverable amount|carrying amount).*=/i.test(
+        item
+      ) ||
+      /(?:=|\+|-|\×|x|÷)\s*[$£€]?\s*\d[\d,]*/.test(item)
+    ) {
+      formulaLines.push(item)
+      continue
+    }
+
+    const row = splitTableRow(item)
+
+    if (row) {
+      pendingRows.push(row)
+
+      /*
+       * Flush a calculation table when a normal paragraph appears.
+       * The rows are kept together instead of being rendered as
+       * independent paragraphs.
+       */
+      if (pendingRows.length >= 2) {
+        continue
+      }
+    }
+
+    if (pendingRows.length > 0) {
+      if (pushTableRows([...pendingRows])) {
+        pendingRows.length = 0
+        continue
+      }
+
+      pendingRows.length = 0
+    }
+
+    if (/^\d+[.)]\s+/.test(item)) {
+      numbered.push(item.replace(/^\d+[.)]\s+/, "").trim())
+    } else if (/^[a-zA-Z][.)]\s+/.test(item)) {
+      nestedBullets.push(
+        item.replace(/^[a-zA-Z][.)]\s+/, "").trim()
+      )
+    } else if (/^(?:[-•✓✔–—])\s+/.test(item)) {
+      bullets.push(removeBulletMarker(item))
+    } else if (/^(?:○|◦|▪|▫|‣|▸)\s+/.test(item)) {
+      nestedBullets.push(removeBulletMarker(item))
+    } else {
+      paragraphs.push(item)
+    }
   }
 
+  // Flush any remaining calculation rows.
+  if (pendingRows.length >= 2) {
+    pushTableRows(pendingRows)
+  } else {
+    paragraphs.push(...pendingRows.map((row) =>
+      row.amount ? `${row.label} ${row.amount}` : row.label
+    ))
+  }
+
+  const normalizedTitle = title.trim()
+
+  const isQuestion = /^question$/i.test(normalizedTitle)
+  const isSolution = /^solution$/i.test(normalizedTitle)
+
   return (
-<section
-
+    <section
       id={`lesson-${index}`}
-
       className="scroll-mt-28 border-b border-slate-200 py-10 first:pt-2 last:border-b-0"
->
-<div className="flex items-start gap-4">
-<div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F1F7FB] text-xs font-bold text-[#168BC4]">
-
+    >
+      <div className="flex items-start gap-4">
+        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F1F7FB] text-xs font-bold text-[#168BC4]">
           {String(index + 1).padStart(2, "0")}
-</div>
-<div className="min-w-0 flex-1">
-<h2 className="text-2xl font-bold leading-tight tracking-tight text-[#071B49] md:text-3xl">
+        </div>
 
-            {title}
-</h2>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-2xl font-bold leading-tight tracking-tight text-[#071B49] md:text-3xl">
+            {normalizedTitle}
+          </h2>
 
           {paragraphs.length > 0 && (
-<div className="mt-5 space-y-4">
+            <div className="mt-6 space-y-5">
+              {paragraphs.map((paragraph, itemIndex) => {
+                const question =
+                  isQuestion ||
+                  /^at what value|^what is|^calculate|^determine/i.test(
+                    paragraph
+                  )
 
-              {paragraphs.map((paragraph, itemIndex) => (
-<p
+                const solution =
+                  isSolution ||
+                  /^therefore|^hence|^the .* should be/i.test(paragraph)
 
-                  key={`paragraph-${itemIndex}`}
+                if (question) {
+                  return (
+                    <div
+                      key={`paragraph-${itemIndex}`}
+                      className="rounded-2xl border border-[#168BC4]/25 bg-[#F5FAFD] p-5 md:p-6"
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#168BC4] text-lg font-bold text-white">
+                          ?
+                        </div>
+                        <p className="text-[15px] font-semibold leading-7 text-[#071B49] md:text-[16px] md:leading-8">
+                          {paragraph}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                }
 
-                  className="text-[15px] leading-7 text-slate-700 md:text-[16px] md:leading-8"
->
+                if (solution) {
+                  return (
+                    <div
+                      key={`paragraph-${itemIndex}`}
+                      className="rounded-2xl border border-[#168BC4]/20 bg-white p-5 shadow-sm md:p-6"
+                    >
+                      <p className="text-[15px] leading-7 text-slate-700 md:text-[16px] md:leading-8">
+                        {paragraph}
+                      </p>
+                    </div>
+                  )
+                }
 
-                  {paragraph}
-</p>
-
-              ))}
-</div>
-
+                return (
+                  <p
+                    key={`paragraph-${itemIndex}`}
+                    className="text-[15px] leading-7 text-slate-700 md:text-[16px] md:leading-8"
+                  >
+                    {paragraph}
+                  </p>
+                )
+              })}
+            </div>
           )}
 
           {bullets.length > 0 && (
-<div className="mt-6 rounded-2xl border border-slate-200 bg-[#F8FBFD] p-5 md:p-6">
-<ul className="space-y-4">
-
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-[#F8FBFD] p-5 md:p-6">
+              <ul className="space-y-4">
                 {bullets.map((bullet, itemIndex) => (
-<li
-
+                  <li
                     key={`bullet-${itemIndex}`}
-
                     className="flex items-start gap-3 text-[15px] leading-7 text-slate-700"
->
-<span className="mt-[9px] h-2 w-2 shrink-0 rounded-full bg-[#168BC4]" />
-<span className="min-w-0">{bullet}</span>
-</li>
-
+                  >
+                    <span className="mt-[9px] h-2 w-2 shrink-0 rounded-full bg-[#168BC4]" />
+                    <span className="min-w-0">{bullet}</span>
+                  </li>
                 ))}
-</ul>
-</div>
-
+              </ul>
+            </div>
           )}
 
           {nestedBullets.length > 0 && (
-<div className="mt-4 ml-3 border-l-2 border-[#35B5E5]/30 pl-5">
-<ul className="space-y-3">
-
+            <div className="mt-4 ml-3 border-l-2 border-[#35B5E5]/30 pl-5">
+              <ul className="space-y-3">
                 {nestedBullets.map((bullet, itemIndex) => (
-<li
-
+                  <li
                     key={`nested-${itemIndex}`}
-
                     className="flex items-start gap-3 text-[14px] leading-6 text-slate-600 md:text-[15px] md:leading-7"
->
-<span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#35B5E5]" />
-<span className="min-w-0">{bullet}</span>
-</li>
-
+                  >
+                    <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#35B5E5]" />
+                    <span className="min-w-0">{bullet}</span>
+                  </li>
                 ))}
-</ul>
-</div>
-
+              </ul>
+            </div>
           )}
 
           {numbered.length > 0 && (
-<div className="mt-6 rounded-2xl border border-[#168BC4]/15 bg-white p-5 shadow-sm md:p-6">
-<ol className="space-y-4">
-
+            <div className="mt-6 rounded-2xl border border-[#168BC4]/15 bg-white p-5 shadow-sm md:p-6">
+              <ol className="space-y-4">
                 {numbered.map((item, itemIndex) => (
-<li
-
+                  <li
                     key={`numbered-${itemIndex}`}
-
                     className="flex items-start gap-4 text-[15px] leading-7 text-slate-700"
->
-<span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#071B49] text-xs font-bold text-white">
-
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#071B49] text-xs font-bold text-white">
                       {itemIndex + 1}
-</span>
-<span className="min-w-0 pt-0.5">{item}</span>
-</li>
-
+                    </span>
+                    <span className="min-w-0 pt-0.5">{item}</span>
+                  </li>
                 ))}
-</ol>
-</div>
+              </ol>
+            </div>
+          )}
 
+          {tableRows.length > 0 && (
+            <div className="mt-7 overflow-hidden rounded-2xl border border-[#168BC4]/20 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] border-collapse text-left">
+                  <thead>
+                    <tr className="bg-[#071B49] text-white">
+                      <th className="px-5 py-3 text-sm font-semibold">
+                        Particulars
+                      </th>
+                      <th className="w-36 px-5 py-3 text-right text-sm font-semibold">
+                        $
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {tableRows.map((row, rowIndex) => {
+                      const isTotal =
+                        /^(carrying amount|total|net book value|closing balance|profit|loss|fair value|amount)/i.test(
+                          row.label
+                        )
+
+                      return (
+                        <tr
+                          key={`table-row-${rowIndex}`}
+                          className={
+                            isTotal
+                              ? "border-t border-[#168BC4]/30 bg-[#F3F8FC] font-semibold"
+                              : rowIndex % 2 === 0
+                                ? "border-b border-slate-200 bg-white"
+                                : "border-b border-slate-200 bg-[#FAFCFE]"
+                          }
+                        >
+                          <td className="px-5 py-3 text-sm leading-6 text-slate-700">
+                            {row.label}
+                          </td>
+                          <td className="px-5 py-3 text-right text-sm font-medium tabular-nums text-[#071B49]">
+                            {row.amount}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {formulaLines.length > 0 && (
+            <div className="mt-5 space-y-3">
+              {formulaLines.map((formula, formulaIndex) => (
+                <div
+                  key={`formula-${formulaIndex}`}
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-[15px] leading-7 text-slate-700"
+                >
+                  <span className="font-semibold text-emerald-700">
+                    Calculation
+                  </span>
+                  <span className="mx-2 text-emerald-500">→</span>
+                  <span>{formula}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {paragraphs.some((paragraph) =>
+            /should be stated|should be reported|therefore|hence/i.test(
+              paragraph
+            )
+          ) && (
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 md:p-6">
+              <p className="text-[15px] font-semibold leading-7 text-[#071B49] md:text-[16px] md:leading-8">
+                Key conclusion
+              </p>
+              <p className="mt-2 text-[15px] leading-7 text-slate-700 md:text-[16px]">
+                {paragraphs.find((paragraph) =>
+                  /should be stated|should be reported|therefore|hence/i.test(
+                    paragraph
+                  )
+                )}
+              </p>
+            </div>
           )}
 
           {paragraphs.length === 0 &&
-
             bullets.length === 0 &&
-
             nestedBullets.length === 0 &&
-
-            numbered.length === 0 && (
-<p className="mt-4 text-sm leading-6 text-slate-500">
-
+            numbered.length === 0 &&
+            tableRows.length === 0 &&
+            formulaLines.length === 0 && (
+              <p className="mt-4 text-sm leading-6 text-slate-500">
                 Further detail is provided in the source material for this
-
                 section.
-</p>
-
+              </p>
             )}
-</div>
-</div>
-</section>
-
+        </div>
+      </div>
+    </section>
   )
-
 }
+
 
 function Quiz({
   questions,
