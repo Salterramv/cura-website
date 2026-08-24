@@ -1,458 +1,763 @@
 "use client"
 
 import Link from "next/link"
+import { useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
 import { accountingTopics } from "../data/accountingTopics"
 
-type Block = {
-  title: string
-  items: string[]
+type RawItem = {
+  text?: string
+  kind?: string
 }
 
-type Topic = {
-  slug: string
-  title: string
-  standard: string
-  description: string
-  blocks: Block[]
-  quiz: {
-    question: string
-    options: string[]
-    answer: number
-    explanation?: string
-  }[]
-  practice: {
+type RawBlock = {
+  title?: string
+  label?: string
+  text?: string
+  items?: string[]
+  blocks?: RawItem[]
+  content?: string[]
+}
+
+type RawTopic = {
+  slug?: string
+  title?: string
+  standard?: string
+  description?: string
+  source?: string
+  blocks?: RawBlock[]
+  sections?: RawBlock[]
+  slides?: {
+    page?: number
     title?: string
-    question: string
-    answer: string
+    blocks?: RawItem[]
   }[]
+  quiz?: any[]
+  practice?: any[]
+  practiceDocuments?: any[]
 }
 
-const figureBySlug: Record<string, string> = {
-  "conceptual-framework-fair-value": "framework",
-  "published-accounts": "statements",
-  "property-plant-equipment": "ppe",
-  "intangible-assets": "intangible",
-  "impairment-of-assets": "impairment",
-  "non-current-assets-held-for-sale": "heldForSale",
-  revenue: "revenue",
-  "agriculture-inventories": "agriculture",
-  "foreign-currency": "currency",
-  leases: "leases",
-  "financial-instruments": "financial",
-  "employee-benefits": "employee",
-  "share-based-payments": "share",
-  taxation: "tax",
-  "earnings-per-share": "eps",
-  "provisions-contingencies-events": "provisions",
-  "statement-of-cash-flows": "cashflow",
-  "accounting-policies-estimates-errors": "ias8",
-  "consolidated-financial-statements": "consolidation",
-  "consolidated-financial-position": "consolidation",
-  "consolidated-profit-or-loss": "consolidation",
-  "associates-joint-ventures": "equity",
-  "changes-in-group-structure": "group",
-  "group-disposals": "disposal",
-  "adoption-new-standards-smes": "adoption",
-  "interpretation-financial-statements": "analysis",
+const VISUALS: Record<
+  string,
+  {
+    eyebrow: string
+    title: string
+    subtitle: string
+    nodes: string[]
+    accent: string
+  }
+> = {
+  "conceptual-framework-fair-value": {
+    eyebrow: "Think in systems",
+    title: "From purpose to measurement",
+    subtitle: "See how the reporting framework connects the objective of financial reporting with the information ultimately presented to users.",
+    nodes: ["Objective", "Useful information", "Elements", "Recognition", "Measurement", "Reporting"],
+    accent: "framework",
+  },
+  "published-accounts": {
+    eyebrow: "Read the statements",
+    title: "How the financial statements fit together",
+    subtitle: "Move between position, performance, cash and supporting information instead of learning each statement in isolation.",
+    nodes: ["Position", "Performance", "Equity", "Cash", "Notes"],
+    accent: "statements",
+  },
+  "property-plant-equipment": {
+    eyebrow: "Follow the asset",
+    title: "The life of a PPE asset",
+    subtitle: "A machine does not stop being an accounting problem after purchase. Follow the asset through its full reporting life.",
+    nodes: ["Recognise", "Measure", "Depreciate", "Revalue", "Impair", "Dispose"],
+    accent: "ppe",
+  },
+  "intangible-assets": {
+    eyebrow: "Make the invisible visible",
+    title: "The intangible asset lifecycle",
+    subtitle: "Start with identification, move through recognition and measurement, then follow the asset into amortisation, impairment and derecognition.",
+    nodes: ["Identify", "Recognise", "Measure", "Amortise", "Impair", "Derecognise"],
+    accent: "intangible",
+  },
+  "impairment-of-assets": {
+    eyebrow: "Decision model",
+    title: "When does an asset lose value?",
+    subtitle: "Turn impairment into a decision rather than a definition: identify the signal, determine recoverable amount and compare it with carrying amount.",
+    nodes: ["Indicator", "Recoverable amount", "Compare", "Loss", "Reversal"],
+    accent: "impairment",
+  },
+  "held-for-sale-discontinued-operations": {
+    eyebrow: "Classification matters",
+    title: "When an asset changes direction",
+    subtitle: "Trace the point at which an asset or disposal group moves from ordinary use into a held-for-sale presentation.",
+    nodes: ["Available", "Highly probable", "Marketed", "Sale expected", "Classify", "Present"],
+    accent: "sale",
+  },
+  revenue: {
+    eyebrow: "Revenue engine",
+    title: "The five questions behind revenue",
+    subtitle: "Use the contract with the customer as the starting point and move through performance obligations, price, allocation and recognition.",
+    nodes: ["Contract", "Obligations", "Price", "Allocate", "Recognise"],
+    accent: "revenue",
+  },
+  "agriculture-inventories": {
+    eyebrow: "From living asset to sale",
+    title: "Agriculture → produce → inventory",
+    subtitle: "Follow the point where biological assets become agricultural produce and then enter the inventory cycle.",
+    nodes: ["Biological asset", "Transformation", "Produce", "Inventory", "Sale"],
+    accent: "agriculture",
+  },
+  "foreign-currency": {
+    eyebrow: "Follow the rate",
+    title: "One transaction, several exchange-rate moments",
+    subtitle: "See where the transaction-date rate, settlement rate and reporting-date rate matter.",
+    nodes: ["Transaction", "Initial rate", "Settlement", "Closing rate", "Translation"],
+    accent: "currency",
+  },
+  leases: {
+    eyebrow: "Lease model",
+    title: "Turning a lease into accounting",
+    subtitle: "The lessee model connects the right to use an asset with the obligation to make lease payments.",
+    nodes: ["Identify", "ROU asset", "Lease liability", "Interest", "Depreciation"],
+    accent: "leases",
+  },
+  "employee-benefits": {
+    eyebrow: "People are accounting too",
+    title: "Classify the benefit first",
+    subtitle: "The accounting treatment changes depending on when and how the employee benefit is settled.",
+    nodes: ["Short-term", "Post-employment", "Defined contribution", "Defined benefit", "Termination"],
+    accent: "people",
+  },
+  "share-based-payments": {
+    eyebrow: "Value the promise",
+    title: "From grant to settlement",
+    subtitle: "Follow the accounting consequence of an equity or cash-based award through its vesting period.",
+    nodes: ["Grant", "Fair value", "Vesting", "Expense", "Settlement"],
+    accent: "shares",
+  },
+  "events-provisions-contingencies": {
+    eyebrow: "Judgement under uncertainty",
+    title: "Recognise, disclose or wait?",
+    subtitle: "Use the nature of the obligation, probability and evidence to understand provisions and contingencies.",
+    nodes: ["Past event", "Obligation", "Outflow", "Estimate", "Recognise / disclose"],
+    accent: "provisions",
+  },
+  "financial-assets-liabilities": {
+    eyebrow: "Financial instruments",
+    title: "Classify before you measure",
+    subtitle: "A visual map of the path from initial recognition through subsequent measurement and impairment.",
+    nodes: ["Recognise", "Classify", "Measure", "Impair", "Derecognise"],
+    accent: "financial",
+  },
+  taxation: {
+    eyebrow: "Tax bridge",
+    title: "Accounting profit is not the tax base",
+    subtitle: "Connect accounting results with taxable amounts and temporary differences.",
+    nodes: ["Accounting", "Tax base", "Difference", "Deferred tax", "Presentation"],
+    accent: "tax",
+  },
+  "earnings-per-share": {
+    eyebrow: "Per-share lens",
+    title: "From profit to EPS",
+    subtitle: "See the building blocks of basic and diluted earnings per share.",
+    nodes: ["Profit", "Adjustments", "Weighted shares", "Basic EPS", "Dilution"],
+    accent: "eps",
+  },
+  "statement-of-cash-flows": {
+    eyebrow: "Cash tells a different story",
+    title: "Where did the cash move?",
+    subtitle: "Separate operating, investing and financing movements and connect them back to the change in cash.",
+    nodes: ["Operating", "Investing", "Financing", "Cash equivalents", "Reconcile"],
+    accent: "cash",
+  },
+  "accounting-policies-estimates-errors": {
+    eyebrow: "IAS 8 decision tree",
+    title: "Policy, estimate or error?",
+    subtitle: "The classification determines whether the accounting change travels backwards or forwards.",
+    nodes: ["Policy", "Estimate", "Error", "Retrospective", "Prospective"],
+    accent: "ias8",
+  },
+  "consolidated-principles": {
+    eyebrow: "Think like a group",
+    title: "From separate entities to one reporting picture",
+    subtitle: "See how control, consolidation adjustments and eliminations transform individual accounts into group information.",
+    nodes: ["Parent", "Subsidiary", "Adjust", "Eliminate", "Consolidate"],
+    accent: "group",
+  },
+  "consolidated-statement-financial-position": {
+    eyebrow: "Group position",
+    title: "Building the consolidated position",
+    subtitle: "A visual route through the group statement of financial position.",
+    nodes: ["Combine", "Fair values", "Goodwill", "NCI", "Eliminate"],
+    accent: "group",
+  },
+  "consolidated-profit-or-loss": {
+    eyebrow: "Group performance",
+    title: "Building consolidated performance",
+    subtitle: "See how the parent's and subsidiary's results become one group performance story.",
+    nodes: ["Combine", "Adjust", "Eliminate", "Allocate", "Report"],
+    accent: "group",
+  },
+  associates: {
+    eyebrow: "Significant influence",
+    title: "The equity method in motion",
+    subtitle: "Follow the investment from acquisition through share of results and distributions.",
+    nodes: ["Investment", "Influence", "Share of profit", "Dividends", "Carrying amount"],
+    accent: "equity",
+  },
+  "group-disposals": {
+    eyebrow: "Control can be lost",
+    title: "What happens when the group changes?",
+    subtitle: "Trace the accounting consequences of disposal and loss of control.",
+    nodes: ["Subsidiary", "Disposal", "Loss of control", "Derecognise", "Gain / loss"],
+    accent: "disposal",
+  },
+  "adopting-new-accounting-standards": {
+    eyebrow: "Change management",
+    title: "A new standard changes more than a note",
+    subtitle: "Transition affects systems, people, profit measures, loan covenants and stakeholder expectations.",
+    nodes: ["Transition", "Systems", "People", "Covenants", "Disclosure"],
+    accent: "adoption",
+  },
+  "ifrs-for-smes": {
+    eyebrow: "A different reporting pathway",
+    title: "IFRS for SMEs",
+    subtitle: "Understand the structure and practical consequences of the simplified reporting framework covered by the source material.",
+    nodes: ["Scope", "Recognition", "Measurement", "Presentation", "Disclosure"],
+    accent: "sme",
+  },
+  "interpretation-financial-statements": {
+    eyebrow: "Read beyond the numbers",
+    title: "Turn statements into a story",
+    subtitle: "Connect profitability, liquidity, efficiency, gearing and cash-flow signals.",
+    nodes: ["Profitability", "Liquidity", "Efficiency", "Gearing", "Cash flow"],
+    accent: "analysis",
+  },
 }
 
-function clean(value: string) {
-  return value
+function clean(text: string) {
+  return text
     .replace(/\s+/g, " ")
-    .replace(/^[-•✓✔]\s*/, "")
+    .replace(/\s+\d+$/g, "")
+    .replace(/^[-•✓✔–—]\s*/, "")
     .trim()
 }
 
-function isBullet(value: string) {
-  return /^(?:[-•✓✔–—]|\d+[.)]|[a-zA-Z][.)])\s*/.test(value.trim())
+function isNoise(text: string) {
+  const value = clean(text)
+  return (
+    !value ||
+    /^(TUU(?:\s+\d+)?|Homework|FR Knowledge|SBR New Knowledge|Reference\s*-\s*Page)$/i.test(
+      value
+    )
+  )
 }
 
-function isNoise(value: string) {
-  const v = clean(value)
-  if (!v) return true
-  return /^(?:TUU|Homework|Reference\s*-\s*Page|FR Knowledge|SBR New Knowledge)$/i.test(v)
+function isBullet(text: string) {
+  return /^(?:[-•✓✔–—]|\d+[.)]|[a-zA-Z][.)])\s+/.test(text.trim())
 }
 
-function normaliseBlocks(blocks: Block[]) {
-  const result: Block[] = []
+function isLikelyHeading(text: string) {
+  const value = clean(text)
+  if (!value || value.length > 90) return false
+  if (/[.!?]$/.test(value)) return false
+  if (isBullet(value)) return false
+  if (value.split(" ").length > 11) return false
 
-  for (const block of blocks) {
-    const title = clean(block.title)
-    const items = block.items
-      .map(clean)
-      .filter((item) => !isNoise(item))
+  return (
+    /^(assets?|liabilities?|equity|income|expenses?|recognition|measurement|initial measurement|subsequent measurement|depreciation|revaluation|impairment|derecognition|obligation|fair value|journal|illustration|example|solution|calculation|summary|key points?|purpose|objective|scope|definitions?|presentation|disclosure|accounting treatment|investor perspective|control|goodwill|non-controlling interest|revenue|leases?|taxation|foreign currency|cash flows?|accounting policies?|accounting estimates?|errors?|provisions?|contingent)/i.test(
+      value
+    ) ||
+    value === value.toUpperCase()
+  )
+}
 
-    if (!title && items.length === 0) continue
+function sourceBlocks(topic: RawTopic): { title: string; items: string[] }[] {
+  const result: { title: string; items: string[] }[] = []
 
-    const previous = result[result.length - 1]
+  const add = (title: string, items: string[]) => {
+    const cleanTitle = clean(title)
+    const cleanItems = items.map(clean).filter((x) => !isNoise(x))
+    if (!cleanTitle && !cleanItems.length) return
 
-    // The source material sometimes splits one topic over several slides
-    // using the same heading. Merge those into one readable section.
-    if (previous && previous.title.toLowerCase() === title.toLowerCase()) {
-      previous.items.push(...items)
+    const last = result[result.length - 1]
+    if (last && last.title.toLowerCase() === cleanTitle.toLowerCase()) {
+      last.items.push(...cleanItems)
     } else {
-      result.push({ title: title || "Further detail", items })
+      result.push({ title: cleanTitle || "Understanding the topic", items: cleanItems })
+    }
+  }
+
+  if (Array.isArray(topic.blocks)) {
+    for (const block of topic.blocks) {
+      const items = [
+        ...(block.items ?? []),
+        ...(block.content ?? []),
+        ...(block.text ? [block.text] : []),
+      ]
+      add(block.title ?? block.label ?? "", items)
+    }
+  }
+
+  if (Array.isArray(topic.sections)) {
+    for (const block of topic.sections) {
+      const items = [
+        ...(block.items ?? []),
+        ...(block.content ?? []),
+        ...(block.text ? [block.text] : []),
+      ]
+      add(block.title ?? block.label ?? "", items)
+    }
+  }
+
+  if (Array.isArray(topic.slides)) {
+    for (const slide of topic.slides) {
+      const items: string[] = []
+      let currentHeading = clean(slide.title ?? "Understanding the topic")
+
+      for (const item of slide.blocks ?? []) {
+        const text = clean(item.text ?? "")
+        if (isNoise(text)) continue
+
+        // Slide headings become visual sub-headings rather than separate cards.
+        if (isLikelyHeading(text) && !items.length) {
+          currentHeading = text
+        } else {
+          items.push(text)
+        }
+      }
+
+      add(currentHeading, items)
     }
   }
 
   return result
 }
 
+function findTopic(slug: string): RawTopic | undefined {
+  const source = accountingTopics as unknown
+
+  if (Array.isArray(source)) {
+    return (source as RawTopic[]).find(
+      (item) => item.slug === slug
+    )
+  }
+
+  const record = source as Record<string, RawTopic>
+  return record[slug] ?? Object.values(record).find((item) => item.slug === slug)
+}
+
 function Figure({
-  type,
+  visual,
   active,
   setActive,
 }: {
-  type: string
+  visual: (typeof VISUALS)[string]
   active: number
-  setActive: (n: number) => void
+  setActive: (value: number) => void
 }) {
-  const figures: Record<string, { title: string; subtitle: string; labels: string[] }> = {
-    framework: {
-      title: "How the reporting framework connects",
-      subtitle: "Select a part of the framework to see its role.",
-      labels: ["Objective", "Qualities", "Elements", "Recognition", "Measurement", "Presentation"],
-    },
-    statements: {
-      title: "A complete reporting picture",
-      subtitle: "Select a statement to see what it contributes.",
-      labels: ["Financial position", "Performance", "Equity", "Cash flows", "Notes"],
-    },
-    ppe: {
-      title: "PPE accounting journey",
-      subtitle: "Follow an asset from acquisition to disposal.",
-      labels: ["Recognition", "Initial measurement", "Depreciation", "Revaluation", "Impairment", "Disposal"],
-    },
-    intangible: {
-      title: "Intangible asset lifecycle",
-      subtitle: "The accounting path from identification to subsequent measurement.",
-      labels: ["Identify", "Recognise", "Measure", "Amortise", "Impair", "Derecognise"],
-    },
-    impairment: {
-      title: "Impairment decision path",
-      subtitle: "A visual route through recoverable amount and impairment.",
-      labels: ["Indicator", "Recoverable amount", "Compare", "Loss", "Reversal"],
-    },
-    heldForSale: {
-      title: "Held-for-sale decision path",
-      subtitle: "A visual summary of the classification journey.",
-      labels: ["Available now", "Highly probable", "Marketed", "Within 12 months", "Classify", "Present"],
-    },
-    revenue: {
-      title: "IFRS 15 five-step model",
-      subtitle: "Select a step to focus on its place in the revenue process.",
-      labels: ["Contract", "Performance obligations", "Transaction price", "Allocate", "Recognise"],
-    },
-    agriculture: {
-      title: "Agriculture and inventory flow",
-      subtitle: "Follow biological assets, produce and inventory through the accounting process.",
-      labels: ["Biological asset", "Agricultural produce", "Inventory", "Measurement", "Sale"],
-    },
-    currency: {
-      title: "Foreign currency journey",
-      subtitle: "See how a foreign-currency transaction moves through reporting.",
-      labels: ["Transaction", "Initial rate", "Settlement", "Closing rate", "Translation"],
-    },
-    leases: {
-      title: "Lessee accounting model",
-      subtitle: "The core flow from lease commencement to subsequent measurement.",
-      labels: ["Identify lease", "Right-of-use asset", "Lease liability", "Interest", "Depreciation"],
-    },
-    financial: {
-      title: "Financial instruments map",
-      subtitle: "Move through classification, measurement and impairment.",
-      labels: ["Classify", "Initial measurement", "Subsequent measurement", "Impairment", "Derecognition"],
-    },
-    employee: {
-      title: "Employee benefits map",
-      subtitle: "Select a benefit category.",
-      labels: ["Short-term", "Post-employment", "Defined contribution", "Defined benefit", "Termination"],
-    },
-    share: {
-      title: "Share-based payment flow",
-      subtitle: "See the basic accounting route.",
-      labels: ["Grant", "Fair value", "Vesting", "Expense", "Settlement"],
-    },
-    tax: {
-      title: "Income tax bridge",
-      subtitle: "Connect accounting profit, taxable amounts and deferred tax.",
-      labels: ["Accounting result", "Tax base", "Temporary difference", "Deferred tax", "Presentation"],
-    },
-    eps: {
-      title: "EPS calculation path",
-      subtitle: "Follow the components used in the calculation.",
-      labels: ["Profit", "Preference claims", "Weighted shares", "Basic EPS", "Dilution"],
-    },
-    provisions: {
-      title: "Provision decision path",
-      subtitle: "A practical visual route through recognition.",
-      labels: ["Past event", "Present obligation", "Probable outflow", "Reliable estimate", "Recognise / disclose"],
-    },
-    cashflow: {
-      title: "Cash-flow classification",
-      subtitle: "See how cash movements are grouped.",
-      labels: ["Operating", "Investing", "Financing", "Cash equivalents", "Reconciliation"],
-    },
-    ias8: {
-      title: "IAS 8 change map",
-      subtitle: "The treatment depends on whether the issue is policy, estimate or error.",
-      labels: ["Policy", "Estimate", "Error", "Retrospective", "Prospective"],
-    },
-    consolidation: {
-      title: "Group reporting structure",
-      subtitle: "Select a layer of the group reporting process.",
-      labels: ["Parent", "Subsidiary", "Adjustments", "Elimination", "Consolidated statements"],
-    },
-    equity: {
-      title: "Equity method pathway",
-      subtitle: "A visual summary of the investment relationship.",
-      labels: ["Investment", "Significant influence", "Share of results", "Dividends", "Carrying amount"],
-    },
-    group: {
-      title: "Changes in group structure",
-      subtitle: "Follow ownership changes through the group accounts.",
-      labels: ["Existing interest", "Additional interest", "Control", "Ownership change", "Accounting effect"],
-    },
-    disposal: {
-      title: "Group disposal pathway",
-      subtitle: "The key stages when control is lost.",
-      labels: ["Subsidiary", "Disposal", "Loss of control", "Derecognition", "Gain / loss"],
-    },
-    adoption: {
-      title: "IFRS transition roadmap",
-      subtitle: "A visual roadmap for first-time adoption and implementation.",
-      labels: ["Transition date", "Opening IFRS position", "Exemptions", "Reconciliations", "Disclosures"],
-    },
-    analysis: {
-      title: "Financial statement analysis",
-      subtitle: "Connect the main analytical perspectives.",
-      labels: ["Profitability", "Liquidity", "Efficiency", "Gearing", "Cash flow"],
-    },
-  }
-
-  const figure = figures[type] ?? figures.statements
-  const selected = figure.labels[active] ?? figure.labels[0]
+  const selected = visual.nodes[active] ?? visual.nodes[0]
 
   return (
-    <div className="mt-8 overflow-hidden rounded-3xl border border-[#168BC4]/15 bg-white shadow-sm">
-      <div className="bg-[#071B49] p-6 text-white md:p-8">
-        <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#35B5E5]">
-          Interactive figure
-        </p>
-        <h2 className="mt-2 text-2xl font-semibold md:text-3xl">{figure.title}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{figure.subtitle}</p>
+    <section className="mt-10 overflow-hidden rounded-[28px] border border-[#168BC4]/15 bg-white shadow-[0_18px_50px_rgba(7,27,73,0.08)]">
+      <div className="relative overflow-hidden bg-[#071B49] px-6 py-8 text-white md:px-10 md:py-10">
+        <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full border border-white/10" />
+        <div className="absolute -right-8 top-8 h-44 w-44 rounded-full border border-[#35B5E5]/20" />
+
+        <div className="relative">
+          <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#35B5E5]">
+            {visual.eyebrow}
+          </p>
+          <h2 className="mt-3 max-w-3xl text-2xl font-semibold md:text-4xl">
+            {visual.title}
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">
+            {visual.subtitle}
+          </p>
+        </div>
       </div>
 
-      <div className="p-6 md:p-8">
-        <div className="overflow-x-auto pb-3">
-          <div className="flex min-w-max items-center gap-2">
-            {figure.labels.map((label, index) => (
-              <div key={label} className="flex items-center">
-                <button
-                  type="button"
+      <div className="p-5 md:p-8">
+        {/* Original CURA-style SVG illustration created in code */}
+        <div className="relative overflow-hidden rounded-3xl bg-[#F5F8FC] p-5 md:p-8">
+          <svg
+            viewBox="0 0 1000 250"
+            className="h-auto w-full"
+            role="img"
+            aria-label={visual.title}
+          >
+            <defs>
+              <linearGradient id="curaLine" x1="0" x2="1">
+                <stop offset="0%" stopColor="#168BC4" />
+                <stop offset="100%" stopColor="#35B5E5" />
+              </linearGradient>
+              <filter id="shadow">
+                <feDropShadow dx="0" dy="5" stdDeviation="6" floodOpacity=".12" />
+              </filter>
+            </defs>
+
+            <path
+              d="M80 125 C220 45 300 205 430 125 S650 45 920 125"
+              fill="none"
+              stroke="url(#curaLine)"
+              strokeWidth="5"
+              strokeLinecap="round"
+              opacity=".65"
+            />
+
+            {visual.nodes.map((node, index) => {
+              const x = 80 + index * (840 / Math.max(1, visual.nodes.length - 1))
+              const selectedNode = index === active
+
+              return (
+                <g
+                  key={node}
                   onClick={() => setActive(index)}
-                  className={`min-w-[125px] rounded-2xl border px-4 py-4 text-left transition ${
-                    active === index
-                      ? "border-[#168BC4] bg-[#F1F7FB] shadow-md"
-                      : "border-slate-200 bg-white hover:border-[#168BC4]/50"
-                  }`}
+                  className="cursor-pointer"
                 >
-                  <span className="text-xs font-bold text-[#168BC4]">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="mt-2 block text-sm font-semibold text-[#071B49]">
-                    {label}
-                  </span>
-                </button>
+                  <circle
+                    cx={x}
+                    cy="125"
+                    r={selectedNode ? "30" : "24"}
+                    fill={selectedNode ? "#071B49" : "#FFFFFF"}
+                    stroke={selectedNode ? "#35B5E5" : "#168BC4"}
+                    strokeWidth={selectedNode ? "5" : "3"}
+                    filter="url(#shadow)"
+                  />
+                  <text
+                    x={x}
+                    y="130"
+                    textAnchor="middle"
+                    fontSize="15"
+                    fontWeight="700"
+                    fill={selectedNode ? "#FFFFFF" : "#071B49"}
+                  >
+                    {index + 1}
+                  </text>
+                  <text
+                    x={x}
+                    y="185"
+                    textAnchor="middle"
+                    fontSize="15"
+                    fontWeight={selectedNode ? "700" : "500"}
+                    fill="#071B49"
+                  >
+                    {node.length > 18 ? `${node.slice(0, 17)}…` : node}
+                  </text>
+                </g>
+              )
+            })}
+          </svg>
 
-                {index < figure.labels.length - 1 && (
-                  <span className="px-2 text-xl text-[#168BC4]">→</span>
-                )}
-              </div>
-            ))}
+          <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+            <span>Click a point to explore the model</span>
+            <span className="font-semibold text-[#168BC4]">{selected}</span>
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl bg-[#F5F8FC] p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-lg font-bold text-[#168BC4] shadow-sm">
-              {active + 1}
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-                Focus
-              </p>
-              <h3 className="mt-1 text-xl font-semibold text-[#071B49]">{selected}</h3>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                Use the source material below to study this part of the topic. The figure is a visual learning aid; the detailed accounting treatment remains in the lesson text.
-              </p>
-            </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl bg-[#071B49] p-5 text-white">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#35B5E5]">
+              Focus
+            </p>
+            <p className="mt-2 text-lg font-semibold">{selected}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Use this stage as the mental anchor while reading the lesson.
+            </p>
           </div>
-        </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          {figure.labels.slice(0, 3).map((label, index) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setActive(index)}
-              className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-[#168BC4]/50"
-            >
-              <div className="h-2 rounded-full bg-[#F1F7FB]">
-                <div
-                  className="h-2 rounded-full bg-[#168BC4] transition-all"
-                  style={{ width: `${Math.max(20, ((index + 1) / figure.labels.length) * 100)}%` }}
-                />
-              </div>
-              <p className="mt-3 text-sm font-semibold text-[#071B49]">{label}</p>
-            </button>
-          ))}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#168BC4]">
+              Why it matters
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              The visual separates the topic into decisions so the learner can
+              understand the relationship between concepts rather than memorise
+              isolated slide points.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#168BC4]">
+              Study move
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Read the explanation, then return to the figure and explain the
+              selected stage in your own words.
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
-function Section({
-  block,
+function ReadingBlock({
+  title,
+  items,
   index,
 }: {
-  block: Block
+  title: string
+  items: string[]
   index: number
 }) {
+  const [open, setOpen] = useState(true)
+
   const paragraphs: string[] = []
   const bullets: string[] = []
 
-  for (const raw of block.items) {
-    const item = clean(raw)
-    if (!item || isNoise(item)) continue
+  for (const raw of items) {
+    const text = clean(raw)
+    if (!text || isNoise(text)) continue
 
-    if (isBullet(item)) {
-      bullets.push(item.replace(/^(?:[-•✓✔–—]|\d+[.)]|[a-zA-Z][.)])\s*/, ""))
+    if (isBullet(text)) {
+      bullets.push(text.replace(/^(?:[-•✓✔–—]|\d+[.)]|[a-zA-Z][.)])\s+/, ""))
     } else {
-      paragraphs.push(item)
+      paragraphs.push(text)
     }
   }
 
-  return (
-    <article id={`section-${index}`} className="scroll-mt-28 border-b border-slate-200 pb-12">
-      <div className="flex items-start gap-4">
-        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F1F7FB] text-xs font-bold text-[#168BC4]">
-          {String(index + 1).padStart(2, "0")}
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-2xl font-semibold leading-tight text-[#071B49] md:text-3xl">
-            {block.title}
-          </h2>
+  if (!paragraphs.length && !bullets.length) return null
 
-          {paragraphs.length > 0 && (
-            <div className="mt-5 space-y-5 text-[16px] leading-8 text-slate-700">
-              {paragraphs.map((paragraph, i) => (
-                <p key={i}>{paragraph}</p>
+  const special = /^(journal|illustration|example|solution|calculation)$/i.test(title)
+
+  return (
+    <section id={`lesson-${index}`} className="scroll-mt-28 py-8 md:py-10">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="group flex w-full items-start justify-between gap-6 text-left"
+      >
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#168BC4]">
+            {special ? "Applied example" : "Concept"}
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071B49] md:text-3xl">
+            {title}
+          </h2>
+        </div>
+
+        <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-xl text-[#168BC4] transition group-hover:border-[#168BC4]">
+          {open ? "−" : "+"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-6">
+          {paragraphs.map((paragraph, index) => (
+            <p
+              key={index}
+              className="mb-5 max-w-4xl text-[16px] leading-8 text-slate-700 md:text-[17px]"
+            >
+              {paragraph}
+            </p>
+          ))}
+
+          {bullets.length > 0 && (
+            <div className="mt-6 grid gap-3 md:grid-cols-2">
+              {bullets.map((bullet, index) => (
+                <div
+                  key={index}
+                  className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                >
+                  <div className="absolute left-0 top-5 h-7 w-1 rounded-r-full bg-[#168BC4]" />
+                  <p className="pl-3 text-[15px] leading-7 text-slate-700">
+                    {bullet}
+                  </p>
+                </div>
               ))}
             </div>
           )}
 
-          {bullets.length > 0 && (
-            <ul className="mt-6 space-y-3">
-              {bullets.map((bullet, i) => (
-                <li
-                  key={i}
-                  className="flex gap-3 rounded-xl bg-[#F7FAFD] px-4 py-3 text-[15px] leading-7 text-slate-700"
-                >
-                  <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#168BC4]" />
-                  <span>{bullet}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {paragraphs.length === 0 && bullets.length === 0 && (
-            <p className="mt-4 text-slate-500">See the related material in this topic.</p>
+          {special && (
+            <div className="mt-7 rounded-3xl bg-[#071B49] p-6 text-white">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#35B5E5]">
+                Work it through
+              </p>
+              <p className="mt-2 text-sm leading-7 text-slate-300">
+                Pause here before moving on. Identify the accounting decision,
+                the measurement basis and the resulting financial statement
+                effect.
+              </p>
+            </div>
           )}
         </div>
+      )}
+    </section>
+  )
+}
+
+function Quiz({
+  questions,
+}: {
+  questions: any[]
+}) {
+  const [answers, setAnswers] = useState<Record<number, number>>({})
+  const [submitted, setSubmitted] = useState(false)
+
+  if (!questions?.length) return null
+
+  const score = questions.reduce(
+    (total, question, index) =>
+      total + (answers[index] === question.answer ? 1 : 0),
+    0
+  )
+
+  return (
+    <section className="mt-14 rounded-[28px] bg-[#071B49] p-6 text-white md:p-10">
+      <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#35B5E5]">
+        Check your understanding
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold">Quick quiz</h2>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+        Answer the questions, submit once, and see both the correct answers and
+        the explanations.
+      </p>
+
+      <div className="mt-8 space-y-8">
+        {questions.map((question, questionIndex) => (
+          <div
+            key={questionIndex}
+            className="rounded-3xl bg-white p-5 text-[#071B49] md:p-7"
+          >
+            <p className="font-semibold leading-7">{question.question}</p>
+
+            <div className="mt-5 space-y-3">
+              {(question.options ?? []).map((option: string, optionIndex: number) => {
+                const selected = answers[questionIndex] === optionIndex
+                const correct = submitted && question.answer === optionIndex
+                const wrong = submitted && selected && !correct
+
+                return (
+                  <button
+                    key={optionIndex}
+                    type="button"
+                    disabled={submitted}
+                    onClick={() =>
+                      setAnswers((current) => ({
+                        ...current,
+                        [questionIndex]: optionIndex,
+                      }))
+                    }
+                    className={`w-full rounded-2xl border p-4 text-left text-sm transition ${
+                      correct
+                        ? "border-emerald-400 bg-emerald-50"
+                        : wrong
+                          ? "border-red-400 bg-red-50"
+                          : selected
+                            ? "border-[#168BC4] bg-[#F1F7FB]"
+                            : "border-slate-200 hover:border-[#168BC4]/50"
+                    }`}
+                  >
+                    <span className="flex items-start gap-3">
+                      <span className="font-bold text-[#168BC4]">
+                        {String.fromCharCode(65 + optionIndex)}
+                      </span>
+                      <span>{option}</span>
+                    </span>
+
+                    {correct && (
+                      <span className="mt-2 block text-xs font-semibold text-emerald-700">
+                        ✓ Correct answer
+                      </span>
+                    )}
+
+                    {wrong && (
+                      <span className="mt-2 block text-xs font-semibold text-red-700">
+                        ✕ Your answer
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {submitted && question.explanation && (
+              <div className="mt-5 rounded-2xl bg-[#F5F8FC] p-4 text-sm leading-7 text-slate-700">
+                <span className="font-semibold text-[#071B49]">Why:</span>{" "}
+                {question.explanation}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
-    </article>
+
+      {!submitted ? (
+        <button
+          type="button"
+          onClick={() => setSubmitted(true)}
+          disabled={Object.keys(answers).length !== questions.length}
+          className="mt-8 rounded-full bg-white px-7 py-3 text-sm font-bold text-[#071B49] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Submit quiz
+        </button>
+      ) : (
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <div className="rounded-2xl bg-white/10 px-5 py-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#35B5E5]">
+              Result
+            </p>
+            <p className="mt-1 text-2xl font-semibold">
+              {score} / {questions.length}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setAnswers({})
+              setSubmitted(false)
+            }}
+            className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+    </section>
   )
 }
 
 export default function AccountingTopicPage() {
-  const params = useParams<{ slug: string }>()
-  const topic = accountingTopics.find((item) => item.slug === params.slug) as Topic | undefined
+  const params = useParams()
+  const slug = String(params?.slug ?? "")
+  const topic = findTopic(slug)
 
-  const [activeSection, setActiveSection] = useState(0)
-  const [figureActive, setFigureActive] = useState(0)
-  const [answers, setAnswers] = useState<Record<number, number>>({})
-  const [submitted, setSubmitted] = useState(false)
+  const visual = VISUALS[slug] ?? VISUALS["published-accounts"]
+  const [active, setActive] = useState(0)
 
   const blocks = useMemo(
-    () => (topic ? normaliseBlocks(topic.blocks) : []),
-    [topic],
+    () => (topic ? sourceBlocks(topic) : []),
+    [topic]
   )
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
-
-        if (visible) {
-          const index = Number(visible.target.id.replace("section-", ""))
-          if (!Number.isNaN(index)) setActiveSection(index)
-        }
-      },
-      { rootMargin: "-120px 0px -60% 0px", threshold: [0.05, 0.2, 0.5] },
-    )
-
-    blocks.forEach((_, index) => {
-      const element = document.getElementById(`section-${index}`)
-      if (element) observer.observe(element)
-    })
-
-    return () => observer.disconnect()
-  }, [blocks])
 
   if (!topic) {
     return (
       <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
         <CuraHeader />
-        <section className="mx-auto max-w-4xl px-6 py-24">
-          <div className="rounded-3xl border border-slate-200 bg-white p-10 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#168BC4]">
-              CURA Education
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold">Material not found</h1>
-            <Link
-              href="/education/materials/accounting"
-              className="mt-6 inline-block font-semibold text-[#168BC4]"
-            >
-              ← Back to Accounting
-            </Link>
-          </div>
+        <section className="mx-auto max-w-4xl px-6 py-24 text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#168BC4]">
+            CURA Education
+          </p>
+          <h1 className="mt-4 text-4xl font-semibold">Topic not found</h1>
+          <Link
+            href="/education/materials/accounting"
+            className="mt-8 inline-flex rounded-full bg-[#071B49] px-6 py-3 text-sm font-semibold text-white"
+          >
+            Back to Accounting
+          </Link>
         </section>
         <CuraFooter />
       </main>
     )
   }
 
-  const answered = Object.keys(answers).length
-  const score = topic.quiz.reduce(
-    (total, question, index) =>
-      total + (answers[index] === question.answer ? 1 : 0),
-    0,
-  )
-
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
       <CuraHeader />
 
-      <header className="bg-[#071B49] text-white">
-        <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8 lg:py-20">
+      <header className="relative overflow-hidden bg-[#071B49]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(53,181,229,0.16),transparent_32%)]" />
+
+        <div className="relative mx-auto max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
           <Link
             href="/education/materials/accounting"
             className="text-sm font-semibold text-[#35B5E5]"
@@ -460,260 +765,78 @@ export default function AccountingTopicPage() {
             ← Accounting
           </Link>
 
-          <p className="mt-8 text-xs font-bold uppercase tracking-[0.3em] text-[#35B5E5]">
-            CURA Education · Accounting
-          </p>
+          <div className="mt-10 max-w-4xl">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#35B5E5]">
+              {topic.standard ?? "Accounting"}
+            </p>
 
-          <div className="mt-5 flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-4xl">
-              <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">
-                {topic.title}
-              </h1>
-              <p className="mt-4 text-lg text-slate-300">{topic.standard}</p>
-            </div>
+            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-6xl">
+              {topic.title}
+            </h1>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-slate-200">
-              <div className="font-semibold text-white">CURA learning material</div>
-              <div className="mt-1">{blocks.length} sections · {topic.quiz.length} questions</div>
-            </div>
+            {topic.description && (
+              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
+                {topic.description}
+              </p>
+            )}
           </div>
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-6 py-10 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#168BC4]">
-                Start here
-              </p>
+      <div className="mx-auto max-w-7xl px-6 pb-20 lg:px-8">
+        <Figure
+          visual={visual}
+          active={active}
+          setActive={setActive}
+        />
 
-              <p className="mt-4 max-w-4xl text-[17px] leading-8 text-slate-700">
-                {topic.description}
-              </p>
+        <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <article className="min-w-0">
+            <div className="rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-sm md:px-10">
+              <div className="mb-4 border-b border-slate-200 pb-6">
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#168BC4]">
+                  The lesson
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  The material below has been reorganised into a reading
+                  experience rather than reproduced slide-by-slide.
+                </p>
+              </div>
 
-              <Figure
-                type={figureBySlug[topic.slug] ?? "statements"}
-                active={figureActive}
-                setActive={setFigureActive}
-              />
-            </div>
-
-            <div className="mt-10 space-y-12">
               {blocks.map((block, index) => (
-                <Section key={`${block.title}-${index}`} block={block} index={index} />
+                <ReadingBlock
+                  key={`${block.title}-${index}`}
+                  title={block.title}
+                  items={block.items}
+                  index={index}
+                />
               ))}
             </div>
 
-            {topic.practice.length > 0 && (
-              <section className="mt-14 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-10">
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#168BC4]">
-                  Practice
-                </p>
-                <h2 className="mt-2 text-3xl font-semibold">Apply what you have studied</h2>
-                <p className="mt-3 leading-7 text-slate-600">
-                  Work through the supplied practice material before revealing the solution.
-                </p>
-
-                <div className="mt-7 space-y-5">
-                  {topic.practice.map((practice, index) => (
-                    <details
-                      key={index}
-                      className="group rounded-2xl border border-slate-200 bg-[#F7FAFD] p-5"
-                    >
-                      <summary className="cursor-pointer list-none font-semibold">
-                        <span className="mr-3 text-[#168BC4]">
-                          {String(index + 1).padStart(2, "0")}
-                        </span>
-                        {practice.title || "Practice question"}
-                        <span className="float-right text-xl text-[#168BC4] transition group-open:rotate-45">
-                          +
-                        </span>
-                      </summary>
-
-                      <div className="mt-5 rounded-xl bg-white p-5 text-[15px] leading-7 text-slate-700 whitespace-pre-wrap">
-                        {practice.question}
-                      </div>
-
-                      {practice.answer && (
-                        <details className="mt-4 rounded-xl border border-[#168BC4]/20 bg-white p-5">
-                          <summary className="cursor-pointer font-semibold text-[#168BC4]">
-                            Reveal solution
-                          </summary>
-                          <div className="mt-4 whitespace-pre-wrap text-[15px] leading-7 text-slate-700">
-                            {practice.answer}
-                          </div>
-                        </details>
-                      )}
-                    </details>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section className="mt-14 rounded-3xl bg-[#071B49] p-6 text-white md:p-10">
-              <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#35B5E5]">
-                    Knowledge check
-                  </p>
-                  <h2 className="mt-2 text-3xl font-semibold">Test your understanding</h2>
-                  <p className="mt-3 max-w-2xl leading-7 text-slate-300">
-                    Answer every question and submit to see which answers were correct and which
-                    were incorrect.
-                  </p>
-                </div>
-
-                {submitted && (
-                  <div className="rounded-2xl border border-white/10 bg-white/10 px-6 py-4 text-center">
-                    <div className="text-3xl font-semibold">
-                      {score}/{topic.quiz.length}
-                    </div>
-                    <div className="text-sm text-slate-300">Score</div>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-8 space-y-6">
-                {topic.quiz.map((question, index) => {
-                  const selected = answers[index]
-                  const correct = selected === question.answer
-
-                  return (
-                    <div
-                      key={index}
-                      className="rounded-2xl bg-white p-5 text-[#071B49] md:p-6"
-                    >
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">
-                        Question {index + 1}
-                      </p>
-
-                      <h3 className="mt-2 text-lg font-semibold leading-7">
-                        {question.question}
-                      </h3>
-
-                      <div className="mt-5 space-y-2">
-                        {question.options.map((option, optionIndex) => {
-                          const selectedOption = selected === optionIndex
-                          const correctOption =
-                            submitted && optionIndex === question.answer
-                          const wrongOption =
-                            submitted && selectedOption && !correct
-
-                          return (
-                            <label
-                              key={optionIndex}
-                              className={`flex cursor-pointer gap-3 rounded-xl border p-4 text-sm leading-6 transition ${
-                                correctOption
-                                  ? "border-emerald-400 bg-emerald-50"
-                                  : wrongOption
-                                    ? "border-red-300 bg-red-50"
-                                    : selectedOption
-                                      ? "border-[#168BC4] bg-[#F1F7FB]"
-                                      : "border-slate-200 hover:border-[#168BC4]/50"
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                name={`question-${index}`}
-                                checked={selectedOption}
-                                disabled={submitted}
-                                onChange={() =>
-                                  setAnswers((current) => ({
-                                    ...current,
-                                    [index]: optionIndex,
-                                  }))
-                                }
-                                className="mt-1"
-                              />
-                              <span>{option}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
-
-                      {submitted && (
-                        <div
-                          className={`mt-4 rounded-xl px-4 py-4 text-sm leading-7 ${
-                            correct
-                              ? "bg-emerald-50 text-emerald-800"
-                              : "bg-red-50 text-red-800"
-                          }`}
-                        >
-                          <strong>{correct ? "Correct." : "Incorrect."}</strong>{" "}
-                          {!correct && (
-                            <>
-                              The correct answer is{" "}
-                              <strong>{question.options[question.answer]}</strong>.
-                            </>
-                          )}
-                          {question.explanation && (
-                            <div className="mt-2">{question.explanation}</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="mt-7 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  disabled={answered < topic.quiz.length}
-                  onClick={() => setSubmitted(true)}
-                  className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-[#071B49] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Submit quiz
-                </button>
-
-                {submitted && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSubmitted(false)
-                      setAnswers({})
-                    }}
-                    className="rounded-xl border border-white/20 px-6 py-3 text-sm font-semibold text-white"
-                  >
-                    Try again
-                  </button>
-                )}
-              </div>
-            </section>
-          </div>
+            <Quiz questions={topic.quiz ?? []} />
+          </article>
 
           <aside className="hidden lg:block">
             <div className="sticky top-24 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#168BC4]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#168BC4]">
                 On this page
               </p>
 
-              <div className="mt-4 max-h-[65vh] space-y-1 overflow-auto pr-1">
+              <div className="mt-4 max-h-[65vh] overflow-y-auto">
                 {blocks.map((block, index) => (
-                  <button
-                    key={`${block.title}-${index}`}
-                    type="button"
-                    onClick={() => {
-                      setActiveSection(index)
-                      document
-                        .getElementById(`section-${index}`)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                    }}
-                    className={`w-full rounded-xl px-3 py-2.5 text-left text-sm leading-5 transition ${
-                      activeSection === index
-                        ? "bg-[#F1F7FB] font-semibold text-[#168BC4]"
-                        : "text-slate-600 hover:bg-slate-50"
-                    }`}
+                  <a
+                    key={`${block.title}-nav-${index}`}
+                    href={`#lesson-${index}`}
+                    className="block border-l-2 border-transparent px-3 py-2 text-sm leading-6 text-slate-600 transition hover:border-[#168BC4] hover:text-[#071B49]"
                   >
                     {block.title}
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
           </aside>
         </div>
-      </section>
+      </div>
 
       <CuraFooter />
     </main>
