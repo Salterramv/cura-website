@@ -1,5 +1,6 @@
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
+
 const taxInsights = [
   {
     tag: "TAX UPDATE",
@@ -38,39 +39,45 @@ const services = [
   {
     number: "01",
     title: "Tax",
+    href: "/tax",
     description:
-      "Tax articles, guides and updates on Maldives tax legislation and compliance.",
+      "Practical tax compliance and advisory services for businesses and professionals.",
   },
   {
     number: "02",
     title: "Audit",
+    href: "/audit",
     description:
-      "Audit insights, financial reporting and professional practice resources.",
+      "Audit and assurance services focused on financial reporting, risk and controls.",
   },
   {
     number: "03",
     title: "Advisory",
+    href: "/advisory",
     description:
-      "Business, financial and strategic insights for better decisions.",
+      "Financial and business advice to help management make better decisions.",
   },
   {
     number: "04",
-    title: "Law",
+    title: "Legal",
+    href: "/legal",
     description:
-      "Legal perspectives, tax case summaries and regulatory developments.",
+      "Practical legal and regulatory guidance for businesses and commercial matters.",
   },
   {
     number: "05",
     title: "Education",
+    href: "/education",
     description:
       "Learning resources to strengthen your professional knowledge.",
   },
   {
-  number: "06",
-  title: "Exchange Rates",
-  description:
-    "Published MVR / USD exchange rates from authorized money exchangers in the Maldives.",
-},
+    number: "06",
+    title: "Exchange Rates",
+    href: "/exchange-rate",
+    description:
+      "Published MVR / USD exchange rates from authorized money exchangers in the Maldives.",
+  },
 ]
 
 export default function Home() {
@@ -78,7 +85,7 @@ export default function Home() {
     <main className="min-h-screen bg-white text-[#071B49]">
 
       {/* SHARED CURA HEADER */}
-<CuraHeader />
+      <CuraHeader />
 
       {/* HERO */}
       <section className="relative overflow-hidden bg-[#061936]">
@@ -103,15 +110,15 @@ export default function Home() {
               Clarity in
               <br />
               <span className="text-[#8EB3D7]">
-                numbers and law
+                numbers and legal matters
               </span>
               <span className="text-[#D71920]">.</span>
             </h1>
 
             <p className="mt-8 max-w-xl text-lg leading-8 text-slate-300">
               CURA brings together practical knowledge in taxation,
-              accounting, audit, advisory and law — helping businesses and
-              professionals make better-informed decisions.
+              accounting, audit, advisory and legal matters — helping
+              businesses and professionals make better-informed decisions.
             </p>
 
             <div className="mt-10 flex flex-col gap-4 sm:flex-row">
@@ -134,7 +141,7 @@ export default function Home() {
 
           </div>
 
-          {/* Brand Statement */}
+          {/* BRAND STATEMENT */}
           <div className="mt-16 flex justify-center lg:mt-0 lg:justify-end">
 
             <div className="relative flex h-80 w-80 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] backdrop-blur-sm md:h-96 md:w-96">
@@ -168,18 +175,13 @@ export default function Home() {
 
       {/* SERVICE STRIP */}
       <section className="relative z-10 -mt-8 px-6">
+
         <div className="mx-auto grid max-w-7xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl md:grid-cols-6">
 
           {services.map((service, index) => (
             <a
               key={service.title}
-              href={
-  service.title === "Education"
-    ? "/education"
-    : service.title === "Exchange Rates"
-      ? "/exchange-rate"
-      : "/articles"
-}
+              href={service.href}
               className={`group p-7 transition hover:bg-slate-50 ${
                 index !== services.length - 1
                   ? "border-b border-slate-200 md:border-b-0 md:border-r"
@@ -192,14 +194,14 @@ export default function Home() {
               </div>
 
               <h3
-  className={`mt-5 text-lg font-semibold ${
-    service.title === "Law"
-      ? "text-[#D71920]"
-      : service.title === "Exchange Rates"
-        ? "text-[#168BC4]"
-        : "text-[#071B49]"
-  }`}
->
+                className={`mt-5 text-lg font-semibold ${
+                  service.title === "Legal"
+                    ? "text-[#D71920]"
+                    : service.title === "Exchange Rates"
+                      ? "text-[#168BC4]"
+                      : "text-[#071B49]"
+                }`}
+              >
                 {service.title}
               </h3>
 
@@ -219,6 +221,7 @@ export default function Home() {
 
       {/* ABOUT */}
       <section id="about" className="bg-white">
+
         <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
 
           <div className="grid gap-16 md:grid-cols-2">
@@ -263,6 +266,7 @@ export default function Home() {
 
       {/* KNOWLEDGE */}
       <section id="knowledge" className="bg-[#F5F8FC]">
+
         <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
 
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
@@ -338,6 +342,7 @@ export default function Home() {
 
       {/* LEGAL CASES */}
       <section id="cases" className="bg-white">
+
         <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
 
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
@@ -405,6 +410,7 @@ export default function Home() {
 
       {/* EDUCATION */}
       <section id="education" className="bg-[#071B49]">
+
         <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
 
           <div className="max-w-3xl">
@@ -436,6 +442,7 @@ export default function Home() {
 
       {/* CONTACT */}
       <section id="contact" className="bg-[#F5F8FC]">
+
         <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
 
           <div className="flex flex-col justify-between gap-8 md:flex-row md:items-center">
@@ -468,105 +475,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="bg-[#04132D] text-white">
-
-        <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
-
-          <div className="grid gap-10 md:grid-cols-3">
-
-            <div>
-
-              <img
-                src="/cura-logo.png"
-                alt="CURA"
-                className="h-20 w-auto brightness-0 invert"
-              />
-
-              <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">
-                Audit · Tax · Advisory
-              </p>
-
-              <p className="mt-2 text-sm tracking-[0.2em] text-[#D99A17]">
-                CURE YOUR FIGURES
-              </p>
-
-            </div>
-
-            <div>
-
-              <h3 className="font-semibold">
-                Knowledge
-              </h3>
-
-              <div className="mt-4 space-y-3 text-sm text-slate-400">
-
-                <a href="#knowledge" className="block hover:text-white">
-                  Tax Articles
-                </a>
-
-                <a href="/cases" className="block hover:text-white">
-                  Legal Cases
-                </a>
-
-                <a href="#education" className="block hover:text-white">
-                  Education
-                </a>
-
-              </div>
-
-            </div>
-
-            <div>
-
-              <h3 className="font-semibold">
-                CURA
-              </h3>
-
-              <div className="mt-4 space-y-3 text-sm text-slate-400">
-
-  <a href="#about" className="block hover:text-white">
-    About CURA
-  </a>
-
-  <a href="#knowledge" className="block hover:text-white">
-    Knowledge
-  </a>
-
-  <a href="#updates" className="block hover:text-white">
-    Tax Updates
-  </a>
-
-  <a href="#education" className="block hover:text-white">
-    Education
-  </a>
-
-  <a
-    href="/exchange-rate"
-    className="block hover:text-white"
-  >
-    Exchange Rates
-  </a>
-
-  <a href="#contact" className="block hover:text-white">
-    Contact
-  </a>
-
-  <p>Maldives</p>
-
-</div>
-
-            </div>
-
-          </div>
-
-          <div className="mt-12 border-t border-white/10 pt-6 text-xs text-slate-500">
-            © {new Date().getFullYear()} CURA. All rights reserved.
-          </div>
-
-        </div>
-
-      </footer>
+      {/* SHARED CURA FOOTER */}
+      <CuraFooter />
 
     </main>
   )
