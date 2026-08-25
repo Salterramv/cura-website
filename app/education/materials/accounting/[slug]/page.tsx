@@ -51,16 +51,19 @@ type Quiz = {
   is_published: boolean
 }
 
+type ContentBlock = {
+  block: Block
+  items: Item[]
+}
+
 /*
- * Sidebar heading formatting.
+ * Sidebar formatting:
  *
- * Example:
- *
- * "4 ALLOCATE THE TRANSACTION PRICE TO THE PERFORMANCE OBLIGATIONS IN THE CONTRACT"
+ * "4 ALLOCATE THE TRANSACTION PRICE..."
  *
  * becomes:
  *
- * "4 allocate the transaction price to the performance obligations in the contract"
+ * "4 allocate the transaction price..."
  *
  * Only the first character remains capitalized.
  */
@@ -75,29 +78,307 @@ function formatSidebarHeading(value: string) {
 }
 
 /*
- * Get the source items belonging to a section.
+ * Determine whether a block should visually behave as an illustration.
+ *
+ * We use both the database block_type and title because the source
+ * material contains illustration headings in different structures.
+ */
+function isIllustration(block: Block) {
+  const type = (block.block_type || "").toLowerCase()
+  const title = (block.title || "").toLowerCase()
+  const content = (block.content || "").toLowerCase()
+
+  return (
+    type.includes("illustration") ||
+    type === "example" ||
+    title.includes("illustration") ||
+    title.includes("illustration") ||
+    content.includes("illustration")
+  )
+}
+
+/*
+ * Determine whether a block is an example.
+ */
+function isExample(block: Block) {
+  const type = (block.block_type || "").toLowerCase()
+  const title = (block.title || "").toLowerCase()
+
+  return (
+    type === "example" ||
+    type.includes("example") ||
+    title.startsWith("example")
+  )
+}
+
+/*
+ * Normalize block type so the presentation is controlled by the
+ * actual source structure rather than by generic paragraph styling.
+ */
+function getBlockType(block: Block) {
+  const type = (block.block_type || "").toLowerCase().trim()
+
+  if (
+    type === "bullet_list" ||
+    type === "bullet-list" ||
+    type === "bullets" ||
+    type === "bullet"
+  ) {
+    return "bullet"
+  }
+
+  if (
+    type === "numbered_list" ||
+    type === "numbered-list" ||
+    type === "numbered" ||
+    type === "ordered_list" ||
+    type === "ordered-list"
+  ) {
+    return "numbered"
+  }
+
+  if (type === "example" || type.includes("example")) {
+    return "example"
+  }
+
+  if (type === "illustration" || type.includes("illustration")) {
+    return "illustration"
+  }
+
+  return "paragraph"
+}
+
+/*
+ * Keep the source text intact while allowing line breaks and tabs
+ * contained in the imported source material to remain visible.
+ */
+function SourceText({
+  children,
+  className = "",
+}: {
+  children: string
+  className?: string
+}) {
+  return (
+    <div
+      className={[
+        "whitespace-pre-wrap",
+        "break-words",
+        "text-[16px]",
+        "leading-8",
+        "text-slate-700",
+        className,
+      ].join(" ")}
+    >
+      {children}
+    </div>
+  )
+}
+
+/*
+ * Render a single source block according to its actual source type.
  *
  * IMPORTANT:
- * We deliberately render only education_block_items.
- *
- * education_content_blocks.content is NOT rendered because it is a
- * duplicate representation of the same imported source material.
+ * We do not rewrite or summarize source material here.
  */
-function getSectionItems(
-  section: Section,
-  blocks: Block[],
-  items: Item[]
-): Item[] {
-  const sectionBlocks = blocks
-    .filter((block) => block.section_id === section.id)
-    .sort((a, b) => a.display_order - b.display_order)
+function RenderSourceBlock({
+  contentBlock,
+}: {
+  contentBlock: ContentBlock
+}) {
+  const { block, items } = contentBlock
+  const blockType = getBlockType(block)
 
-  return sectionBlocks
-    .flatMap((block) =>
-      items
-        .filter((item) => item.block_id === block.id)
-        .sort((a, b) => a.display_order - b.display_order)
+  const validItems = items.filter(
+    (item) =>
+      typeof item.content === "string" &&
+      item.content.trim().length > 0
+  )
+
+  const blockTitle =
+    typeof block.title === "string"
+      ? block.title.trim()
+      : ""
+
+  /*
+   * Illustration
+   */
+  if (isIllustration(block) || blockType === "illustration") {
+    return (
+      <div className="rounded-2xl border border-[#168BC4]/20 bg-[#F4FAFD] p-6 md:p-8">
+        {blockTitle && (
+          <div className="mb-5">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+              Illustration
+            </p>
+
+            <h3 className="mt-2 text-xl font-semibold leading-7 text-[#071B49]">
+              {blockTitle}
+            </h3>
+          </div>
+        )}
+
+        {block.content &&
+          block.content.trim().length > 0 && (
+            <SourceText className="mb-5">
+              {block.content}
+            </SourceText>
+          )}
+
+        {validItems.length > 0 && (
+          <div className="space-y-4">
+            {validItems.map((item) => (
+              <SourceText key={item.id}>
+                {item.content}
+              </SourceText>
+            ))}
+          </div>
+        )}
+      </div>
     )
+  }
+
+  /*
+   * Example
+   */
+  if (isExample(block) || blockType === "example") {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 md:p-8">
+        {blockTitle && (
+          <div className="mb-5">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+              Example
+            </p>
+
+            <h3 className="mt-2 text-xl font-semibold leading-7 text-[#071B49]">
+              {blockTitle}
+            </h3>
+          </div>
+        )}
+
+        {block.content &&
+          block.content.trim().length > 0 && (
+            <SourceText className="mb-5">
+              {block.content}
+            </SourceText>
+          )}
+
+        {validItems.length > 0 && (
+          <div className="space-y-4">
+            {validItems.map((item) => (
+              <SourceText key={item.id}>
+                {item.content}
+              </SourceText>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  /*
+   * Bullet list
+   */
+  if (blockType === "bullet") {
+    return (
+      <div className="mt-2">
+        {blockTitle && (
+          <h3 className="mb-4 text-lg font-semibold text-[#071B49]">
+            {blockTitle}
+          </h3>
+        )}
+
+        {block.content &&
+          block.content.trim().length > 0 && (
+            <SourceText className="mb-4">
+              {block.content}
+            </SourceText>
+          )}
+
+        {validItems.length > 0 && (
+          <ul className="list-disc space-y-3 pl-7 marker:text-[#168BC4]">
+            {validItems.map((item) => (
+              <li
+                key={item.id}
+                className="pl-1 text-[16px] leading-8 text-slate-700"
+              >
+                <span className="whitespace-pre-wrap break-words">
+                  {item.content}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  }
+
+  /*
+   * Numbered list
+   */
+  if (blockType === "numbered") {
+    return (
+      <div className="mt-2">
+        {blockTitle && (
+          <h3 className="mb-4 text-lg font-semibold text-[#071B49]">
+            {blockTitle}
+          </h3>
+        )}
+
+        {block.content &&
+          block.content.trim().length > 0 && (
+            <SourceText className="mb-4">
+              {block.content}
+            </SourceText>
+          )}
+
+        {validItems.length > 0 && (
+          <ol className="list-decimal space-y-3 pl-7 marker:font-semibold marker:text-[#168BC4]">
+            {validItems.map((item) => (
+              <li
+                key={item.id}
+                className="pl-1 text-[16px] leading-8 text-slate-700"
+              >
+                <span className="whitespace-pre-wrap break-words">
+                  {item.content}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    )
+  }
+
+  /*
+   * Normal paragraph
+   */
+  return (
+    <div>
+      {blockTitle && (
+        <h3 className="mb-4 text-lg font-semibold text-[#071B49]">
+          {blockTitle}
+        </h3>
+      )}
+
+      {block.content &&
+        block.content.trim().length > 0 && (
+          <SourceText className="mb-5">
+            {block.content}
+          </SourceText>
+        )}
+
+      {validItems.length > 0 && (
+        <div className="space-y-5">
+          {validItems.map((item) => (
+            <SourceText key={item.id}>
+              {item.content}
+            </SourceText>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function AccountingTopicPage() {
@@ -134,23 +415,28 @@ export default function AccountingTopicPage() {
 
       /*
        * =========================================================
-       * 1. LOAD TOPIC
+       * 1. TOPIC
        * =========================================================
        */
 
-      const { data: topicData, error: topicError } = await supabase
-        .from("education_topics")
-        .select(
-          "id,slug,title,standard,description,source_reference"
-        )
-        .eq("slug", slug)
-        .eq("category", "Accounting")
-        .eq("is_published", true)
-        .eq("status", "published")
-        .maybeSingle()
+      const { data: topicData, error: topicError } =
+        await supabase
+          .from("education_topics")
+          .select(
+            "id,slug,title,standard,description,source_reference"
+          )
+          .eq("slug", slug)
+          .eq("category", "Accounting")
+          .eq("is_published", true)
+          .eq("status", "published")
+          .maybeSingle()
 
       if (topicError) {
-        console.error("Topic loading error:", topicError)
+        console.error(
+          "Topic loading error:",
+          topicError
+        )
+
         setError(topicError.message)
         setLoading(false)
         return
@@ -162,18 +448,12 @@ export default function AccountingTopicPage() {
         return
       }
 
-      /*
-       * Supabase's generated database types currently resolve these
-       * education-table results as GenericStringError.
-       *
-       * The runtime query is valid, so explicitly narrow the result
-       * through unknown to our local page types.
-       */
-      const loadedTopic = topicData as unknown as Topic
+      const loadedTopic =
+        topicData as unknown as Topic
 
       /*
        * =========================================================
-       * 2. LOAD SECTIONS
+       * 2. SECTIONS
        * =========================================================
        */
 
@@ -211,7 +491,7 @@ export default function AccountingTopicPage() {
 
       /*
        * =========================================================
-       * 3. LOAD CONTENT BLOCKS
+       * 3. CONTENT BLOCKS
        * =========================================================
        */
 
@@ -249,7 +529,7 @@ export default function AccountingTopicPage() {
 
       /*
        * =========================================================
-       * 4. LOAD SOURCE ITEMS
+       * 4. SOURCE ITEMS
        * =========================================================
        */
 
@@ -290,12 +570,8 @@ export default function AccountingTopicPage() {
 
       /*
        * =========================================================
-       * 5. LOAD TOPIC QUIZ
+       * 5. QUIZ
        * =========================================================
-       *
-       * The quiz is intentionally loaded separately.
-       *
-       * It will be rendered AFTER all learning material.
        */
 
       const expectedQuizTitle =
@@ -315,10 +591,6 @@ export default function AccountingTopicPage() {
         .maybeSingle()
 
       if (quizError) {
-        /*
-         * A missing quiz should not prevent the learning material
-         * from displaying.
-         */
         console.warn(
           "Quiz loading warning:",
           quizError.message
@@ -331,7 +603,7 @@ export default function AccountingTopicPage() {
 
       /*
        * =========================================================
-       * SAVE STATE
+       * SAVE
        * =========================================================
        */
 
@@ -349,7 +621,7 @@ export default function AccountingTopicPage() {
 
   /*
    * ===========================================================
-   * LOADING STATE
+   * LOADING
    * ===========================================================
    */
 
@@ -388,7 +660,7 @@ export default function AccountingTopicPage() {
 
   /*
    * ===========================================================
-   * ERROR STATE
+   * ERROR
    * ===========================================================
    */
 
@@ -422,35 +694,91 @@ export default function AccountingTopicPage() {
 
   /*
    * ===========================================================
-   * PREPARE VISIBLE SECTIONS
+   * PREPARE SOURCE STRUCTURE
    * ===========================================================
    *
-   * A section is shown only if it contains actual source items.
+   * IMPORTANT:
    *
-   * We do NOT use education_content_blocks.content.
-   * Only education_block_items are rendered.
+   * We keep the block boundaries.
+   *
+   * Previously the page flattened all blocks into a single list
+   * of items. That destroyed the source presentation.
+   *
+   * Now:
+   *
+   * Section
+   *   ├── Block
+   *   │    ├── Block type
+   *   │    └── Items
+   *   ├── Block
+   *   └── Block
+   *
+   * This allows bullet lists, paragraphs, examples and
+   * illustrations to retain their original structure.
    */
 
   const visibleSections = sections
     .map((section) => {
-      const sectionItems = getSectionItems(
-        section,
-        blocks,
-        items
-      )
+      const sectionBlocks = blocks
+        .filter(
+          (block) =>
+            block.section_id === section.id
+        )
+        .sort(
+          (a, b) =>
+            a.display_order - b.display_order
+        )
+
+      const contentBlocks: ContentBlock[] =
+        sectionBlocks
+          .map((block) => {
+            const blockItems = items
+              .filter(
+                (item) =>
+                  item.block_id === block.id
+              )
+              .sort(
+                (a, b) =>
+                  a.display_order -
+                  b.display_order
+              )
+
+            return {
+              block,
+              items: blockItems,
+            }
+          })
+          .filter(({ block, items }) => {
+            const hasBlockContent =
+              typeof block.content === "string" &&
+              block.content.trim().length > 0
+
+            const hasItems = items.some(
+              (item) =>
+                typeof item.content === "string" &&
+                item.content.trim().length > 0
+            )
+
+            const hasTitle =
+              typeof block.title === "string" &&
+              block.title.trim().length > 0
+
+            return (
+              hasBlockContent ||
+              hasItems ||
+              hasTitle
+            )
+          })
 
       return {
         section,
-        items: sectionItems,
+        blocks: contentBlocks,
       }
     })
-    .filter(({ items: sectionItems }) => {
-      return sectionItems.some(
-        (item) =>
-          typeof item.content === "string" &&
-          item.content.trim().length > 0
-      )
-    })
+    .filter(
+      ({ blocks: sectionBlocks }) =>
+        sectionBlocks.length > 0
+    )
 
   /*
    * ===========================================================
@@ -462,9 +790,9 @@ export default function AccountingTopicPage() {
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
       <CuraHeader />
 
-      {/* =======================================================
+      {/* =====================================================
           HERO
-          ======================================================= */}
+          ===================================================== */}
 
       <section className="relative overflow-hidden bg-[#071B49] text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(53,181,229,0.16),transparent_30%),radial-gradient(circle_at_10%_90%,rgba(22,139,196,0.12),transparent_35%)]" />
@@ -484,7 +812,6 @@ export default function AccountingTopicPage() {
               </span>
             )}
 
-            {/* Topic title appears ONCE */}
             <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-6xl">
               {topic.title}
             </h1>
@@ -498,18 +825,18 @@ export default function AccountingTopicPage() {
         </div>
       </section>
 
-      {/* =======================================================
-          CONTENT AREA
-          ======================================================= */}
+      {/* =====================================================
+          CONTENT
+          ===================================================== */}
 
       <section className="mx-auto max-w-7xl px-6 py-10 lg:px-8 lg:py-14">
         <div className="lg:grid lg:grid-cols-[250px_minmax(0,1fr)] lg:items-start lg:gap-10">
 
-          {/* ===================================================
-              SIDE PANEL
-              =================================================== */}
+          {/* =================================================
+              RIGHT-FIXED / STICKY SIDE PANEL
+              ================================================= */}
 
-          <aside className="mb-8 lg:sticky lg:top-24 lg:mb-0">
+          <aside className="order-2 mb-8 lg:sticky lg:top-24 lg:mb-0">
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(7,27,73,0.05)]">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
                 On this page
@@ -519,23 +846,19 @@ export default function AccountingTopicPage() {
                 <nav className="mt-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-1">
                   <ol className="space-y-1">
                     {visibleSections.map(
-                      ({ section }, index) => {
-                        const label =
-                          formatSidebarHeading(
-                            section.title
-                          )
-
-                        return (
-                          <li key={section.id}>
-                            <a
-                              href={`#section-${section.id}`}
-                              className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
-                            >
-                              {index + 1}. {label}
-                            </a>
-                          </li>
-                        )
-                      }
+                      ({ section }, index) => (
+                        <li key={section.id}>
+                          <a
+                            href={`#section-${section.id}`}
+                            className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
+                          >
+                            {index + 1}.{" "}
+                            {formatSidebarHeading(
+                              section.title
+                            )}
+                          </a>
+                        </li>
+                      )
                     )}
 
                     {quiz && (
@@ -544,7 +867,7 @@ export default function AccountingTopicPage() {
                           href="#topic-quiz"
                           className="block rounded-xl px-3 py-2 text-sm font-semibold leading-5 text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
                         >
-                          {visibleSections.length + 1}. Topic assessment
+                          {visibleSections.length + 1}. topic assessment
                         </a>
                       </li>
                     )}
@@ -558,11 +881,11 @@ export default function AccountingTopicPage() {
             </div>
           </aside>
 
-          {/* ===================================================
-              MAIN CONTENT
-              =================================================== */}
+          {/* =================================================
+              MAIN SOURCE CONTENT
+              ================================================= */}
 
-          <div className="min-w-0">
+          <div className="order-1 min-w-0">
             {visibleSections.length === 0 ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-10">
                 <p className="text-sm leading-6 text-slate-500">
@@ -573,95 +896,53 @@ export default function AccountingTopicPage() {
             ) : (
               <div className="space-y-8">
 
-                {/* =================================================
-                    SOURCE MATERIAL
-                    ================================================= */}
-
                 {visibleSections.map(
-                  ({ section, items: sectionItems }, index) => {
-                    return (
-                      <article
-                        key={section.id}
-                        id={`section-${section.id}`}
-                        className="scroll-mt-24 rounded-[30px] border border-slate-200 bg-white p-7 shadow-[0_8px_30px_rgba(7,27,73,0.05)] md:p-10"
-                      >
-                        {/* -----------------------------------------
-                            SECTION HEADING
+                  (
+                    {
+                      section,
+                      blocks: sectionBlocks,
+                    },
+                    sectionIndex
+                  ) => (
+                    <article
+                      key={section.id}
+                      id={`section-${section.id}`}
+                      className="scroll-mt-24 rounded-[30px] border border-slate-200 bg-white p-7 shadow-[0_8px_30px_rgba(7,27,73,0.05)] md:p-10"
+                    >
+                      {/* SECTION HEADING */}
 
-                            section.title is rendered ONCE.
+                      <div className="border-b border-slate-100 pb-6">
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+                          Section {sectionIndex + 1}
+                        </p>
 
-                            block.title is NOT rendered.
+                        <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071B49] md:text-3xl">
+                          {section.title}
+                        </h2>
+                      </div>
 
-                            block.content is NOT rendered.
-                            ----------------------------------------- */}
+                      {/* SOURCE BLOCKS */}
 
-                        <div className="border-b border-slate-100 pb-6">
-                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-                            Section {index + 1}
-                          </p>
-
-                          <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071B49] md:text-3xl">
-                            {section.title}
-                          </h2>
-                        </div>
-
-                        {/* -----------------------------------------
-                            RAW SOURCE ITEMS
-
-                            Render exactly once and in order.
-                            ----------------------------------------- */}
-
-                        <div className="mt-8">
-                          {sectionItems.map((item, itemIndex) => {
-                            const content =
-                              item.content ?? ""
-
-                            /*
-                             * Preserve empty source entries as
-                             * spacing, but don't display an empty
-                             * bullet/card.
-                             */
-                            if (
-                              content.trim().length === 0
-                            ) {
-                              return (
-                                <div
-                                  key={item.id}
-                                  className="h-3"
-                                  aria-hidden="true"
-                                />
-                              )
-                            }
-
-                            return (
-                              <div
-                                key={item.id}
-                                className={[
-                                  "whitespace-pre-line",
-                                  "text-[16px]",
-                                  "leading-8",
-                                  "text-slate-700",
-                                  itemIndex > 0
-                                    ? "mt-5"
-                                    : "",
-                                ].join(" ")}
-                              >
-                                {content}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </article>
-                    )
-                  }
+                      <div className="mt-8 space-y-8">
+                        {sectionBlocks.map(
+                          (contentBlock) => (
+                            <RenderSourceBlock
+                              key={
+                                contentBlock.block.id
+                              }
+                              contentBlock={
+                                contentBlock
+                              }
+                            />
+                          )
+                        )}
+                      </div>
+                    </article>
+                  )
                 )}
 
                 {/* =================================================
-                    QUIZ
-                    =================================================
-                    
-                    This is deliberately the LAST element in the
-                    learning-content flow.
+                    QUIZ — ALWAYS LAST
                     ================================================= */}
 
                 {quiz && (
@@ -684,11 +965,13 @@ export default function AccountingTopicPage() {
                             "Test your understanding of this topic."}
                         </p>
 
-                        {quiz.time_limit_seconds > 0 && (
+                        {quiz.time_limit_seconds >
+                          0 && (
                           <p className="mt-3 text-xs font-semibold text-slate-400">
                             Time limit:{" "}
                             {Math.ceil(
-                              quiz.time_limit_seconds / 60
+                              quiz.time_limit_seconds /
+                                60
                             )}{" "}
                             minutes
                           </p>
