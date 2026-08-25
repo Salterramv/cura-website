@@ -183,8 +183,10 @@ function SourceText({
  */
 function RenderSourceBlock({
   contentBlock,
+  sectionTitle,
 }: {
   contentBlock: ContentBlock
+  sectionTitle: string
 }) {
   const { block, items } = contentBlock
   const blockType = getBlockType(block)
@@ -200,13 +202,31 @@ function RenderSourceBlock({
       ? block.title.trim()
       : ""
 
+  const normalizedSectionTitle =
+    sectionTitle
+      .toLowerCase()
+      .replace(/[–—-]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+
+  const normalizedBlockTitle =
+    blockTitle
+      .toLowerCase()
+      .replace(/[–—-]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+
+  const duplicateBlockTitle =
+    normalizedBlockTitle.length > 0 &&
+    normalizedBlockTitle === normalizedSectionTitle
+
   /*
    * Illustration
    */
   if (isIllustration(block) || blockType === "illustration") {
     return (
       <div className="rounded-2xl border border-[#168BC4]/20 bg-[#F4FAFD] p-6 md:p-8">
-        {blockTitle && (
+        {blockTitle && !duplicateBlockTitle && (
           <div className="mb-5">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
               Illustration
@@ -244,7 +264,7 @@ function RenderSourceBlock({
   if (isExample(block) || blockType === "example") {
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 md:p-8">
-        {blockTitle && (
+        {blockTitle && !duplicateBlockTitle && (
           <div className="mb-5">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
               Example
@@ -282,7 +302,7 @@ function RenderSourceBlock({
   if (blockType === "bullet") {
     return (
       <div className="mt-2">
-        {blockTitle && (
+        {blockTitle && !duplicateBlockTitle && (
           <h3 className="mb-4 text-lg font-semibold text-[#071B49]">
             {blockTitle}
           </h3>
@@ -319,7 +339,7 @@ function RenderSourceBlock({
   if (blockType === "numbered") {
     return (
       <div className="mt-2">
-        {blockTitle && (
+        {blockTitle && !duplicateBlockTitle && (
           <h3 className="mb-4 text-lg font-semibold text-[#071B49]">
             {blockTitle}
           </h3>
@@ -781,6 +801,97 @@ export default function AccountingTopicPage() {
     )
 
   /*
+   * Remove consecutive duplicate source sections.
+   *
+   * This is deliberately conservative:
+   * - only adjacent sections are compared;
+   * - titles must match after normalization;
+   * - the section containing more source material is retained.
+   *
+   * This prevents legitimate repeated headings elsewhere in the
+   * source from being removed automatically.
+   */
+
+  const normalizeSectionTitle = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[–—-]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+
+  const cleanedSections: typeof visibleSections = []
+
+  for (const current of visibleSections) {
+    const previous =
+      cleanedSections[
+        cleanedSections.length - 1
+      ]
+
+    if (!previous) {
+      cleanedSections.push(current)
+      continue
+    }
+
+    const sameTitle =
+      normalizeSectionTitle(
+        previous.section.title
+      ) ===
+      normalizeSectionTitle(
+        current.section.title
+      )
+
+    if (!sameTitle) {
+      cleanedSections.push(current)
+      continue
+    }
+
+    const previousContentLength =
+      previous.blocks.reduce(
+        (total, contentBlock) =>
+          total +
+          (contentBlock.block.content?.length || 0) +
+          contentBlock.items.reduce(
+            (itemTotal, item) =>
+              itemTotal +
+              (item.content?.length || 0),
+            0
+          ),
+        0
+      )
+
+    const currentContentLength =
+      current.blocks.reduce(
+        (total, contentBlock) =>
+          total +
+          (contentBlock.block.content?.length || 0) +
+          contentBlock.items.reduce(
+            (itemTotal, item) =>
+              itemTotal +
+              (item.content?.length || 0),
+            0
+          ),
+        0
+      )
+
+    /*
+     * Keep the more complete version.
+     */
+    if (
+      currentContentLength >
+      previousContentLength
+    ) {
+      cleanedSections[
+        cleanedSections.length - 1
+      ] = current
+    }
+
+    /*
+     * Otherwise retain the previous section and ignore
+     * the thinner duplicate.
+     */
+  }
+
+  /*
    * ===========================================================
    * PAGE
    * ===========================================================
@@ -842,10 +953,10 @@ export default function AccountingTopicPage() {
                 On this page
               </p>
 
-              {visibleSections.length > 0 ? (
+              {cleanedSections.length > 0 ? (
                 <nav className="mt-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-1">
                   <ol className="space-y-1">
-                    {visibleSections.map(
+                    {cleanedSections.map(
                       ({ section }, index) => (
                         <li key={section.id}>
                           <a
@@ -867,7 +978,7 @@ export default function AccountingTopicPage() {
                           href="#topic-quiz"
                           className="block rounded-xl px-3 py-2 text-sm font-semibold leading-5 text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
                         >
-                          {visibleSections.length + 1}. topic assessment
+                          {cleanedSections.length + 1}. topic assessment
                         </a>
                       </li>
                     )}
@@ -886,7 +997,7 @@ export default function AccountingTopicPage() {
               ================================================= */}
 
           <div className="order-1 min-w-0">
-            {visibleSections.length === 0 ? (
+            {cleanedSections.length === 0 ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-10">
                 <p className="text-sm leading-6 text-slate-500">
                   No published source content is currently
@@ -896,7 +1007,7 @@ export default function AccountingTopicPage() {
             ) : (
               <div className="space-y-8">
 
-                {visibleSections.map(
+                {cleanedSections.map(
                   (
                     {
                       section,
@@ -932,6 +1043,9 @@ export default function AccountingTopicPage() {
                               }
                               contentBlock={
                                 contentBlock
+                              }
+                              sectionTitle={
+                                section.title
                               }
                             />
                           )
