@@ -284,74 +284,150 @@ function isLikelyHeading(text: string) {
  )
 }
 function sourceBlocks(topic: RawTopic): {
- title: string
- items: string[]
+  title: string
+  items: string[]
 }[] {
- const result: { title: string; items: string[] }[] = []
- const add = (title: string, items: string[]) => {
-   const cleanTitle = clean(title)
-   const cleanItems = items
-     .map(clean)
-     .filter((x) => !isNoise(x))
-   if (!cleanTitle && !cleanItems.length) return
-   const last = result[result.length - 1]
-   if (
-     last &&
-     last.title.toLowerCase() === cleanTitle.toLowerCase()
-   ) {
-     last.items.push(...cleanItems)
-   } else {
-     result.push({
-       title: cleanTitle || "Understanding the Topic",
-       items: cleanItems,
-     })
-   }
- }
- if (Array.isArray(topic.blocks)) {
-   for (const block of topic.blocks) {
-     const items = [
-       ...(block.items ?? []),
-       ...(block.content ?? []),
-       ...(block.text ? [block.text] : []),
-     ]
-     add(block.title ?? block.label ?? "", items)
-   }
- }
- if (Array.isArray(topic.sections)) {
-   for (const block of topic.sections) {
-     const items = [
-       ...(block.items ?? []),
-       ...(block.content ?? []),
-       ...(block.text ? [block.text] : []),
-     ]
-     add(block.title ?? block.label ?? "", items)
-   }
- }
- if (Array.isArray(topic.slides)) {
-   for (const slide of topic.slides) {
-     const items: string[] = []
-     let currentHeading = clean(
-       slide.title ?? "Understanding the Topic"
-     )
-     for (const item of slide.blocks ?? []) {
-       /*
-        * IMPORTANT:
-        * Preserve the original bullet marker.
-        * The old renderer removed it here and therefore
-        * could no longer distinguish bullets from paragraphs.
-        */
-       const text = clean(item.text ?? "")
-       if (isNoise(text)) continue
-       if (isLikelyHeading(text) && !items.length) {
-         currentHeading = text
-       } else {
-         items.push(text)
-       }
-     }
-     add(currentHeading, items)
-   }
- }
- return result
+  const result: { title: string; items: string[] }[] = []
+
+  const add = (title: string, items: string[]) => {
+    const cleanTitle = clean(title)
+
+    const cleanItems = items
+      .map(clean)
+      .filter((x) => !isNoise(x))
+
+    if (!cleanTitle && !cleanItems.length) return
+
+    const last = result[result.length - 1]
+
+    if (
+      last &&
+      last.title.toLowerCase() === cleanTitle.toLowerCase()
+    ) {
+      last.items.push(...cleanItems)
+    } else {
+      result.push({
+        title: cleanTitle || "Understanding the Topic",
+        items: cleanItems,
+      })
+    }
+  }
+
+  /*
+   * IMPORTANT:
+   *
+   * The corrected structured representation is the primary
+   * source of accounting content.
+   *
+   * Once blocks exist, legacy slides MUST NOT also be rendered.
+   */
+  if (Array.isArray(topic.blocks) && topic.blocks.length > 0) {
+    for (const block of topic.blocks) {
+      const items = [
+        ...(block.items ?? []),
+        ...(block.content ?? []),
+        ...(block.text ? [block.text] : []),
+      ]
+
+      add(block.title ?? block.label ?? "", items)
+    }
+  } else if (
+    Array.isArray(topic.sections) &&
+    topic.sections.length > 0
+  ) {
+    /*
+     * Sections are the second-choice structured source.
+     */
+    for (const block of topic.sections) {
+      const items = [
+        ...(block.items ?? []),
+        ...(block.content ?? []),
+        ...(block.text ? [block.text] : []),
+      ]
+
+      add(block.title ?? block.label ?? "", items)
+    }
+  } else if (Array.isArray(topic.slides)) {
+    /*
+     * Legacy fallback only.
+     *
+     * This is used only when the topic has not yet been
+     * converted to blocks or sections.
+     */
+    for (const slide of topic.slides) {
+      const items: string[] = []
+
+      let currentHeading = clean(
+        slide.title ?? "Understanding the Topic"
+      )
+
+      for (const item of slide.blocks ?? []) {
+        const text = clean(item.text ?? "")
+
+        if (isNoise(text)) continue
+
+        if (isLikelyHeading(text) && !items.length) {
+          currentHeading = text
+        } else {
+          items.push(text)
+        }
+      }
+
+      add(currentHeading, items)
+    }
+  }
+
+  /*
+   * GLOBAL DUPLICATE REMOVAL
+   *
+   * Some source materials contain the same complete topic
+   * more than once. The old renderer displayed both copies.
+   *
+   * Compare the complete block:
+   *   title + all content
+   *
+   * Comparison ignores:
+   *   - capitalization
+   *   - repeated whitespace
+   *   - common bullet markers
+   *
+   * Therefore:
+   *
+   *   "Identifiable - EXAMPLES"
+   *
+   * and
+   *
+   *   "Identifiable - Examples"
+   *
+   * are treated as the same heading.
+   *
+   * But two blocks with the same title and different
+   * substantive content are retained.
+   */
+  const normalizeForDuplicateCheck = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[•✓✔–—○◦▪▫‣▸]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+
+  const seen = new Set<string>()
+
+  const deduplicated = result.filter((block) => {
+    const signature = [
+      normalizeForDuplicateCheck(block.title),
+      ...block.items.map(normalizeForDuplicateCheck),
+    ].join("||")
+
+    if (seen.has(signature)) {
+      return false
+    }
+
+    seen.add(signature)
+    return true
+  })
+
+  return deduplicated
 }
 function findTopic(slug: string): RawTopic | undefined {
   const source = accountingTopics as unknown
