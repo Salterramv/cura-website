@@ -931,34 +931,119 @@ export default function AccountingTopicPage() {
   const normalizedTopicTitle =
     normalizeTitleForComparison(topic.title)
 
+  /*
+   * ===========================================================
+   * REMOVE TOPIC-TITLE-ONLY SECTIONS
+   * ===========================================================
+   *
+   * Some source imports create a section such as:
+   *
+   *   Section 22
+   *   IAS 20 Accounting for Government Grants...
+   *
+   * with a block containing the exact same title.
+   *
+   * This is not a learning section. It is the title slide/header
+   * from the source material.
+   *
+   * Remove it only when ALL substantive content in the section
+   * is effectively the same as the topic title.
+   */
+
+  const normalizeForComparison = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[–—-]/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+
+
   const finalSections =
     cleanedSections.filter((entry) => {
       const normalizedSectionTitle =
-        normalizeTitleForComparison(
+        normalizeForComparison(
           entry.section.title
         )
 
-      const contentLength =
-        entry.blocks.reduce(
-          (total, contentBlock) =>
-            total +
-            (contentBlock.block.content?.trim()
-              .length || 0) +
-            contentBlock.items.reduce(
-              (itemTotal, item) =>
-                itemTotal +
-                (item.content?.trim().length || 0),
-              0
-            ),
-          0
+      /*
+       * If the section heading itself is not the topic title,
+       * it is a genuine learning section.
+       */
+      if (
+        normalizedSectionTitle !==
+        normalizedTopicTitle
+      ) {
+        return true
+      }
+
+      /*
+       * Collect ALL actual source text in the section.
+       */
+      const sourceTexts: string[] = []
+
+      for (const contentBlock of entry.blocks) {
+        const block = contentBlock.block
+
+        if (
+          typeof block.content === "string" &&
+          block.content.trim().length > 0
+        ) {
+          sourceTexts.push(block.content.trim())
+        }
+
+        if (
+          typeof block.title === "string" &&
+          block.title.trim().length > 0
+        ) {
+          sourceTexts.push(block.title.trim())
+        }
+
+        for (const item of contentBlock.items) {
+          if (
+            typeof item.content === "string" &&
+            item.content.trim().length > 0
+          ) {
+            sourceTexts.push(item.content.trim())
+          }
+        }
+      }
+
+      /*
+       * Remove empty strings and compare the remaining content.
+       */
+      const meaningfulTexts =
+        sourceTexts
+          .map(normalizeForComparison)
+          .filter(Boolean)
+
+      /*
+       * No content at all:
+       * definitely a title placeholder.
+       */
+      if (meaningfulTexts.length === 0) {
+        return false
+      }
+
+      /*
+       * Every piece of content is just the topic title:
+       * this is a title/header section, not learning content.
+       */
+      const containsOnlyTopicTitle =
+        meaningfulTexts.every(
+          (text) =>
+            text === normalizedTopicTitle
         )
 
-      const isTopicTitlePlaceholder =
-        normalizedSectionTitle ===
-          normalizedTopicTitle &&
-        contentLength === 0
+      if (containsOnlyTopicTitle) {
+        return false
+      }
 
-      return !isTopicTitlePlaceholder
+      /*
+       * If the section contains any substantive content,
+       * retain it.
+       */
+      return true
     })
 
   /*
