@@ -830,7 +830,7 @@ export default function AccountingTopicPage() {
           ===================================================== */}
 
       <section className="mx-auto max-w-7xl px-6 py-10 lg:px-8 lg:py-14">
-        <div className="lg:grid lg:grid-cols-[250px_minmax(0,1fr)] lg:items-start lg:gap-10">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_250px] lg:items-start lg:gap-10">
 
           {/* =================================================
               RIGHT-FIXED / STICKY SIDE PANEL
