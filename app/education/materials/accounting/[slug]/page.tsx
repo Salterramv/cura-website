@@ -1053,6 +1053,21 @@ function RenderSourceBlock({
 
   /*
    * Bullet list
+   *
+   * IMPORTANT:
+   *
+   * Not every database item inside a bullet block is actually
+   * a source bullet.
+   *
+   * Accounting source material can contain:
+   *
+   *   - journal headings
+   *   - $ amount headings
+   *   - Dr / Cr journal rows
+   *   - numbered steps
+   *   - specially coloured source text
+   *
+   * These must bypass the generic <li> renderer.
    */
   if (blockType === "bullet") {
     return (
@@ -1065,21 +1080,146 @@ function RenderSourceBlock({
 
         {block.content &&
           block.content.trim().length > 0 && (
-            <SourceText className="mb-4">
-              {block.content}
-            </SourceText>
+            <div className="mb-4">
+              {renderFormattedSourceText(block.content)}
+            </div>
           )}
 
         {validItems.length > 0 && (
           <div className="space-y-3">
             {validItems.map((item) => {
+              const value =
+                normalizeSourceContent(
+                  item.content || ""
+                ).trim()
+
+              /*
+               * --------------------------------------------------
+               * SOURCE-SPECIFIC NON-BULLET CONTENT
+               * --------------------------------------------------
+               */
+
+              /*
+               * Journal heading
+               */
+              if (isJournalHeader(value)) {
+                return (
+                  <div
+                    key={item.id}
+                    className="
+                      mt-5
+                      mb-2
+                      text-[18px]
+                      leading-8
+                      text-black
+                    "
+                  >
+                    {renderFormattedSourceText(value)}
+                  </div>
+                )
+              }
+
+              /*
+               * Journal $ header.
+               */
+              if (isJournalAmountLine(value)) {
+                return (
+                  <div
+                    key={item.id}
+                    className="w-full"
+                  >
+                    {renderJournalAmountColumns(value)}
+                  </div>
+                )
+              }
+
+              /*
+               * Journal Dr / Cr rows.
+               *
+               * These are NOT bullets.
+               */
+              if (
+                isJournalDebit(value) ||
+                isJournalCredit(value)
+              ) {
+                return (
+                  <div
+                    key={item.id}
+                    className="w-full"
+                  >
+                    {renderJournalAmountColumns(value)}
+                  </div>
+                )
+              }
+
+              /*
+               * Numbered source lines:
+               *
+               * (1)
+               * (2)
+               * (3)
+               *
+               * These must not receive a bullet.
+               */
+              if (isNumberedSourceLine(value)) {
+                return renderNumberedSourceLine(item)
+              }
+
+              /*
+               * "Steps:" is a source heading.
+               *
+               * The original source uses a square marker rather
+               * than the ordinary CURA round bullet.
+               */
+              if (/^Steps:\s*$/i.test(value)) {
+                return (
+                  <div
+                    key={item.id}
+                    className="
+                      flex
+                      items-start
+                      gap-4
+                      text-[18px]
+                      leading-8
+                      text-black
+                    "
+                  >
+                    <span
+                      className="
+                        mt-[11px]
+                        h-[8px]
+                        w-[8px]
+                        shrink-0
+                        bg-[#168BC4]
+                      "
+                    />
+
+                    <span className="font-bold">
+                      Steps:
+                    </span>
+                  </div>
+                )
+              }
+
+              /*
+               * --------------------------------------------------
+               * ORDINARY SOURCE BULLET
+               * --------------------------------------------------
+               */
+
               if (!shouldRenderAsBullet(item)) {
                 return (
                   <div
                     key={item.id}
-                    className="whitespace-pre-wrap break-words pl-1 font-mono text-[16px] leading-8 text-slate-700"
+                    className="
+                      whitespace-pre-wrap
+                      break-words
+                      text-[16px]
+                      leading-8
+                      text-black
+                    "
                   >
-                    {item.content}
+                    {renderFormattedSourceText(value)}
                   </div>
                 )
               }
@@ -1087,11 +1227,22 @@ function RenderSourceBlock({
               return (
                 <ul
                   key={item.id}
-                  className="list-disc pl-7 marker:text-[#168BC4]"
+                  className="
+                    list-disc
+                    pl-7
+                    marker:text-[#168BC4]
+                  "
                 >
-                  <li className="pl-1 text-[16px] leading-8 text-slate-700">
+                  <li
+                    className="
+                      pl-1
+                      text-[16px]
+                      leading-8
+                      text-black
+                    "
+                  >
                     <span className="whitespace-pre-wrap break-words">
-                      {item.content}
+                      {renderFormattedSourceText(value)}
                     </span>
                   </li>
                 </ul>
