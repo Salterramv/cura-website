@@ -188,7 +188,7 @@ function renderSourceStructuredRow(item: Item) {
           items-start
           gap-6
           py-1
-          text-[16px]
+          text-base
           leading-8
           text-slate-700
         "
@@ -219,7 +219,7 @@ function renderSourceStructuredRow(item: Item) {
         items-start
         gap-6
         py-1
-        text-[16px]
+        text-base
         leading-8
         text-slate-700
       "
@@ -297,7 +297,7 @@ function renderJournalHeader(item: Item) {
         grid-cols-[minmax(0,1fr)_110px_110px]
         items-center
         py-1
-        text-[16px]
+        text-base
         leading-8
         text-black
       "
@@ -336,7 +336,7 @@ function renderJournalRow(item: Item) {
         grid-cols-[minmax(0,1fr)_110px_110px]
         items-start
         py-1
-        text-[16px]
+        text-base
         leading-8
       "
     >
@@ -351,7 +351,7 @@ function renderJournalRow(item: Item) {
           {type}
         </span>
 
-        <span className="text-black">
+        <span className="text-[#102A5F]">
           {" "}
           {description.replace(
             /^(Dr|Cr)\s+/i,
@@ -440,7 +440,7 @@ function renderSourceFormattedText(
   if (gainMatch) {
     return (
       <>
-        <span className="text-black">
+        <span className="text-[#102A5F]">
           {gainMatch[1]}
         </span>
 
@@ -448,7 +448,7 @@ function renderSourceFormattedText(
           {gainMatch[2]}
         </span>
 
-        <span className="text-black">
+        <span className="text-[#102A5F]">
           {gainMatch[3]}
         </span>
       </>
@@ -456,7 +456,7 @@ function renderSourceFormattedText(
   }
 
   return (
-    <span className="text-black">
+    <span className="text-[#102A5F]">
       {value}
     </span>
   )
@@ -494,7 +494,7 @@ function renderNumberedSourceLine(
         grid-cols-[64px_minmax(0,1fr)]
         items-start
         py-1
-        text-[16px]
+        text-base
         leading-8
       "
     >
@@ -507,13 +507,35 @@ function renderNumberedSourceLine(
         ({match[1]})
       </div>
 
-      <div className="text-black">
+      <div className="text-base leading-8 text-[#102A5F]">
         {match[2]}
       </div>
     </div>
   )
 }
 
+
+
+/*
+ * ============================================================
+ * GLOBAL CURA SOURCE TYPOGRAPHY
+ * ============================================================
+ *
+ * All accounting source material uses the same typography.
+ * Do not create section-specific font sizes.
+ *
+ * The accounting page inherits the CURA font from the
+ * application layout.
+ */
+
+const CURA_SOURCE_TEXT =
+  "text-base leading-8 text-[#102A5F]"
+
+const CURA_SOURCE_SMALL =
+  "text-sm leading-7 text-[#102A5F]"
+
+const CURA_SOURCE_NUMBER =
+  "text-base leading-8 text-[#168BC4]"
 
 function sourceTextClass(content: string) {
   const value = content.trim()
@@ -670,10 +692,10 @@ function renderJournalAmountColumns(content: string) {
       <div
         className="
           grid
-          grid-cols-[minmax(0,1fr)_120px_120px]
+          grid-cols-[minmax(0,1fr)_140px_140px]
           items-center
           min-h-[42px]
-          text-[18px]
+          text-base
           font-medium
         "
       >
@@ -712,11 +734,12 @@ function renderJournalAmountColumns(content: string) {
     <div
       className="
         grid
-        grid-cols-[minmax(0,1fr)_120px_120px]
+        grid-cols-[minmax(0,1fr)_140px_140px]
         items-start
         min-h-[42px]
-        text-[18px]
+        text-base
         leading-8
+        text-[#102A5F]
       "
     >
       <div>
@@ -782,7 +805,7 @@ function renderSourceItem(item: Item) {
         className="
           mt-5
           mb-4
-          text-[18px]
+          text-base
           leading-8
           text-[#111111]
         "
@@ -801,7 +824,7 @@ function renderSourceItem(item: Item) {
         key={item.id}
         className="
           my-3
-          text-[18px]
+          text-base
           leading-8
           text-[#111111]
         "
@@ -822,7 +845,7 @@ function renderSourceItem(item: Item) {
     <div
       key={item.id}
       className={`
-        text-[18px]
+        text-base
         leading-8
         text-[#111111]
         ${sourceTextClass(content)}
@@ -923,7 +946,7 @@ function SourceText({
       className={[
         "whitespace-pre-wrap",
         "break-words",
-        "text-[16px]",
+        "text-base",
         "leading-8",
         "text-slate-700",
         className,
@@ -1109,9 +1132,9 @@ function RenderSourceBlock({
                     className="
                       mt-5
                       mb-2
-                      text-[18px]
+                      text-base
                       leading-8
-                      text-black
+                      text-[#102A5F]
                     "
                   >
                     {renderFormattedSourceText(value)}
@@ -1179,7 +1202,7 @@ function RenderSourceBlock({
                       flex
                       items-start
                       gap-4
-                      text-[18px]
+                      text-base
                       leading-8
                       text-black
                     "
@@ -1214,7 +1237,7 @@ function RenderSourceBlock({
                     className="
                       whitespace-pre-wrap
                       break-words
-                      text-[16px]
+                      text-base
                       leading-8
                       text-black
                     "
@@ -1236,7 +1259,7 @@ function RenderSourceBlock({
                   <li
                     className="
                       pl-1
-                      text-[16px]
+                      text-base
                       leading-8
                       text-black
                     "
@@ -1278,7 +1301,7 @@ function RenderSourceBlock({
             {validItems.map((item) => (
               <li
                 key={item.id}
-                className="pl-1 text-[16px] leading-8 text-slate-700"
+                className="pl-1 text-base leading-8 text-slate-700"
               >
                 <span className="whitespace-pre-wrap break-words">
                   {item.content}
