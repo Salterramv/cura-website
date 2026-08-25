@@ -514,130 +514,324 @@ function renderNumberedSourceLine(
   )
 }
 
+
+function sourceTextClass(content: string) {
+  const value = content.trim()
+
+  /*
+   * Source headings / sub-headings
+   */
+  if (
+    /^steps?:?$/i.test(value) ||
+    /^journal\s*\(/i.test(value) ||
+    /^definitions$/i.test(value)
+  ) {
+    return "font-bold"
+  }
+
+  return ""
+}
+
+function isJournalHeader(content: string) {
+  return /^journal\s*\(/i.test(content.trim())
+}
+
+function isJournalAmountLine(content: string) {
+  const value = content.trim()
+
+  return (
+    value === "$ $" ||
+    value === "$   $" ||
+    /^\$\s+\$/.test(value)
+  )
+}
+
+function isJournalDebit(content: string) {
+  return /^\s*Dr\b/i.test(content)
+}
+
+function isJournalCredit(content: string) {
+  return /^\s*Cr\b/i.test(content)
+}
+
+function renderFormattedSourceText(content: string) {
+  const value = content.trim()
+
+  /*
+   * Journal heading:
+   * bold + italic + underline, matching the source.
+   */
+  if (isJournalHeader(value)) {
+    return (
+      <span className="font-bold italic underline decoration-2 underline-offset-4">
+        {value}
+      </span>
+    )
+  }
+
+  /*
+   * Journal debit rows:
+   * "Dr" is green and bold in the source.
+   */
+  if (isJournalDebit(value)) {
+    const match = value.match(/^(\s*Dr\b)(.*)$/i)
+
+    if (match) {
+      return (
+        <>
+          <span className="font-bold text-[#00A651]">
+            {match[1]}
+          </span>
+          <span>{match[2]}</span>
+        </>
+      )
+    }
+  }
+
+  /*
+   * Journal credit rows:
+   * "Cr" is red and bold in the source.
+   */
+  if (isJournalCredit(value)) {
+    const match = value.match(/^(\s*Cr\b)(.*)$/i)
+
+    if (match) {
+      return (
+        <>
+          <span className="font-bold text-[#D00000]">
+            {match[1]}
+          </span>
+          <span>{match[2]}</span>
+        </>
+      )
+    }
+  }
+
+  /*
+   * Numbered source steps.
+   *
+   * The source uses:
+   * (1), (2), (3)
+   *
+   * These must NOT become ordinary bullet points.
+   */
+  const numbered = value.match(/^\((\d+)\)\s*(.*)$/)
+
+  if (numbered) {
+    return (
+      <div className="flex items-start gap-4">
+        <span className="shrink-0 font-medium text-[#168BC4]">
+          ({numbered[1]})
+        </span>
+
+        <span>{numbered[2]}</span>
+      </div>
+    )
+  }
+
+  /*
+   * Preserve the green phrase in the revaluation source.
+   *
+   * This is deliberately limited to the source phrase rather
+   * than recolouring an entire paragraph.
+   */
+  if (/^assuming a revaluation gain\b/i.test(value)) {
+    const match = value.match(
+      /^(Assuming a revaluation Gain)(.*)$/i
+    )
+
+    if (match) {
+      return (
+        <>
+          <span className="text-[#00A651]">
+            {match[1]}
+          </span>
+          <span>{match[2]}</span>
+        </>
+      )
+    }
+  }
+
+  return value
+}
+
+function renderJournalAmountColumns(content: string) {
+  /*
+   * The source journal has two fixed amount columns.
+   *
+   * We deliberately use a grid rather than spaces in the text.
+   * This prevents browser whitespace collapsing from moving
+   * the $ and X values.
+   */
+  const value = content.trim()
+
+  if (isJournalAmountLine(value)) {
+    return (
+      <div
+        className="
+          grid
+          grid-cols-[minmax(0,1fr)_120px_120px]
+          items-center
+          min-h-[42px]
+          text-[18px]
+          font-medium
+        "
+      >
+        <div />
+
+        <div className="text-center">
+          $
+        </div>
+
+        <div className="text-center">
+          $
+        </div>
+      </div>
+    )
+  }
+
+  const debit = isJournalDebit(value)
+  const credit = isJournalCredit(value)
+
+  if (!debit && !credit) {
+    return null
+  }
+
+  const match = value.match(
+    /^(Dr|Cr)\s+(.*?)(?:\s+)(X)\s*$/i
+  )
+
+  if (!match) {
+    return null
+  }
+
+  const account = match[2]
+  const amount = match[3]
+
+  return (
+    <div
+      className="
+        grid
+        grid-cols-[minmax(0,1fr)_120px_120px]
+        items-start
+        min-h-[42px]
+        text-[18px]
+        leading-8
+      "
+    >
+      <div>
+        <span
+          className={
+            debit
+              ? "font-bold text-[#00A651]"
+              : "font-bold text-[#D00000]"
+          }
+        >
+          {match[1]}
+        </span>{" "}
+        {account}
+      </div>
+
+      <div className="text-center">
+        {debit ? amount : ""}
+      </div>
+
+      <div className="text-center">
+        {credit ? amount : ""}
+      </div>
+    </div>
+  )
+}
+
 function renderSourceItem(item: Item) {
   const content =
     normalizeSourceContent(item.content || "")
       .trim()
 
-  /*
-   * ----------------------------------------------------------
-   * ACCOUNTING JOURNAL
-   * ----------------------------------------------------------
-   */
+  if (!content) {
+    return null
+  }
 
+  /*
+   * Journal content gets its own source-faithful renderer.
+   * This prevents the browser from collapsing the spaces
+   * between $ and X columns.
+   */
   if (
-    content === "$\t$" ||
-    /^\$\s+\$+$/.test(
-      content.replace(/\t/g, " ")
-    )
+    isJournalAmountLine(content) ||
+    isJournalDebit(content) ||
+    isJournalCredit(content)
   ) {
-    return renderJournalHeader(item)
-  }
-
-  if (isJournalRow(content)) {
-    return renderJournalRow(item)
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * NUMBERED SOURCE LINES
-   * ----------------------------------------------------------
-   */
-
-  if (isNumberedSourceLine(content)) {
-    return renderNumberedSourceLine(item)
-  }
-
-  /*
-   * ----------------------------------------------------------
-   * OTHER TAB-BASED SOURCE CONTENT
-   * ----------------------------------------------------------
-   */
-
-  if (content.includes("\t")) {
-    const columns =
-      content
-        .split("\t")
-        .map((value) => value.trim())
-
     return (
       <div
         key={item.id}
-        className="
-          grid
-          grid-cols-[minmax(0,1fr)_160px_minmax(0,1fr)]
-          items-start
-          gap-6
-          py-1
-          text-[16px]
-          leading-8
-          text-black
-        "
+        className="my-1 w-full"
       >
-        <div className="whitespace-pre-wrap break-words">
-          {columns[0] || ""}
-        </div>
-
-        <div className="whitespace-pre-wrap text-center">
-          {columns[1] || ""}
-        </div>
-
-        <div className="whitespace-pre-wrap break-words">
-          {columns.slice(2).filter(Boolean).join(" ")}
-        </div>
+        {renderJournalAmountColumns(content)}
       </div>
     )
   }
 
   /*
-   * ----------------------------------------------------------
-   * NORMAL SOURCE CONTENT
-   * ----------------------------------------------------------
+   * Journal heading is not a bullet.
    */
-
-  if (!shouldRenderAsBullet(item)) {
+  if (isJournalHeader(content)) {
     return (
       <div
         key={item.id}
         className="
-          whitespace-pre-wrap
-          break-words
-          pl-1
-          text-[16px]
+          mt-5
+          mb-4
+          text-[18px]
           leading-8
-          text-black
+          text-[#111111]
         "
       >
-        {renderSourceFormattedText(content)}
+        {renderFormattedSourceText(content)}
       </div>
     )
   }
 
+  /*
+   * Numbered source material should remain numbered.
+   */
+  if (/^\(\d+\)\s*/.test(content)) {
+    return (
+      <div
+        key={item.id}
+        className="
+          my-3
+          text-[18px]
+          leading-8
+          text-[#111111]
+        "
+      >
+        {renderFormattedSourceText(content)}
+      </div>
+    )
+  }
+
+  /*
+   * Ordinary source content.
+   *
+   * Keep the CURA bullet only where the source item itself
+   * is represented as a bullet. Do not force every source
+   * line into a bullet.
+   */
   return (
-    <ul
+    <div
       key={item.id}
-      className="
-        list-disc
-        pl-7
-        marker:text-[#168BC4]
-      "
+      className={`
+        text-[18px]
+        leading-8
+        text-[#111111]
+        ${sourceTextClass(content)}
+      `}
     >
-      <li
-        className="
-          pl-1
-          text-[16px]
-          leading-8
-          text-black
-        "
-      >
-        <span className="whitespace-pre-wrap break-words">
-          {renderSourceFormattedText(content)}
-        </span>
-      </li>
-    </ul>
+      {renderFormattedSourceText(content)}
+    </div>
   )
 }
-
 
 function shouldRenderAsBullet(item: Item) {
   const value = (item.content || "").trim()
