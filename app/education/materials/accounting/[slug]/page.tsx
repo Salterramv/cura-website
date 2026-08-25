@@ -893,9 +893,81 @@ export default function AccountingTopicPage() {
 
   /*
    * ===========================================================
+   * REMOVE TOPIC-TITLE PLACEHOLDER SECTIONS
+   * ===========================================================
+   *
+   * Some imported source material creates a section containing
+   * nothing except the topic title itself.
+   *
+   * Example:
+   *
+   *   Section 22
+   *   IAS 20 Accounting for Government Grants...
+   *
+   * followed by:
+   *
+   *   Section 23
+   *   Definitions
+   *   [actual learning content]
+   *
+   * The first section is a source/import artefact, not a
+   * substantive learning section. Remove it from the page.
+   *
+   * This is deliberately limited to sections that:
+   *   1. have the same title as the topic;
+   *   2. contain no substantive text/items.
+   */
+
+  const normalizeTitleForComparison = (
+    value: string
+  ) =>
+    value
+      .toLowerCase()
+      .replace(/[–—-]/g, "-")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+
+  const normalizedTopicTitle =
+    normalizeTitleForComparison(topic.title)
+
+  const finalSections =
+    cleanedSections.filter((entry) => {
+      const normalizedSectionTitle =
+        normalizeTitleForComparison(
+          entry.section.title
+        )
+
+      const contentLength =
+        entry.blocks.reduce(
+          (total, contentBlock) =>
+            total +
+            (contentBlock.block.content?.trim()
+              .length || 0) +
+            contentBlock.items.reduce(
+              (itemTotal, item) =>
+                itemTotal +
+                (item.content?.trim().length || 0),
+              0
+            ),
+          0
+        )
+
+      const isTopicTitlePlaceholder =
+        normalizedSectionTitle ===
+          normalizedTopicTitle &&
+        contentLength === 0
+
+      return !isTopicTitlePlaceholder
+    })
+
+  /*
+   * ===========================================================
    * PAGE
    * ===========================================================
    */
+
+
 
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
@@ -953,10 +1025,10 @@ export default function AccountingTopicPage() {
                 On this page
               </p>
 
-              {cleanedSections.length > 0 ? (
+              {finalSections.length > 0 ? (
                 <nav className="mt-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-1">
                   <ol className="space-y-1">
-                    {cleanedSections.map(
+                    {finalSections.map(
                       ({ section }, index) => (
                         <li key={section.id}>
                           <a
@@ -978,7 +1050,7 @@ export default function AccountingTopicPage() {
                           href="#topic-quiz"
                           className="block rounded-xl px-3 py-2 text-sm font-semibold leading-5 text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
                         >
-                          {cleanedSections.length + 1}. topic assessment
+                          {finalSections.length + 1}. topic assessment
                         </a>
                       </li>
                     )}
@@ -997,7 +1069,7 @@ export default function AccountingTopicPage() {
               ================================================= */}
 
           <div className="order-1 min-w-0">
-            {cleanedSections.length === 0 ? (
+            {finalSections.length === 0 ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-10">
                 <p className="text-sm leading-6 text-slate-500">
                   No published source content is currently
@@ -1007,7 +1079,7 @@ export default function AccountingTopicPage() {
             ) : (
               <div className="space-y-8">
 
-                {cleanedSections.map(
+                {finalSections.map(
                   (
                     {
                       section,
