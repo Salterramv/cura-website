@@ -1745,94 +1745,151 @@ export default function AccountingTopicPage() {
     )
 
   /*
-   * Remove consecutive duplicate source sections.
+   * ===========================================================
+   * GLOBAL DUPLICATE SECTION CLEANUP
+   * ===========================================================
    *
-   * This is deliberately conservative:
-   * - only adjacent sections are compared;
-   * - titles must match after normalization;
-   * - the section containing more source material is retained.
+   * Source imports can contain a complete chapter twice:
    *
-   * This prevents legitimate repeated headings elsewhere in the
-   * source from being removed automatically.
+   *   Section A
+   *   Section B
+   *   Section C
+   *
+   *   Section A
+   *   Section B
+   *   Section C
+   *
+   * The existing cleanup only removed adjacent duplicate
+   * headings. That does not catch a duplicated chapter because
+   * the duplicated sections are separated by other sections.
+   *
+   * We therefore compare the COMPLETE SOURCE CONTENT of each
+   * section.
+   *
+   * IMPORTANT:
+   *
+   * We do NOT remove a section simply because its title matches
+   * another section.
+   *
+   * Two sections can legitimately have the same heading.
+   *
+   * A section is removed only when its normalized title AND
+   * normalized complete source content are identical.
    */
 
-  const normalizeSectionTitle = (value: string) =>
+  const normalizeDuplicateSectionText = (
+    value: string
+  ) =>
     value
       .toLowerCase()
-      .replace(/[–—-]/g, "-")
+      .replace(/[–—]/g, "-")
       .replace(/\s+/g, " ")
       .trim()
+
+  const getSectionContentFingerprint = (
+    entry: (typeof visibleSections)[number]
+  ) => {
+    const parts: string[] = []
+
+    /*
+     * Section title
+     */
+    parts.push(
+      normalizeDuplicateSectionText(
+        entry.section.title || ""
+      )
+    )
+
+    /*
+     * Block order is significant.
+     *
+     * This means the same material in a different order is NOT
+     * treated as a duplicate.
+     */
+    for (const contentBlock of entry.blocks) {
+      const block = contentBlock.block
+
+      parts.push(
+        normalizeDuplicateSectionText(
+          block.block_type || ""
+        )
+      )
+
+      parts.push(
+        normalizeDuplicateSectionText(
+          block.title || ""
+        )
+      )
+
+      parts.push(
+        normalizeDuplicateSectionText(
+          block.content || ""
+        )
+      )
+
+      for (const item of contentBlock.items) {
+        parts.push(
+          normalizeDuplicateSectionText(
+            item.item_type || ""
+          )
+        )
+
+        parts.push(
+          normalizeDuplicateSectionText(
+            item.content || ""
+          )
+        )
+      }
+    }
+
+    return parts.join("|")
+  }
+
+  /*
+   * Remove exact duplicate sections globally.
+   *
+   * This is deliberately NOT:
+   *
+   *   title-only deduplication
+   *
+   * because legitimate repeated headings may exist.
+   */
+  const seenSectionFingerprints =
+    new Set<string>()
 
   const cleanedSections: typeof visibleSections = []
 
   for (const current of visibleSections) {
-    const previous =
-      cleanedSections[
-        cleanedSections.length - 1
-      ]
-
-    if (!previous) {
-      cleanedSections.push(current)
-      continue
-    }
-
-    const sameTitle =
-      normalizeSectionTitle(
-        previous.section.title
-      ) ===
-      normalizeSectionTitle(
-        current.section.title
-      )
-
-    if (!sameTitle) {
-      cleanedSections.push(current)
-      continue
-    }
-
-    const previousContentLength =
-      previous.blocks.reduce(
-        (total, contentBlock) =>
-          total +
-          (contentBlock.block.content?.length || 0) +
-          contentBlock.items.reduce(
-            (itemTotal, item) =>
-              itemTotal +
-              (item.content?.length || 0),
-            0
-          ),
-        0
-      )
-
-    const currentContentLength =
-      current.blocks.reduce(
-        (total, contentBlock) =>
-          total +
-          (contentBlock.block.content?.length || 0) +
-          contentBlock.items.reduce(
-            (itemTotal, item) =>
-              itemTotal +
-              (item.content?.length || 0),
-            0
-          ),
-        0
-      )
+    const fingerprint =
+      getSectionContentFingerprint(current)
 
     /*
-     * Keep the more complete version.
+     * Empty fingerprints should never be treated as duplicates.
      */
+    if (!fingerprint) {
+      cleanedSections.push(current)
+      continue
+    }
+
     if (
-      currentContentLength >
-      previousContentLength
+      seenSectionFingerprints.has(
+        fingerprint
+      )
     ) {
-      cleanedSections[
-        cleanedSections.length - 1
-      ] = current
+      /*
+       * This section is an exact source-content duplicate
+       * of a section already rendered earlier.
+       *
+       * Do not render it again.
+       */
+      continue
     }
 
-    /*
-     * Otherwise retain the previous section and ignore
-     * the thinner duplicate.
-     */
+    seenSectionFingerprints.add(
+      fingerprint
+    )
+
+    cleanedSections.push(current)
   }
 
   /*
