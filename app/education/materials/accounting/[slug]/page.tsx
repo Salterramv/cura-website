@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
+import AccountingSourceIllustration from "@/components/education/AccountingSourceIllustration"
 import { createClient } from "@/lib/supabase/client"
 
 type Topic = {
@@ -241,52 +242,359 @@ function renderSourceStructuredRow(item: Item) {
   )
 }
 
-function renderSourceItem(item: Item) {
-  const content = item.content || ""
+
+function normalizeSourceContent(value: string) {
+  return value
+    .replace(/\\t/g, "\t")
+    .replace(/\u00a0/g, " ")
+}
+
+function isJournalRow(content: string) {
+  const value = normalizeSourceContent(content).trim()
+
+  return (
+    /^(Dr|Cr)\b/i.test(value) &&
+    /\bX\s*$/i.test(value)
+  )
+}
+
+function getJournalDescription(content: string) {
+  const value =
+    normalizeSourceContent(content)
+      .replace(/\t+/g, " ")
+      .trim()
 
   /*
-   * GLOBAL RULE:
-   *
-   * Any source item containing tabs is treated as structured
-   * source material, not as a bullet.
+   * Remove the final X from the description.
    */
-  if (hasSourceColumns(content)) {
-    return (
-      <div key={item.id}>
-        {renderSourceStructuredRow(item)}
+  return value
+    .replace(/\s+X\s*$/i, "")
+    .trim()
+}
+
+function getJournalType(content: string) {
+  const value =
+    normalizeSourceContent(content).trim()
+
+  if (/^Dr\b/i.test(value)) {
+    return "Dr"
+  }
+
+  if (/^Cr\b/i.test(value)) {
+    return "Cr"
+  }
+
+  return ""
+}
+
+
+function renderJournalHeader(item: Item) {
+  return (
+    <div
+      key={item.id}
+      className="
+        grid
+        grid-cols-[minmax(0,1fr)_110px_110px]
+        items-center
+        py-1
+        text-[16px]
+        leading-8
+        text-black
+      "
+    >
+      <div />
+
+      <div className="text-center font-medium">
+        $
       </div>
+
+      <div className="text-center font-medium">
+        $
+      </div>
+    </div>
+  )
+}
+
+function renderJournalRow(item: Item) {
+  const content =
+    normalizeSourceContent(item.content || "")
+      .trim()
+
+  const type =
+    getJournalType(content)
+
+  const description =
+    getJournalDescription(content)
+
+  const isCredit = type === "Cr"
+
+  return (
+    <div
+      key={item.id}
+      className="
+        grid
+        grid-cols-[minmax(0,1fr)_110px_110px]
+        items-start
+        py-1
+        text-[16px]
+        leading-8
+      "
+    >
+      <div className="whitespace-pre-wrap break-words text-black">
+        <span
+          className={
+            type === "Dr"
+              ? "font-bold text-[#16A34A]"
+              : "font-bold text-[#DC2626]"
+          }
+        >
+          {type}
+        </span>
+
+        <span className="text-black">
+          {" "}
+          {description.replace(
+            /^(Dr|Cr)\s+/i,
+            ""
+          )}
+        </span>
+      </div>
+
+      <div className="text-center text-black">
+        {!isCredit && "X"}
+      </div>
+
+      <div className="text-center text-black">
+        {isCredit && "X"}
+      </div>
+    </div>
+  )
+}
+
+/*
+ * ------------------------------------------------------------
+ * SOURCE-SPECIFIC TEXT FORMATTING
+ * ------------------------------------------------------------
+ *
+ * The source material contains some formatting that is carried
+ * in the wording itself rather than in the database item type.
+ *
+ * These helpers preserve that formatting without changing the
+ * actual source wording.
+ */
+
+function renderSourceFormattedText(
+  content: string
+) {
+  const value =
+    normalizeSourceContent(content)
+      .trim()
+
+  /*
+   * "Steps:"
+   */
+  if (
+    /^Steps:\s*$/i.test(value)
+  ) {
+    return (
+      <span className="font-bold text-black">
+        Steps:
+      </span>
     )
   }
 
   /*
-   * Currency-only source rows such as "$    $"
-   * are source layout markers, not bullet points.
+   * Journal heading.
    */
-  if (isCurrencyOnlySourceRow(content)) {
+  if (
+    /^Journal\s*\(/i.test(value)
+  ) {
+    return (
+      <span
+        className="
+          font-bold
+          italic
+          underline
+          decoration-1
+          underline-offset-2
+          text-black
+        "
+      >
+        {value}
+      </span>
+    )
+  }
+
+  /*
+   * The source specifically highlights:
+   *
+   * "Assuming a revaluation Gain"
+   *
+   * in green and bold.
+   */
+  const gainMatch =
+    value.match(
+      /^(.*?)(Assuming a revaluation Gain)(.*)$/i
+    )
+
+  if (gainMatch) {
+    return (
+      <>
+        <span className="text-black">
+          {gainMatch[1]}
+        </span>
+
+        <span className="font-bold text-[#16A34A]">
+          {gainMatch[2]}
+        </span>
+
+        <span className="text-black">
+          {gainMatch[3]}
+        </span>
+      </>
+    )
+  }
+
+  return (
+    <span className="text-black">
+      {value}
+    </span>
+  )
+}
+
+function isNumberedSourceLine(
+  content: string
+) {
+  return /^\(\d+\)\s*/.test(
+    normalizeSourceContent(content).trim()
+  )
+}
+
+function renderNumberedSourceLine(
+  item: Item
+) {
+  const value =
+    normalizeSourceContent(item.content || "")
+      .trim()
+
+  const match =
+    value.match(
+      /^\((\d+)\)\s*(.*)$/
+    )
+
+  if (!match) {
+    return null
+  }
+
+  return (
+    <div
+      key={item.id}
+      className="
+        grid
+        grid-cols-[64px_minmax(0,1fr)]
+        items-start
+        py-1
+        text-[16px]
+        leading-8
+      "
+    >
+      <div
+        className="
+          font-medium
+          text-[#168BC4]
+        "
+      >
+        ({match[1]})
+      </div>
+
+      <div className="text-black">
+        {match[2]}
+      </div>
+    </div>
+  )
+}
+
+function renderSourceItem(item: Item) {
+  const content =
+    normalizeSourceContent(item.content || "")
+      .trim()
+
+  /*
+   * ----------------------------------------------------------
+   * ACCOUNTING JOURNAL
+   * ----------------------------------------------------------
+   */
+
+  if (
+    content === "$\t$" ||
+    /^\$\s+\$+$/.test(
+      content.replace(/\t/g, " ")
+    )
+  ) {
+    return renderJournalHeader(item)
+  }
+
+  if (isJournalRow(content)) {
+    return renderJournalRow(item)
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * NUMBERED SOURCE LINES
+   * ----------------------------------------------------------
+   */
+
+  if (isNumberedSourceLine(content)) {
+    return renderNumberedSourceLine(item)
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * OTHER TAB-BASED SOURCE CONTENT
+   * ----------------------------------------------------------
+   */
+
+  if (content.includes("\t")) {
+    const columns =
+      content
+        .split("\t")
+        .map((value) => value.trim())
+
     return (
       <div
         key={item.id}
         className="
           grid
-          grid-cols-[minmax(0,1fr)_120px]
+          grid-cols-[minmax(0,1fr)_160px_minmax(0,1fr)]
+          items-start
           gap-6
           py-1
           text-[16px]
           leading-8
-          text-slate-700
+          text-black
         "
       >
-        <span>{content.split(/\s+/)[0] || ""}</span>
-        <span className="text-right">
-          {content.split(/\s+/)[1] || ""}
-        </span>
+        <div className="whitespace-pre-wrap break-words">
+          {columns[0] || ""}
+        </div>
+
+        <div className="whitespace-pre-wrap text-center">
+          {columns[1] || ""}
+        </div>
+
+        <div className="whitespace-pre-wrap break-words">
+          {columns.slice(2).filter(Boolean).join(" ")}
+        </div>
       </div>
     )
   }
 
   /*
-   * Ordinary source item.
+   * ----------------------------------------------------------
+   * NORMAL SOURCE CONTENT
+   * ----------------------------------------------------------
    */
+
   if (!shouldRenderAsBullet(item)) {
     return (
       <div
@@ -297,30 +605,39 @@ function renderSourceItem(item: Item) {
           pl-1
           text-[16px]
           leading-8
-          text-slate-700
+          text-black
         "
       >
-        {content}
+        {renderSourceFormattedText(content)}
       </div>
     )
   }
 
-  /*
-   * Genuine bullet-point source content.
-   */
   return (
     <ul
       key={item.id}
-      className="list-disc pl-7 marker:text-[#168BC4]"
+      className="
+        list-disc
+        pl-7
+        marker:text-[#168BC4]
+      "
     >
-      <li className="pl-1 text-[16px] leading-8 text-slate-700">
+      <li
+        className="
+          pl-1
+          text-[16px]
+          leading-8
+          text-black
+        "
+      >
         <span className="whitespace-pre-wrap break-words">
-          {content}
+          {renderSourceFormattedText(content)}
         </span>
       </li>
     </ul>
   )
 }
+
 
 function shouldRenderAsBullet(item: Item) {
   const value = (item.content || "").trim()
@@ -1453,17 +1770,21 @@ export default function AccountingTopicPage() {
                       <div className="mt-8 space-y-8">
                         {sectionBlocks.map(
                           (contentBlock) => (
-                            <RenderSourceBlock
-                              key={
-                                contentBlock.block.id
-                              }
-                              contentBlock={
-                                contentBlock
-                              }
-                              sectionTitle={
-                                section.title
-                              }
-                            />
+                            <AccountingSourceIllustration
+                              key={contentBlock.block.id}
+                              sourceText={[
+                                contentBlock.block.title || "",
+                                contentBlock.block.content || "",
+                                ...contentBlock.items.map(
+                                  (item) => item.content || ""
+                                ),
+                              ].join(" ")}
+                            >
+                              <RenderSourceBlock
+                                contentBlock={contentBlock}
+                                sectionTitle={section.title}
+                              />
+                            </AccountingSourceIllustration>
                           )
                         )}
                       </div>
