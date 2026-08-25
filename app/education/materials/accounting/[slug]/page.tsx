@@ -234,42 +234,112 @@ const VISUALS: Record<
 }
 
 function clean(text: string) {
- return text
-   .replace(/\r/g, "")
-   .replace(/[ \t]+/g, " ")
-   .replace(/\s+\d+$/g, "")
-   .trim()
+  return text
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .trim()
 }
+
 function isNoise(text: string) {
- const value = clean(text)
- return (
-   !value ||
-   /^(TUU(?:\s+\d+)?|Homework|FR Knowledge|SBR New Knowledge|Reference\s*-\s*Page)$/i.test(
-     value
-   )
- )
+  const value = clean(text)
+
+  return (
+    !value ||
+    /^(?:TUU(?:\s+\d+)?|Homework|FR Knowledge|SBR New Knowledge|Reference\s*-\s*Page(?:\s+\d+)?)$/i.test(
+      value
+    )
+  )
 }
+
 function isBullet(text: string) {
- return /^(?:[-•✓✔–—]|○|◦|▪|▫|‣|▸)\s+/.test(text.trim()) ||
-   /^\d+[.)]\s+/.test(text.trim()) ||
-   /^[a-zA-Z][.)]\s+/.test(text.trim())
+  const value = text.trim()
+
+  return (
+    /^(?:[-•✓✔–—○◦▪▫‣▸])\s*/.test(value) ||
+    /^\d+[.)]\s*/.test(value) ||
+    /^[a-zA-Z][.)]\s*/.test(value)
+  )
 }
+
 function bulletLevel(text: string) {
- const value = text.trim()
- if (/^(?:[-•✓✔–—])\s+/.test(value)) return 0
- if (/^\d+[.)]\s+/.test(value)) return 0
- if (/^[a-zA-Z][.)]\s+/.test(value)) return 1
- if (/^(?:○|◦|▪|▫|‣|▸)\s+/.test(value)) return 1
- return -1
+  const value = text.trim()
+
+  if (/^(?:[-•✓✔–—])\s*/.test(value)) return 0
+  if (/^\d+[.)]\s*/.test(value)) return 0
+  if (/^[a-zA-Z][.)]\s*/.test(value)) return 1
+  if (/^(?:○|◦|▪|▫|‣|▸)\s*/.test(value)) return 1
+
+  return -1
 }
+
 function removeBulletMarker(text: string) {
- return text
-   .trim()
-   .replace(/^(?:[-•✓✔–—]|○|◦|▪|▫|‣|▸)\s+/, "")
-   .replace(/^\d+[.)]\s+/, "")
-   .replace(/^[a-zA-Z][.)]\s+/, "")
-   .trim()
+  return text
+    .trim()
+    .replace(/^(?:[-•✓✔–—]|○|◦|▪|▫|‣|▸)\s*/, "")
+    .replace(/^\d+[.)]\s*/, "")
+    .replace(/^[a-zA-Z][.)]\s*/, "")
+    .trim()
 }
+
+/*
+ * Headings in the source material are not consistently capitalised.
+ * Keep the source wording intact, but present headings consistently.
+ */
+function displayHeading(text: string) {
+  const value = clean(text)
+
+  if (!value) return "Understanding the Topic"
+
+  const abbreviations = new Set([
+    "IAS",
+    "IFRS",
+    "CGU",
+    "PPE",
+    "EPS",
+    "OCI",
+    "NRV",
+    "ROU",
+    "NCI",
+    "SME",
+    "SMEs",
+    "SBR",
+    "FR",
+    "FV",
+    "FVOCI",
+    "FVTPL",
+    "P&L",
+  ])
+
+  return value
+    .split(" ")
+    .map((word) => {
+      const leading = word.match(/^[^A-Za-z0-9&]+/)?.[0] ?? ""
+      const trailing = word.match(/[^A-Za-z0-9&]+$/)?.[0] ?? ""
+      const core = word.slice(
+        leading.length,
+        word.length - trailing.length || undefined
+      )
+
+      if (!core) return word
+
+      if (abbreviations.has(core.toUpperCase())) {
+        return `${leading}${core.toUpperCase()}${trailing}`
+      }
+
+      if (/^[A-Z][A-Z0-9&-]*$/.test(core) || /^[a-z]+$/.test(core)) {
+        return (
+          leading +
+          core.charAt(0).toUpperCase() +
+          core.slice(1).toLowerCase() +
+          trailing
+        )
+      }
+
+      return word
+    })
+    .join(" ")
+}
+
 function isLikelyHeading(text: string) {
  const value = clean(text)
  if (!value || value.length > 90) return false
@@ -283,29 +353,10 @@ function isLikelyHeading(text: string) {
    value === value.toUpperCase()
  )
 }
-function sourceBlocks(topic: RawTopic): {
-  title: string
-  items: string[]
-}[] {
+function sourceBlocks(
+  topic: RawTopic
+): { title: string; items: string[] }[] {
   const result: { title: string; items: string[] }[] = []
-
-  /*
-   * IMPORTANT:
-   * Never merge blocks merely because their headings match.
-   *
-   * The source presentations legitimately contain multiple
-   * slides with the same heading but different content.
-   *
-   * Example:
-   *
-   *   Recognition
-   *     Point A
-   *
-   *   Recognition
-   *     Point B
-   *
-   * These must remain two separate blocks.
-   */
 
   const add = (title: string, items: string[]) => {
     const cleanTitle = clean(title)
@@ -314,14 +365,33 @@ function sourceBlocks(topic: RawTopic): {
       .map(clean)
       .filter((item) => !isNoise(item))
 
-    if (!cleanTitle && cleanItems.length === 0) {
+    /*
+     * Do not render empty source blocks.
+     *
+     * Some source presentations contain a heading-only slide,
+     * followed by the actual content on the next slide.
+     */
+    if (cleanItems.length === 0) {
       return
     }
 
     /*
-     * ALWAYS create a new presentation block.
+     * IMPORTANT:
      *
-     * Do not merge with the previous block.
+     * Never merge blocks merely because their headings match.
+     *
+     * The source material can legitimately contain multiple
+     * slides with the same heading but different content.
+     *
+     * Example:
+     *
+     *   Recognition
+     *      content A
+     *
+     *   Recognition
+     *      content B
+     *
+     * Both blocks must remain separate.
      */
     result.push({
       title: cleanTitle || "Understanding the Topic",
@@ -330,24 +400,22 @@ function sourceBlocks(topic: RawTopic): {
   }
 
   /*
-   * Structured blocks are authoritative.
+   * Structured blocks are preferred.
    *
-   * When blocks exist, do not also render legacy slides.
-   * This prevents the old flattened source from appearing
-   * a second time.
+   * When blocks exist, they are rendered directly and the
+   * legacy slide representation is not also rendered.
    */
-  if (
-    Array.isArray(topic.blocks) &&
-    topic.blocks.length > 0
-  ) {
+  if (Array.isArray(topic.blocks) && topic.blocks.length > 0) {
     for (const block of topic.blocks) {
+      const items = [
+        ...(block.items ?? []),
+        ...(block.content ?? []),
+        ...(block.text ? [block.text] : []),
+      ]
+
       add(
         block.title ?? block.label ?? "",
-        [
-          ...(block.items ?? []),
-          ...(block.content ?? []),
-          ...(block.text ? [block.text] : []),
-        ]
+        items
       )
     }
 
@@ -355,20 +423,19 @@ function sourceBlocks(topic: RawTopic): {
   }
 
   /*
-   * Sections are the second-choice structured source.
+   * Sections are the second structured source.
    */
-  if (
-    Array.isArray(topic.sections) &&
-    topic.sections.length > 0
-  ) {
+  if (Array.isArray(topic.sections) && topic.sections.length > 0) {
     for (const block of topic.sections) {
+      const items = [
+        ...(block.items ?? []),
+        ...(block.content ?? []),
+        ...(block.text ? [block.text] : []),
+      ]
+
       add(
         block.title ?? block.label ?? "",
-        [
-          ...(block.items ?? []),
-          ...(block.content ?? []),
-          ...(block.text ? [block.text] : []),
-        ]
+        items
       )
     }
 
@@ -377,8 +444,6 @@ function sourceBlocks(topic: RawTopic): {
 
   /*
    * Legacy slide fallback.
-   *
-   * Used only where structured blocks/sections do not exist.
    */
   if (Array.isArray(topic.slides)) {
     for (const slide of topic.slides) {
@@ -395,10 +460,7 @@ function sourceBlocks(topic: RawTopic): {
           continue
         }
 
-        if (
-          isLikelyHeading(text) &&
-          items.length === 0
-        ) {
+        if (isLikelyHeading(text) && items.length === 0) {
           currentHeading = text
         } else {
           items.push(text)
@@ -668,6 +730,23 @@ function ReadingBlock({
 
   const pendingRows: TableRow[] = []
 
+  /*
+   * Some of the supplied presentation material uses a colon to
+   * introduce a list, but the extracted text no longer contains
+   * the original bullet glyphs.
+   *
+   * Example:
+   *
+   *   The following costs should be excluded ...:
+   *   abnormal waste - ...
+   *   storage costs
+   *   administrative overheads ...
+   *   selling costs
+   *
+   * Recover that structure for display without changing the text.
+   */
+  let implicitBulletList = false
+
   for (const raw of items) {
     const item = clean(raw)
 
@@ -679,6 +758,7 @@ function ReadingBlock({
 
     if (/^(?:question|solution)$/i.test(item)) {
       paragraphs.push(item)
+      implicitBulletList = false
       continue
     }
 
@@ -686,9 +766,10 @@ function ReadingBlock({
       /(?:fair value less costs to sell|net realisable value|recoverable amount|carrying amount).*=/i.test(
         item
       ) ||
-      /(?:=|\+|-|\×|x|÷)\s*[$£€]?\s*\d[\d,]*/.test(item)
+      /(?:=|\+|-|×|x|÷)\s*[$£€]?\s*\d[\d,]*/.test(item)
     ) {
       formulaLines.push(item)
+      implicitBulletList = false
       continue
     }
 
@@ -697,11 +778,6 @@ function ReadingBlock({
     if (row) {
       pendingRows.push(row)
 
-      /*
-       * Flush a calculation table when a normal paragraph appears.
-       * The rows are kept together instead of being rendered as
-       * independent paragraphs.
-       */
       if (pendingRows.length >= 2) {
         continue
       }
@@ -710,24 +786,40 @@ function ReadingBlock({
     if (pendingRows.length > 0) {
       if (pushTableRows([...pendingRows])) {
         pendingRows.length = 0
+        implicitBulletList = false
         continue
       }
 
       pendingRows.length = 0
     }
 
-    if (/^\d+[.)]\s+/.test(item)) {
-      numbered.push(item.replace(/^\d+[.)]\s+/, "").trim())
-    } else if (/^[a-zA-Z][.)]\s+/.test(item)) {
-      nestedBullets.push(
-        item.replace(/^[a-zA-Z][.)]\s+/, "").trim()
-      )
-    } else if (/^(?:[-•✓✔–—])\s+/.test(item)) {
-      bullets.push(removeBulletMarker(item))
-    } else if (/^(?:○|◦|▪|▫|‣|▸)\s+/.test(item)) {
+    const explicitBullet = isBullet(item)
+    const numberedItem = /^\d+[.)]\s*/.test(item)
+    const letteredItem = /^[a-zA-Z][.)]\s*/.test(item)
+    const nestedMarker = /^(?:○|◦|▪|▫|‣|▸)\s*/.test(item)
+
+    if (numberedItem) {
+      numbered.push(removeBulletMarker(item))
+      implicitBulletList = true
+    } else if (letteredItem) {
       nestedBullets.push(removeBulletMarker(item))
+      implicitBulletList = true
+    } else if (explicitBullet && !nestedMarker) {
+      bullets.push(removeBulletMarker(item))
+      implicitBulletList = true
+    } else if (nestedMarker) {
+      nestedBullets.push(removeBulletMarker(item))
+      implicitBulletList = true
+    } else if (
+      implicitBulletList &&
+      !isLikelyHeading(item) &&
+      !/[.!?]$/.test(item) &&
+      item.length <= 180
+    ) {
+      bullets.push(item)
     } else {
       paragraphs.push(item)
+      implicitBulletList = /:$/.test(item)
     }
   }
 
@@ -740,7 +832,7 @@ function ReadingBlock({
     ))
   }
 
-  const normalizedTitle = title.trim()
+  const normalizedTitle = displayHeading(title)
 
   const isQuestion = /^question$/i.test(normalizedTitle)
   const isSolution = /^solution$/i.test(normalizedTitle)
@@ -1212,7 +1304,7 @@ export default function AccountingTopicPage() {
                     href={`#lesson-${index}`}
                     className="block border-l-2 border-transparent px-3 py-2 text-sm leading-6 text-slate-600 transition hover:border-[#168BC4] hover:text-[#071B49]"
                   >
-                    {block.title}
+                    {displayHeading(block.title)}
                   </a>
                 ))}
               </div>
