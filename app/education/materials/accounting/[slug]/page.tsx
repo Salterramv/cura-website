@@ -115,6 +115,47 @@ function isExample(block: Block) {
  * Normalize block type so the presentation is controlled by the
  * actual source structure rather than by generic paragraph styling.
  */
+function shouldRenderAsBullet(item: Item) {
+  const value = (item.content || "").trim()
+
+  if (!value) {
+    return false
+  }
+
+  /*
+   * Currency/calculation placeholders from the source material
+   * are not bullet points.
+   *
+   * Examples:
+   *   $ $
+   *   $   $
+   *   $       $
+   */
+  const withoutWhitespace = value.replace(/\s+/g, "")
+
+  if (
+    /^\$+$/.test(withoutWhitespace) ||
+    /^\$+\$+$/.test(withoutWhitespace)
+  ) {
+    return false
+  }
+
+  /*
+   * Lines containing only accounting separators or formatting
+   * characters should remain source-format content rather than
+   * becoming bullets.
+   */
+  if (
+    /^[\$\-_=.,:;|]+$/.test(
+      withoutWhitespace
+    )
+  ) {
+    return false
+  }
+
+  return true
+}
+
 function getBlockType(block: Block) {
   const type = (block.block_type || "").toLowerCase().trim()
 
@@ -316,18 +357,33 @@ function RenderSourceBlock({
           )}
 
         {validItems.length > 0 && (
-          <ul className="list-disc space-y-3 pl-7 marker:text-[#168BC4]">
-            {validItems.map((item) => (
-              <li
-                key={item.id}
-                className="pl-1 text-[16px] leading-8 text-slate-700"
-              >
-                <span className="whitespace-pre-wrap break-words">
-                  {item.content}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-3">
+            {validItems.map((item) => {
+              if (!shouldRenderAsBullet(item)) {
+                return (
+                  <div
+                    key={item.id}
+                    className="whitespace-pre-wrap break-words pl-1 font-mono text-[16px] leading-8 text-slate-700"
+                  >
+                    {item.content}
+                  </div>
+                )
+              }
+
+              return (
+                <ul
+                  key={item.id}
+                  className="list-disc pl-7 marker:text-[#168BC4]"
+                >
+                  <li className="pl-1 text-[16px] leading-8 text-slate-700">
+                    <span className="whitespace-pre-wrap break-words">
+                      {item.content}
+                    </span>
+                  </li>
+                </ul>
+              )
+            })}
+          </div>
         )}
       </div>
     )
