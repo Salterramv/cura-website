@@ -289,71 +289,98 @@ function sourceBlocks(topic: RawTopic): {
 }[] {
   const result: { title: string; items: string[] }[] = []
 
+  /*
+   * IMPORTANT:
+   * Never merge blocks merely because their headings match.
+   *
+   * The source presentations legitimately contain multiple
+   * slides with the same heading but different content.
+   *
+   * Example:
+   *
+   *   Recognition
+   *     Point A
+   *
+   *   Recognition
+   *     Point B
+   *
+   * These must remain two separate blocks.
+   */
+
   const add = (title: string, items: string[]) => {
     const cleanTitle = clean(title)
 
     const cleanItems = items
       .map(clean)
-      .filter((x) => !isNoise(x))
+      .filter((item) => !isNoise(item))
 
-    if (!cleanTitle && !cleanItems.length) return
-
-    const last = result[result.length - 1]
-
-    if (
-      last &&
-      last.title.toLowerCase() === cleanTitle.toLowerCase()
-    ) {
-      last.items.push(...cleanItems)
-    } else {
-      result.push({
-        title: cleanTitle || "Understanding the Topic",
-        items: cleanItems,
-      })
+    if (!cleanTitle && cleanItems.length === 0) {
+      return
     }
+
+    /*
+     * ALWAYS create a new presentation block.
+     *
+     * Do not merge with the previous block.
+     */
+    result.push({
+      title: cleanTitle || "Understanding the Topic",
+      items: cleanItems,
+    })
   }
 
   /*
-   * IMPORTANT:
+   * Structured blocks are authoritative.
    *
-   * The corrected structured representation is the primary
-   * source of accounting content.
-   *
-   * Once blocks exist, legacy slides MUST NOT also be rendered.
+   * When blocks exist, do not also render legacy slides.
+   * This prevents the old flattened source from appearing
+   * a second time.
    */
-  if (Array.isArray(topic.blocks) && topic.blocks.length > 0) {
+  if (
+    Array.isArray(topic.blocks) &&
+    topic.blocks.length > 0
+  ) {
     for (const block of topic.blocks) {
-      const items = [
-        ...(block.items ?? []),
-        ...(block.content ?? []),
-        ...(block.text ? [block.text] : []),
-      ]
-
-      add(block.title ?? block.label ?? "", items)
+      add(
+        block.title ?? block.label ?? "",
+        [
+          ...(block.items ?? []),
+          ...(block.content ?? []),
+          ...(block.text ? [block.text] : []),
+        ]
+      )
     }
-  } else if (
+
+    return result
+  }
+
+  /*
+   * Sections are the second-choice structured source.
+   */
+  if (
     Array.isArray(topic.sections) &&
     topic.sections.length > 0
   ) {
-    /*
-     * Sections are the second-choice structured source.
-     */
     for (const block of topic.sections) {
-      const items = [
-        ...(block.items ?? []),
-        ...(block.content ?? []),
-        ...(block.text ? [block.text] : []),
-      ]
-
-      add(block.title ?? block.label ?? "", items)
+      add(
+        block.title ?? block.label ?? "",
+        [
+          ...(block.items ?? []),
+          ...(block.content ?? []),
+          ...(block.text ? [block.text] : []),
+        ]
+      )
     }
-  } else if (Array.isArray(topic.slides)) {
-    /*
-     * Legacy fallback only.
-     *
-     * This is used only when the topic has not yet been
-     * converted to blocks or sections.
-     */
+
+    return result
+  }
+
+  /*
+   * Legacy slide fallback.
+   *
+   * Used only where structured blocks/sections do not exist.
+   */
+  if (Array.isArray(topic.slides)) {
     for (const slide of topic.slides) {
       const items: string[] = []
 
@@ -364,9 +391,14 @@ function sourceBlocks(topic: RawTopic): {
       for (const item of slide.blocks ?? []) {
         const text = clean(item.text ?? "")
 
-        if (isNoise(text)) continue
+        if (isNoise(text)) {
+          continue
+        }
 
-        if (isLikelyHeading(text) && !items.length) {
+        if (
+          isLikelyHeading(text) &&
+          items.length === 0
+        ) {
           currentHeading = text
         } else {
           items.push(text)
@@ -377,58 +409,9 @@ function sourceBlocks(topic: RawTopic): {
     }
   }
 
-  /*
-   * GLOBAL DUPLICATE REMOVAL
-   *
-   * Some source materials contain the same complete topic
-   * more than once. The old renderer displayed both copies.
-   *
-   * Compare the complete block:
-   *   title + all content
-   *
-   * Comparison ignores:
-   *   - capitalization
-   *   - repeated whitespace
-   *   - common bullet markers
-   *
-   * Therefore:
-   *
-   *   "Identifiable - EXAMPLES"
-   *
-   * and
-   *
-   *   "Identifiable - Examples"
-   *
-   * are treated as the same heading.
-   *
-   * But two blocks with the same title and different
-   * substantive content are retained.
-   */
-  const normalizeForDuplicateCheck = (value: string) =>
-    value
-      .toLowerCase()
-      .replace(/[•✓✔–—○◦▪▫‣▸]/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-
-  const seen = new Set<string>()
-
-  const deduplicated = result.filter((block) => {
-    const signature = [
-      normalizeForDuplicateCheck(block.title),
-      ...block.items.map(normalizeForDuplicateCheck),
-    ].join("||")
-
-    if (seen.has(signature)) {
-      return false
-    }
-
-    seen.add(signature)
-    return true
-  })
-
-  return deduplicated
+  return result
 }
+
 function findTopic(slug: string): RawTopic | undefined {
   const source = accountingTopics as unknown
 
