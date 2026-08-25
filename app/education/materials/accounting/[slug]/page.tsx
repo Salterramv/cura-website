@@ -4,121 +4,100 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 
-import { createClient } from "@/lib/supabase/client"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
-import { accountingSourceTopics } from "../data/topics"
+import { createClient } from "@/lib/supabase/client"
+
+type Topic = {
+  id: string
+  slug: string
+  title: string
+  standard: string | null
+  description: string | null
+  source_reference: string | null
+}
+
+type Section = {
+  id: string
+  title: string
+  section_type: string
+  display_order: number
+  presentation: Record<string, unknown> | null
+}
+
+type Block = {
+  id: string
+  section_id: string
+  block_type: string
+  title: string | null
+  content: string | null
+  display_order: number
+  presentation: Record<string, unknown> | null
+}
+
+type Item = {
+  id: string
+  block_id: string
+  content: string
+  item_type: string | null
+  display_order: number
+}
 
 type Quiz = {
   id: string
   title: string
   description: string | null
   time_limit_seconds: number
-}
-
-type Question = {
-  id: string
-  question_text: string
-  options: unknown
-  correct_option: number
-  explanation: string | null
-  points: number
+  is_published: boolean
 }
 
 /*
- * Convert the original heading to the requested sidebar format.
+ * Sidebar heading formatting.
  *
  * Example:
  *
- * REVENUE RECOGNITION
+ * "4 ALLOCATE THE TRANSACTION PRICE TO THE PERFORMANCE OBLIGATIONS IN THE CONTRACT"
  *
  * becomes:
  *
- * Revenue recognition
+ * "4 allocate the transaction price to the performance obligations in the contract"
+ *
+ * Only the first character remains capitalized.
  */
-function sidebarLabel(text: string) {
-  const value = text.trim()
+function formatSidebarHeading(value: string) {
+  const cleaned = value.trim()
 
-  if (!value) {
+  if (!cleaned) {
     return ""
   }
 
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+  return cleaned.charAt(0) + cleaned.slice(1).toLowerCase()
 }
 
 /*
- * Turn source text into readable continuous web content.
+ * Get the source items belonging to a section.
  *
- * We deliberately do NOT:
- * - rewrite the text
- * - summarise it
- * - add outside accounting knowledge
- * - convert every line into a card
+ * IMPORTANT:
+ * We deliberately render only education_block_items.
  *
- * The PowerPoint-derived source remains the authority.
+ * education_content_blocks.content is NOT rendered because it is a
+ * duplicate representation of the same imported source material.
  */
-function renderSourceText(text: string) {
-  const parts = text
-    .split(/\n{2,}/)
-    .map((part) => part.trim())
-    .filter(Boolean)
+function getSectionItems(
+  section: Section,
+  blocks: Block[],
+  items: Item[]
+): Item[] {
+  const sectionBlocks = blocks
+    .filter((block) => block.section_id === section.id)
+    .sort((a, b) => a.display_order - b.display_order)
 
-  return parts.map((part, index) => {
-    const lines = part
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-
-    /*
-     * Detect simple numbered or bulleted source lists.
-     *
-     * These are presented as a clean CURA list rather than as
-     * separate slide-like blocks.
-     */
-    const isList =
-      lines.length > 1 &&
-      lines.every((line) =>
-        /^((\d+[\.\)]|[a-zA-Z][\.\)]|[-•●▪])\s+)/.test(line)
-      )
-
-    if (isList) {
-      return (
-        <ul
-          key={index}
-          className="space-y-3 pl-6 text-[16px] leading-8 text-slate-700"
-        >
-          {lines.map((line, lineIndex) => {
-            const cleaned = line.replace(
-              /^((\d+[\.\)]|[a-zA-Z][\.\)]|[-•●▪])\s+)/,
-              ""
-            )
-
-            return (
-              <li
-                key={lineIndex}
-                className="relative pl-2"
-              >
-                <span className="absolute -left-4 top-[0.75rem] h-1.5 w-1.5 rounded-full bg-[#35B5E5]" />
-                {cleaned}
-              </li>
-            )
-          })}
-        </ul>
-      )
-    }
-
-    /*
-     * Preserve line breaks where the original source uses them.
-     */
-    return (
-      <p
-        key={index}
-        className="whitespace-pre-line text-[16px] leading-8 text-slate-700"
-      >
-        {part}
-      </p>
+  return sectionBlocks
+    .flatMap((block) =>
+      items
+        .filter((item) => item.block_id === block.id)
+        .sort((a, b) => a.display_order - b.display_order)
     )
-  })
 }
 
 export default function AccountingTopicPage() {
@@ -131,75 +110,215 @@ export default function AccountingTopicPage() {
         ? params.slug[0]
         : ""
 
-  const sourceTopic = useMemo(
-    () =>
-      accountingSourceTopics.find(
-        (topic) => topic.slug === slug
-      ),
-    [slug]
-  )
+  const supabase = useMemo(() => createClient(), [])
 
-  const supabase = useMemo(
-    () => createClient(),
-    []
-  )
+  const [topic, setTopic] = useState<Topic | null>(null)
+  const [sections, setSections] = useState<Section[]>([])
+  const [blocks, setBlocks] = useState<Block[]>([])
+  const [items, setItems] = useState<Item[]>([])
+  const [quiz, setQuiz] = useState<Quiz | null>(null)
 
-  const [quiz, setQuiz] =
-    useState<Quiz | null>(null)
-
-  const [questions, setQuestions] =
-    useState<Question[]>([])
-
-  const [answers, setAnswers] =
-    useState<Record<string, number>>({})
-
-  const [submitted, setSubmitted] =
-    useState(false)
-
-  const [loadingQuiz, setLoadingQuiz] =
-    useState(false)
-
-  /*
-   * -----------------------------------------------------------
-   * LOAD QUIZ
-   * -----------------------------------------------------------
-   */
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!sourceTopic) {
+    if (!slug) {
+      setError("Topic not found.")
+      setLoading(false)
       return
     }
 
-    let active = true
-
-    async function loadQuiz() {
-      setLoadingQuiz(true)
+    async function loadTopic() {
+      setLoading(true)
+      setError(null)
 
       /*
-       * First try the topic-specific quiz already stored
-       * in Supabase.
+       * =========================================================
+       * 1. LOAD TOPIC
+       * =========================================================
        */
+
+      const { data: topicData, error: topicError } = await supabase
+        .from("education_topics")
+        .select(
+          "id,slug,title,standard,description,source_reference"
+        )
+        .eq("slug", slug)
+        .eq("category", "Accounting")
+        .eq("is_published", true)
+        .eq("status", "published")
+        .maybeSingle()
+
+      if (topicError) {
+        console.error("Topic loading error:", topicError)
+        setError(topicError.message)
+        setLoading(false)
+        return
+      }
+
+      if (!topicData) {
+        setError("Topic not found.")
+        setLoading(false)
+        return
+      }
+
+      /*
+       * Supabase's generated database types currently resolve these
+       * education-table results as GenericStringError.
+       *
+       * The runtime query is valid, so explicitly narrow the result
+       * through unknown to our local page types.
+       */
+      const loadedTopic = topicData as unknown as Topic
+
+      /*
+       * =========================================================
+       * 2. LOAD SECTIONS
+       * =========================================================
+       */
+
+      const {
+        data: sectionData,
+        error: sectionError,
+      } = await supabase
+        .from("education_sections")
+        .select(
+          "id,title,section_type,display_order,presentation"
+        )
+        .eq("topic_id", loadedTopic.id)
+        .eq("is_published", true)
+        .order("display_order", {
+          ascending: true,
+        })
+
+      if (sectionError) {
+        console.error(
+          "Section loading error:",
+          sectionError
+        )
+
+        setError(sectionError.message)
+        setLoading(false)
+        return
+      }
+
+      const loadedSections =
+        (sectionData ?? []) as unknown as Section[]
+
+      const sectionIds = loadedSections.map(
+        (section) => section.id
+      )
+
+      /*
+       * =========================================================
+       * 3. LOAD CONTENT BLOCKS
+       * =========================================================
+       */
+
+      let loadedBlocks: Block[] = []
+
+      if (sectionIds.length > 0) {
+        const {
+          data: blockData,
+          error: blockError,
+        } = await supabase
+          .from("education_content_blocks")
+          .select(
+            "id,section_id,block_type,title,content,display_order,presentation"
+          )
+          .in("section_id", sectionIds)
+          .eq("is_published", true)
+          .order("display_order", {
+            ascending: true,
+          })
+
+        if (blockError) {
+          console.error(
+            "Block loading error:",
+            blockError
+          )
+
+          setError(blockError.message)
+          setLoading(false)
+          return
+        }
+
+        loadedBlocks =
+          (blockData ?? []) as unknown as Block[]
+      }
+
+      /*
+       * =========================================================
+       * 4. LOAD SOURCE ITEMS
+       * =========================================================
+       */
+
+      const blockIds = loadedBlocks.map(
+        (block) => block.id
+      )
+
+      let loadedItems: Item[] = []
+
+      if (blockIds.length > 0) {
+        const {
+          data: itemData,
+          error: itemError,
+        } = await supabase
+          .from("education_block_items")
+          .select(
+            "id,block_id,content,item_type,display_order"
+          )
+          .in("block_id", blockIds)
+          .order("display_order", {
+            ascending: true,
+          })
+
+        if (itemError) {
+          console.error(
+            "Item loading error:",
+            itemError
+          )
+
+          setError(itemError.message)
+          setLoading(false)
+          return
+        }
+
+        loadedItems =
+          (itemData ?? []) as unknown as Item[]
+      }
+
+      /*
+       * =========================================================
+       * 5. LOAD TOPIC QUIZ
+       * =========================================================
+       *
+       * The quiz is intentionally loaded separately.
+       *
+       * It will be rendered AFTER all learning material.
+       */
+
+      const expectedQuizTitle =
+        `${loadedTopic.title} — Topic Quiz`
+
       const {
         data: quizData,
         error: quizError,
       } = await supabase
         .from("education_quizzes")
         .select(
-          "id,title,description,time_limit_seconds"
+          "id,title,description,time_limit_seconds,is_published"
         )
         .eq("category", "Accounting")
         .eq("is_published", true)
-        .eq(
-          "title",
-          `${topic.title} — Topic Quiz`
-        )
+        .eq("title", expectedQuizTitle)
         .maybeSingle()
 
-      if (!active) {
-        return
-      }
-
       if (quizError) {
+        /*
+         * A missing quiz should not prevent the learning material
+         * from displaying.
+         */
         console.warn(
           "Quiz loading warning:",
           quizError.message
@@ -210,87 +329,55 @@ export default function AccountingTopicPage() {
         ? (quizData as unknown as Quiz)
         : null
 
+      /*
+       * =========================================================
+       * SAVE STATE
+       * =========================================================
+       */
+
+      setTopic(loadedTopic)
+      setSections(loadedSections)
+      setBlocks(loadedBlocks)
+      setItems(loadedItems)
       setQuiz(loadedQuiz)
 
-      /*
-       * Load questions only when the quiz exists.
-       */
-      if (loadedQuiz) {
-        const {
-          data: questionData,
-          error: questionError,
-        } = await supabase
-          .from("education_questions")
-          .select(
-            "id,question_text,options,correct_option,explanation,points"
-          )
-          .eq("quiz_id", loadedQuiz.id)
-          .order("sort_order", {
-            ascending: true,
-          })
-
-        if (!active) {
-          return
-        }
-
-        if (questionError) {
-          console.warn(
-            "Question loading warning:",
-            questionError.message
-          )
-
-          setQuestions([])
-        } else {
-          setQuestions(
-            (questionData ?? []) as unknown as Question[]
-          )
-        }
-      } else {
-        setQuestions([])
-      }
-
-      setLoadingQuiz(false)
+      setLoading(false)
     }
 
-    void loadQuiz()
-
-    return () => {
-      active = false
-    }
-  }, [sourceTopic, supabase])
+    void loadTopic()
+  }, [slug, supabase])
 
   /*
-   * -----------------------------------------------------------
-   * TOPIC NOT FOUND
-   * -----------------------------------------------------------
+   * ===========================================================
+   * LOADING STATE
+   * ===========================================================
    */
 
-  if (!sourceTopic) {
+  if (loading) {
     return (
       <main className="min-h-screen bg-[#F5F8FC]">
         <CuraHeader />
 
-        <section className="mx-auto max-w-4xl px-6 py-24 text-center">
-          <div className="mx-auto max-w-xl">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#168BC4]">
-              Accounting education
-            </p>
+        <section className="bg-[#071B49]">
+          <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+            <div className="h-4 w-28 animate-pulse rounded bg-white/20" />
 
-            <h1 className="mt-4 text-3xl font-semibold text-[#071B49]">
-              Topic unavailable
-            </h1>
+            <div className="mt-8 h-6 w-24 animate-pulse rounded-full bg-white/20" />
 
-            <p className="mt-4 text-slate-500">
-              The requested accounting topic could
-              not be found.
-            </p>
+            <div className="mt-6 h-14 w-2/3 animate-pulse rounded bg-white/20" />
 
-            <Link
-              href="/education/materials/accounting"
-              className="mt-8 inline-flex rounded-full bg-[#071B49] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#102A5F]"
-            >
-              Back to Accounting
-            </Link>
+            <div className="mt-6 h-5 w-2/3 animate-pulse rounded bg-white/10" />
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
+          <div className="grid gap-8 lg:grid-cols-[250px_minmax(0,1fr)]">
+            <div className="h-80 animate-pulse rounded-3xl bg-white" />
+
+            <div className="space-y-8">
+              <div className="h-96 animate-pulse rounded-3xl bg-white" />
+              <div className="h-96 animate-pulse rounded-3xl bg-white" />
+            </div>
           </div>
         </section>
 
@@ -299,43 +386,76 @@ export default function AccountingTopicPage() {
     )
   }
 
-  const topic = sourceTopic
-
   /*
-   * -----------------------------------------------------------
-   * QUIZ SCORE
-   * -----------------------------------------------------------
+   * ===========================================================
+   * ERROR STATE
+   * ===========================================================
    */
 
-  const totalPoints = questions.reduce(
-    (sum, question) =>
-      sum + (question.points || 1),
-    0
-  )
+  if (error || !topic) {
+    return (
+      <main className="min-h-screen bg-[#F5F8FC]">
+        <CuraHeader />
 
-  const score = submitted
-    ? questions.reduce(
-        (sum, question) =>
-          sum +
-          (answers[question.id] ===
-          question.correct_option
-            ? question.points || 1
-            : 0),
-        0
-      )
-    : 0
+        <section className="mx-auto max-w-4xl px-6 py-24 text-center">
+          <h1 className="text-3xl font-semibold text-[#071B49]">
+            Topic unavailable
+          </h1>
 
-  const answeredAll =
-    questions.length > 0 &&
-    questions.every(
-      (question) =>
-        answers[question.id] !== undefined
+          <p className="mx-auto mt-4 max-w-xl text-slate-500">
+            {error ||
+              "The requested accounting topic could not be found."}
+          </p>
+
+          <Link
+            href="/education/materials/accounting"
+            className="mt-8 inline-flex rounded-full bg-[#071B49] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#102A5F]"
+          >
+            Back to Accounting
+          </Link>
+        </section>
+
+        <CuraFooter />
+      </main>
     )
+  }
 
   /*
-   * -----------------------------------------------------------
+   * ===========================================================
+   * PREPARE VISIBLE SECTIONS
+   * ===========================================================
+   *
+   * A section is shown only if it contains actual source items.
+   *
+   * We do NOT use education_content_blocks.content.
+   * Only education_block_items are rendered.
+   */
+
+  const visibleSections = sections
+    .map((section) => {
+      const sectionItems = getSectionItems(
+        section,
+        blocks,
+        items
+      )
+
+      return {
+        section,
+        items: sectionItems,
+      }
+    })
+    .filter(({ items: sectionItems }) => {
+      return sectionItems.some(
+        (item) =>
+          typeof item.content === "string" &&
+          item.content.trim().length > 0
+      )
+    })
+
+  /*
+   * ===========================================================
    * PAGE
-   * -----------------------------------------------------------
+   * ===========================================================
    */
 
   return (
@@ -347,7 +467,7 @@ export default function AccountingTopicPage() {
           ======================================================= */}
 
       <section className="relative overflow-hidden bg-[#071B49] text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(53,181,229,0.18),transparent_32%),radial-gradient(circle_at_5%_90%,rgba(22,139,196,0.14),transparent_35%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(53,181,229,0.16),transparent_30%),radial-gradient(circle_at_10%_90%,rgba(22,139,196,0.12),transparent_35%)]" />
 
         <div className="relative mx-auto max-w-7xl px-6 py-14 lg:px-8 lg:py-20">
           <Link
@@ -357,425 +477,238 @@ export default function AccountingTopicPage() {
             ← Accounting
           </Link>
 
-          <p className="mt-8 text-xs font-bold uppercase tracking-[0.25em] text-[#35B5E5]">
-            Chapter {topic.chapter}
-          </p>
+          <div className="mt-8 max-w-4xl">
+            {topic.standard && (
+              <span className="inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#35B5E5]">
+                {topic.standard}
+              </span>
+            )}
 
-          <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight md:text-6xl">
-            {topic.title}
-          </h1>
+            {/* Topic title appears ONCE */}
+            <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-6xl">
+              {topic.title}
+            </h1>
 
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-            Study this topic through the original
-            course material, presented in a continuous
-            CURA learning experience.
-          </p>
+            {topic.description && (
+              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
+                {topic.description}
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
       {/* =======================================================
-          MAIN LAYOUT
+          CONTENT AREA
           ======================================================= */}
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="relative lg:pr-[320px]">
-          <article className="py-10 lg:py-14">
+      <section className="mx-auto max-w-7xl px-6 py-10 lg:px-8 lg:py-14">
+        <div className="lg:grid lg:grid-cols-[250px_minmax(0,1fr)] lg:items-start lg:gap-10">
 
-            {/* =================================================
-                LEARNING CONTENT
-                ================================================= */}
+          {/* ===================================================
+              SIDE PANEL
+              =================================================== */}
 
-            <div className="space-y-16">
-              {topic.sections.map(
-                (section, index) => {
-                  const id =
-                    `section-${topic.chapter}-${index}`
+          <aside className="mb-8 lg:sticky lg:top-24 lg:mb-0">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(7,27,73,0.05)]">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+                On this page
+              </p>
 
-                  return (
-                    <section
-                      key={id}
-                      id={id}
-                      className="scroll-mt-24"
-                    >
-                      {/* ---------------------------------------
-                          SECTION HEADING
-                          --------------------------------------- */}
-
-                      <div className="border-b border-slate-200 pb-5">
-                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#168BC4]">
-                          Section {index + 1}
-                        </p>
-
-                        <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071B49] md:text-3xl">
-                          {section.heading}
-                        </h2>
-                      </div>
-
-                      {/* ---------------------------------------
-                          SOURCE CONTENT
-
-                          Continuous page content.
-                          Not a slide.
-                          --------------------------------------- */}
-
-                      <div className="mt-7 space-y-5">
-                        {section.content
-                          ? renderSourceText(
-                              section.content
-                            )
-                          : null}
-                      </div>
-                    </section>
-                  )
-                }
-              )}
-            </div>
-
-            {/* =================================================
-                QUIZ
-                ================================================= */}
-
-            <section
-              id="topic-quiz"
-              className="mt-24 scroll-mt-24 border-t border-slate-200 pt-14"
-            >
-              {/* Quiz introduction */}
-
-              <div className="rounded-[30px] bg-[#071B49] p-8 text-white md:p-10">
-                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#35B5E5]">
-                  Topic assessment
-                </p>
-
-                <h2 className="mt-3 text-3xl font-semibold md:text-4xl">
-                  Test your knowledge
-                </h2>
-
-                <p className="mt-4 max-w-2xl text-[16px] leading-7 text-slate-300">
-                  Answer the multiple-choice questions
-                  based on this chapter's source
-                  material.
-                </p>
-
-                {quiz &&
-                  quiz.time_limit_seconds > 0 && (
-                    <p className="mt-4 text-sm font-semibold text-slate-400">
-                      Time limit:{" "}
-                      {Math.ceil(
-                        quiz.time_limit_seconds /
-                          60
-                      )}{" "}
-                      minutes
-                    </p>
-                  )}
-              </div>
-
-              {/* Loading */}
-
-              {loadingQuiz && (
-                <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8">
-                  <p className="text-slate-500">
-                    Loading quiz…
-                  </p>
-                </div>
-              )}
-
-              {/* No questions */}
-
-              {!loadingQuiz &&
-                questions.length === 0 && (
-                  <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8">
-                    <p className="text-slate-500">
-                      No quiz questions are currently
-                      published for this topic.
-                    </p>
-                  </div>
-                )}
-
-              {/* Questions */}
-
-              {!loadingQuiz &&
-                questions.length > 0 && (
-                  <div className="mt-8 space-y-6">
-
-                    {/* Result */}
-
-                    {submitted && (
-                      <div className="rounded-3xl border border-[#35B5E5]/30 bg-white p-8 shadow-[0_8px_30px_rgba(7,27,73,0.04)]">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-                          Your result
-                        </p>
-
-                        <p className="mt-2 text-5xl font-bold text-[#071B49]">
-                          {score} / {totalPoints}
-                        </p>
-
-                        <p className="mt-2 text-sm text-slate-500">
-                          {totalPoints > 0
-                            ? `${Math.round(
-                                (score /
-                                  totalPoints) *
-                                  100
-                              )}%`
-                            : "0%"}{" "}
-                          correct
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Individual questions */}
-
-                    {questions.map(
-                      (question, questionIndex) => {
-                        const options =
-                          Array.isArray(
-                            question.options
+              {visibleSections.length > 0 ? (
+                <nav className="mt-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-1">
+                  <ol className="space-y-1">
+                    {visibleSections.map(
+                      ({ section }, index) => {
+                        const label =
+                          formatSidebarHeading(
+                            section.title
                           )
-                            ? question.options.map(
-                                String
-                              )
-                            : []
 
                         return (
-                          <div
-                            key={question.id}
-                            className="rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_8px_30px_rgba(7,27,73,0.04)] md:p-8"
-                          >
-                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">
-                              Question{" "}
-                              {questionIndex + 1}
-                            </p>
-
-                            <h3 className="mt-3 text-lg font-semibold leading-7 text-[#071B49]">
-                              {
-                                question.question_text
-                              }
-                            </h3>
-
-                            <div className="mt-6 space-y-3">
-                              {options.map(
-                                (
-                                  option,
-                                  optionIndex
-                                ) => {
-                                  const selected =
-                                    answers[
-                                      question.id
-                                    ] ===
-                                    optionIndex
-
-                                  const correct =
-                                    submitted &&
-                                    optionIndex ===
-                                      question.correct_option
-
-                                  const wrong =
-                                    submitted &&
-                                    selected &&
-                                    optionIndex !==
-                                      question.correct_option
-
-                                  return (
-                                    <label
-                                      key={
-                                        optionIndex
-                                      }
-                                      className={[
-                                        "flex cursor-pointer gap-3 rounded-2xl border p-4 transition",
-                                        correct
-                                          ? "border-emerald-400 bg-emerald-50"
-                                          : wrong
-                                            ? "border-red-300 bg-red-50"
-                                            : selected
-                                              ? "border-[#168BC4] bg-[#F1F8FC]"
-                                              : "border-slate-200 hover:border-[#168BC4]/50",
-                                      ].join(
-                                        " "
-                                      )}
-                                    >
-                                      <input
-                                        type="radio"
-                                        name={`question-${question.id}`}
-                                        checked={
-                                          selected
-                                        }
-                                        disabled={
-                                          submitted
-                                        }
-                                        onChange={() =>
-                                          setAnswers(
-                                            (
-                                              current
-                                            ) => ({
-                                              ...current,
-                                              [question.id]:
-                                                optionIndex,
-                                            })
-                                          )
-                                        }
-                                        className="mt-1 accent-[#168BC4]"
-                                      />
-
-                                      <span className="text-sm leading-6 text-slate-700">
-                                        {option}
-                                      </span>
-                                    </label>
-                                  )
-                                }
-                              )}
-                            </div>
-
-                            {/* Explanation after submission */}
-
-                            {submitted &&
-                              question.explanation && (
-                                <div className="mt-5 rounded-2xl border border-slate-100 bg-[#F5F8FC] p-5 text-sm leading-7 text-slate-600">
-                                  <strong className="text-[#071B49]">
-                                    Explanation:
-                                  </strong>{" "}
-                                  {
-                                    question.explanation
-                                  }
-                                </div>
-                              )}
-                          </div>
+                          <li key={section.id}>
+                            <a
+                              href={`#section-${section.id}`}
+                              className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
+                            >
+                              {index + 1}. {label}
+                            </a>
+                          </li>
                         )
                       }
                     )}
 
-                    {/* Submit / retake */}
-
-                    <div className="flex justify-end pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (submitted) {
-                            setAnswers({})
-                            setSubmitted(false)
-                          } else {
-                            setSubmitted(true)
-                          }
-                        }}
-                        disabled={
-                          !submitted &&
-                          !answeredAll
-                        }
-                        className="rounded-full bg-[#071B49] px-8 py-3.5 text-sm font-bold text-white transition hover:bg-[#102A5F] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {submitted
-                          ? "Retake quiz"
-                          : "Submit quiz"}
-                      </button>
-                    </div>
-
-                    {!submitted && !answeredAll && (
-                      <p className="text-right text-xs text-slate-400">
-                        Answer all questions before
-                        submitting.
-                      </p>
+                    {quiz && (
+                      <li>
+                        <a
+                          href="#topic-quiz"
+                          className="block rounded-xl px-3 py-2 text-sm font-semibold leading-5 text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
+                        >
+                          {visibleSections.length + 1}. Topic assessment
+                        </a>
+                      </li>
                     )}
-                  </div>
+                  </ol>
+                </nav>
+              ) : (
+                <p className="mt-4 text-sm leading-6 text-slate-500">
+                  No published material is available.
+                </p>
+              )}
+            </div>
+          </aside>
+
+          {/* ===================================================
+              MAIN CONTENT
+              =================================================== */}
+
+          <div className="min-w-0">
+            {visibleSections.length === 0 ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-10">
+                <p className="text-sm leading-6 text-slate-500">
+                  No published source content is currently
+                  available for this topic.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+
+                {/* =================================================
+                    SOURCE MATERIAL
+                    ================================================= */}
+
+                {visibleSections.map(
+                  ({ section, items: sectionItems }, index) => {
+                    return (
+                      <article
+                        key={section.id}
+                        id={`section-${section.id}`}
+                        className="scroll-mt-24 rounded-[30px] border border-slate-200 bg-white p-7 shadow-[0_8px_30px_rgba(7,27,73,0.05)] md:p-10"
+                      >
+                        {/* -----------------------------------------
+                            SECTION HEADING
+
+                            section.title is rendered ONCE.
+
+                            block.title is NOT rendered.
+
+                            block.content is NOT rendered.
+                            ----------------------------------------- */}
+
+                        <div className="border-b border-slate-100 pb-6">
+                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+                            Section {index + 1}
+                          </p>
+
+                          <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071B49] md:text-3xl">
+                            {section.title}
+                          </h2>
+                        </div>
+
+                        {/* -----------------------------------------
+                            RAW SOURCE ITEMS
+
+                            Render exactly once and in order.
+                            ----------------------------------------- */}
+
+                        <div className="mt-8">
+                          {sectionItems.map((item, itemIndex) => {
+                            const content =
+                              item.content ?? ""
+
+                            /*
+                             * Preserve empty source entries as
+                             * spacing, but don't display an empty
+                             * bullet/card.
+                             */
+                            if (
+                              content.trim().length === 0
+                            ) {
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="h-3"
+                                  aria-hidden="true"
+                                />
+                              )
+                            }
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={[
+                                  "whitespace-pre-line",
+                                  "text-[16px]",
+                                  "leading-8",
+                                  "text-slate-700",
+                                  itemIndex > 0
+                                    ? "mt-5"
+                                    : "",
+                                ].join(" ")}
+                              >
+                                {content}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </article>
+                    )
+                  }
                 )}
-            </section>
-          </article>
-        </div>
-      </div>
 
-      {/* =======================================================
-          FIXED RIGHT-HAND PANEL
-          ======================================================= */}
+                {/* =================================================
+                    QUIZ
+                    =================================================
+                    
+                    This is deliberately the LAST element in the
+                    learning-content flow.
+                    ================================================= */}
 
-      <aside className="fixed right-6 top-28 bottom-6 z-30 hidden w-[270px] xl:block">
-        <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_40px_rgba(7,27,73,0.10)]">
+                {quiz && (
+                  <section
+                    id="topic-quiz"
+                    className="scroll-mt-24 rounded-[30px] border border-[#168BC4]/20 bg-white p-7 shadow-[0_8px_30px_rgba(7,27,73,0.05)] md:p-10"
+                  >
+                    <div className="flex flex-col gap-7 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+                          Topic assessment
+                        </p>
 
-          <div className="shrink-0">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-              On this page
-            </p>
+                        <h2 className="mt-2 text-2xl font-semibold text-[#071B49] md:text-3xl">
+                          {quiz.title}
+                        </h2>
 
-            <div className="mt-3 h-px bg-slate-100" />
+                        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+                          {quiz.description ||
+                            "Test your understanding of this topic."}
+                        </p>
+
+                        {quiz.time_limit_seconds > 0 && (
+                          <p className="mt-3 text-xs font-semibold text-slate-400">
+                            Time limit:{" "}
+                            {Math.ceil(
+                              quiz.time_limit_seconds / 60
+                            )}{" "}
+                            minutes
+                          </p>
+                        )}
+                      </div>
+
+                      <Link
+                        href={`/education/test?quiz=${quiz.id}`}
+                        className="inline-flex shrink-0 items-center justify-center rounded-full bg-[#071B49] px-7 py-3.5 text-sm font-bold text-white transition hover:bg-[#102A5F]"
+                      >
+                        Start quiz →
+                      </Link>
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
           </div>
-
-          <nav className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
-            <ol className="space-y-1">
-              {topic.sections.map(
-                (section, index) => {
-                  const id =
-                    `section-${topic.chapter}-${index}`
-
-                  return (
-                    <li key={id}>
-                      <a
-                        href={`#${id}`}
-                        className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
-                      >
-                        {sidebarLabel(
-                          section.heading
-                        )}
-                      </a>
-                    </li>
-                  )
-                }
-              )}
-
-              {/* Quiz is always last */}
-
-              <li className="mt-3 border-t border-slate-100 pt-3">
-                <a
-                  href="#topic-quiz"
-                  className="block rounded-xl px-3 py-2 text-sm font-semibold leading-5 text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
-                >
-                  Quiz
-                </a>
-              </li>
-            </ol>
-          </nav>
         </div>
-      </aside>
-
-      {/* =======================================================
-          MOBILE NAVIGATION
-          ======================================================= */}
-
-      <div className="sticky bottom-4 z-20 mx-4 mb-4 xl:hidden">
-        <details className="rounded-2xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(7,27,73,0.12)]">
-          <summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-[#071B49]">
-            On this page
-          </summary>
-
-          <nav className="max-h-[50vh] overflow-y-auto border-t border-slate-100 px-3 py-3">
-            <ol className="space-y-1">
-              {topic.sections.map(
-                (section, index) => {
-                  const id =
-                    `section-${topic.chapter}-${index}`
-
-                  return (
-                    <li key={id}>
-                      <a
-                        href={`#${id}`}
-                        className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 hover:bg-[#F1F7FB] hover:text-[#168BC4]"
-                      >
-                        {sidebarLabel(
-                          section.heading
-                        )}
-                      </a>
-                    </li>
-                  )
-                }
-              )}
-
-              <li className="border-t border-slate-100 pt-2">
-                <a
-                  href="#topic-quiz"
-                  className="block rounded-xl px-3 py-2 text-sm font-semibold text-[#071B49]"
-                >
-                  Quiz
-                </a>
-              </li>
-            </ol>
-          </nav>
-        </details>
-      </div>
+      </section>
 
       <CuraFooter />
     </main>
