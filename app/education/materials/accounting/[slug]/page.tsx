@@ -115,6 +115,213 @@ function isExample(block: Block) {
  * Normalize block type so the presentation is controlled by the
  * actual source structure rather than by generic paragraph styling.
  */
+
+/* ============================================================
+ * GLOBAL SOURCE-MATERIAL FORMAT PRESERVATION
+ *
+ * Source material is not always plain bullet-point text.
+ *
+ * Tabs are meaningful in the original materials and are used
+ * for:
+ *
+ *   - accounting journal columns
+ *   - debit / credit layouts
+ *   - amount columns
+ *   - formulas
+ *   - calculation layouts
+ *   - other structured source material
+ *
+ * Therefore tab-separated content must NEVER automatically be
+ * converted into an ordinary bullet.
+ * ============================================================ */
+
+function getSourceColumns(content: string) {
+  /*
+   * Keep empty columns because multiple tabs represent
+   * intentional horizontal spacing in the source.
+   */
+  return content
+    .split("\t")
+    .map((value) => value.trim())
+}
+
+function hasSourceColumns(content: string) {
+  return content.includes("\t")
+}
+
+function isCurrencyOnlySourceRow(content: string) {
+  const columns = getSourceColumns(content)
+  const nonEmpty = columns.filter(Boolean)
+
+  return (
+    nonEmpty.length >= 2 &&
+    nonEmpty.every((value) => /^\$+$/.test(value))
+  )
+}
+
+function renderSourceStructuredRow(item: Item) {
+  const content = item.content || ""
+  const columns = getSourceColumns(content)
+
+  /*
+   * Remove only trailing empty columns.
+   * Internal empty columns are preserved because they represent
+   * source positioning.
+   */
+  while (
+    columns.length > 0 &&
+    columns[columns.length - 1] === ""
+  ) {
+    columns.pop()
+  }
+
+  /*
+   * A simple two-column source layout.
+   */
+  if (columns.length <= 2) {
+    return (
+      <div
+        className="
+          grid
+          grid-cols-[minmax(0,1fr)_120px]
+          items-start
+          gap-6
+          py-1
+          text-[16px]
+          leading-8
+          text-slate-700
+        "
+      >
+        <div className="whitespace-pre-wrap break-words">
+          {columns[0] || ""}
+        </div>
+
+        <div className="whitespace-pre-wrap text-right">
+          {columns[1] || ""}
+        </div>
+      </div>
+    )
+  }
+
+  /*
+   * Three-column source layout.
+   *
+   * This covers common accounting material such as:
+   *
+   * Account description | X | Explanation
+   */
+  return (
+    <div
+      className="
+        grid
+        grid-cols-[minmax(0,1fr)_120px_minmax(0,1fr)]
+        items-start
+        gap-6
+        py-1
+        text-[16px]
+        leading-8
+        text-slate-700
+      "
+    >
+      <div className="whitespace-pre-wrap break-words">
+        {columns[0] || ""}
+      </div>
+
+      <div className="whitespace-pre-wrap text-center">
+        {columns[1] || ""}
+      </div>
+
+      <div className="whitespace-pre-wrap break-words">
+        {columns
+          .slice(2)
+          .filter(Boolean)
+          .join(" ")}
+      </div>
+    </div>
+  )
+}
+
+function renderSourceItem(item: Item) {
+  const content = item.content || ""
+
+  /*
+   * GLOBAL RULE:
+   *
+   * Any source item containing tabs is treated as structured
+   * source material, not as a bullet.
+   */
+  if (hasSourceColumns(content)) {
+    return (
+      <div key={item.id}>
+        {renderSourceStructuredRow(item)}
+      </div>
+    )
+  }
+
+  /*
+   * Currency-only source rows such as "$    $"
+   * are source layout markers, not bullet points.
+   */
+  if (isCurrencyOnlySourceRow(content)) {
+    return (
+      <div
+        key={item.id}
+        className="
+          grid
+          grid-cols-[minmax(0,1fr)_120px]
+          gap-6
+          py-1
+          text-[16px]
+          leading-8
+          text-slate-700
+        "
+      >
+        <span>{content.split(/\s+/)[0] || ""}</span>
+        <span className="text-right">
+          {content.split(/\s+/)[1] || ""}
+        </span>
+      </div>
+    )
+  }
+
+  /*
+   * Ordinary source item.
+   */
+  if (!shouldRenderAsBullet(item)) {
+    return (
+      <div
+        key={item.id}
+        className="
+          whitespace-pre-wrap
+          break-words
+          pl-1
+          text-[16px]
+          leading-8
+          text-slate-700
+        "
+      >
+        {content}
+      </div>
+    )
+  }
+
+  /*
+   * Genuine bullet-point source content.
+   */
+  return (
+    <ul
+      key={item.id}
+      className="list-disc pl-7 marker:text-[#168BC4]"
+    >
+      <li className="pl-1 text-[16px] leading-8 text-slate-700">
+        <span className="whitespace-pre-wrap break-words">
+          {content}
+        </span>
+      </li>
+    </ul>
+  )
+}
+
 function shouldRenderAsBullet(item: Item) {
   const value = (item.content || "").trim()
 
@@ -287,14 +494,10 @@ function RenderSourceBlock({
           )}
 
         {validItems.length > 0 && (
-          <div className="space-y-4">
-            {validItems.map((item) => (
-              <SourceText key={item.id}>
-                {item.content}
-              </SourceText>
-            ))}
-          </div>
-        )}
+  <div className="space-y-3">
+    {validItems.map((item) => renderSourceItem(item))}
+  </div>
+)}
       </div>
     )
   }
