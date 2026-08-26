@@ -6,8 +6,8 @@ import { useParams } from "next/navigation"
 
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
-import AccountingSourceIllustration from "@/components/education/AccountingSourceIllustration"
 import { createClient } from "@/lib/supabase/client"
+import { accountingIllustrations } from "../data/illustrations"
 
 type Topic = {
   id: string
@@ -87,24 +87,115 @@ type ContentBlock = {
 }
 
 /*
- * Sidebar formatting:
+ * SOURCE PRESENTATION RULES
  *
- * "4 ALLOCATE THE TRANSACTION PRICE..."
- *
- * becomes:
- *
- * "4 allocate the transaction price..."
- *
- * Only the first character remains capitalized.
+ * The PDFs are the authority. The website must not invent labels,
+ * lecture metadata, or generic headings that are not present in the
+ * source material.
  */
-function formatSidebarHeading(value: string) {
-  const cleaned = value.trim()
 
-  if (!cleaned) {
-    return ""
+const HIDDEN_SOURCE_METADATA = [
+  /^SBR\s+New\s+Knowledge$/i,
+  /^FR\s+Knowledge$/i,
+  /^F\d+\s+Knowledge$/i,
+  /^TUU\s*\d+(?:\s+.*)?$/i,
+  /^Homework\s+TUU\s*\d+.*$/i,
+]
+
+function cleanSourceText(value: string) {
+  return value
+    .replace(/\\t/g, "\t")
+    .replace(/\u00a0/g, " ")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(
+      (line) =>
+        line.trim().length > 0 &&
+        !HIDDEN_SOURCE_METADATA.some((pattern) =>
+          pattern.test(line.trim())
+        )
+    )
+    .join("\n")
+    .trim()
+}
+
+function isHiddenSourceMetadata(value: string) {
+  const cleaned = value.trim()
+  return (
+    !cleaned ||
+    HIDDEN_SOURCE_METADATA.some((pattern) =>
+      pattern.test(cleaned)
+    )
+  )
+}
+
+function normalizeForMatch(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function sourceMatchesIllustration(
+  illustration: {
+    sourceFile: string
+    sourceLabel: string
+  },
+  topic: Topic,
+  contentBlock: ContentBlock
+) {
+  const sourceReference = normalizeForMatch(
+    topic.source_reference || ""
+  )
+
+  const sourceFile = normalizeForMatch(
+    illustration.sourceFile.replace(/\.pdf$/i, "")
+  )
+
+  const blockText = normalizeForMatch(
+    [
+      contentBlock.block.title || "",
+      contentBlock.block.content || "",
+      ...contentBlock.items.map((item) => item.content || ""),
+    ].join(" ")
+  )
+
+  const sourceMatch =
+    sourceReference.includes(sourceFile) ||
+    sourceFile.includes(sourceReference)
+
+  if (!sourceMatch) {
+    return false
   }
 
-  return cleaned.charAt(0) + cleaned.slice(1).toLowerCase()
+  const label = normalizeForMatch(
+    illustration.sourceLabel
+  )
+
+  const labelWithoutIllustration = label
+    .replace(/^illustration\s*/, "")
+    .trim()
+
+  return (
+    blockText.includes(label) ||
+    (labelWithoutIllustration.length > 0 &&
+      blockText.includes(labelWithoutIllustration))
+  )
+}
+
+function getStaticIllustrations(
+  topic: Topic,
+  contentBlock: ContentBlock
+) {
+  return accountingIllustrations.filter((illustration) =>
+    sourceMatchesIllustration(
+      illustration,
+      topic,
+      contentBlock
+    )
+  )
 }
 
 /*
@@ -273,9 +364,7 @@ function renderSourceStructuredRow(item: Item) {
 
 
 function normalizeSourceContent(value: string) {
-  return value
-    .replace(/\\t/g, "\t")
-    .replace(/\u00a0/g, " ")
+  return cleanSourceText(value)
 }
 
 function isJournalRow(content: string) {
@@ -977,7 +1066,7 @@ function SourceText({
         "break-words",
         "text-base",
         "leading-8",
-        "text-slate-700",
+        "text-[#102A5F]",
         className,
       ].join(" ")}
     >
@@ -1006,15 +1095,21 @@ function RenderSourceBlock({
   const { block, items } = contentBlock
   const blockType = getBlockType(block)
 
-  const validItems = items.filter(
-    (item) =>
-      typeof item.content === "string" &&
-      item.content.trim().length > 0
-  )
+  const validItems = items
+    .map((item) => ({
+      ...item,
+      content: cleanSourceText(item.content || ""),
+    }))
+    .filter(
+      (item) =>
+        typeof item.content === "string" &&
+        item.content.trim().length > 0 &&
+        !isHiddenSourceMetadata(item.content)
+    )
 
   const blockTitle =
     typeof block.title === "string"
-      ? block.title.trim()
+      ? cleanSourceText(block.title)
       : ""
 
   const normalizedSectionTitle =
@@ -1130,23 +1225,19 @@ function RenderSourceBlock({
    */
   if (isIllustration(block) || blockType === "illustration") {
     return (
-      <div className="rounded-2xl border border-[#168BC4]/20 bg-[#F4FAFD] p-6 md:p-8">
-        {blockTitle && !duplicateBlockTitle && (
-          <div className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-              Illustration
-            </p>
-
-            <h3 className="mt-2 text-xl font-semibold leading-7 text-[#071B49]">
+      <div className="space-y-5">
+        {blockTitle &&
+          !duplicateBlockTitle &&
+          !isHiddenSourceMetadata(blockTitle) && (
+            <h3 className="text-xl font-semibold leading-8 text-[#071B49]">
               {blockTitle}
             </h3>
-          </div>
-        )}
+          )}
 
         {block.content &&
-          block.content.trim().length > 0 && (
-            <SourceText className="mb-5">
-              {block.content}
+          cleanSourceText(block.content).length > 0 && (
+            <SourceText className="mb-2">
+              {cleanSourceText(block.content)}
             </SourceText>
           )}
 
@@ -1174,34 +1265,36 @@ function RenderSourceBlock({
    */
   if (isExample(block) || blockType === "example") {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 md:p-8">
-        {blockTitle && !duplicateBlockTitle && (
-          <div className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-              Example
-            </p>
-
-            <h3 className="mt-2 text-xl font-semibold leading-7 text-[#071B49]">
+      <div className="space-y-5">
+        {blockTitle &&
+          !duplicateBlockTitle &&
+          !isHiddenSourceMetadata(blockTitle) && (
+            <h3 className="text-xl font-semibold leading-8 text-[#071B49]">
               {blockTitle}
             </h3>
-          </div>
-        )}
+          )}
 
         {block.content &&
-          block.content.trim().length > 0 && (
-            <SourceText className="mb-5">
-              {block.content}
+          cleanSourceText(block.content).length > 0 && (
+            <SourceText className="mb-2">
+              {cleanSourceText(block.content)}
             </SourceText>
           )}
 
         {validItems.length > 0 && (
           <div className="space-y-4">
-            {validItems.map((item) => (
-              <SourceText key={item.id}>
-                {item.content}
-              </SourceText>
-            ))}
+            {validItems.map((item) =>
+              renderSourceItem(item)
+            )}
           </div>
+        )}
+
+        {tables.map((table) =>
+          renderEducationTable(table)
+        )}
+
+        {assets.map((asset) =>
+          renderEducationAsset(asset)
         )}
       </div>
     )
@@ -1425,7 +1518,7 @@ function RenderSourceBlock({
         {block.content &&
           block.content.trim().length > 0 && (
             <SourceText className="mb-4">
-              {block.content}
+              {cleanSourceText(block.content)}
             </SourceText>
           )}
 
@@ -1437,7 +1530,7 @@ function RenderSourceBlock({
                 className="pl-1 text-base leading-8 text-slate-700"
               >
                 <span className="whitespace-pre-wrap break-words">
-                  {item.content}
+                  {cleanSourceText(item.content)}
                 </span>
               </li>
             ))}
@@ -1839,7 +1932,7 @@ export default function AccountingTopicPage() {
           <div className="grid gap-8 lg:grid-cols-[250px_minmax(0,1fr)]">
             <div className="h-80 animate-pulse rounded-3xl bg-white" />
 
-            <div className="space-y-8">
+            <div className="space-y-10">
               <div className="h-96 animate-pulse rounded-3xl bg-white" />
               <div className="h-96 animate-pulse rounded-3xl bg-white" />
             </div>
@@ -1958,19 +2051,32 @@ export default function AccountingTopicPage() {
             }
           })
           .filter(({ block, items }) => {
+            const cleanedBlockContent =
+              typeof block.content === "string"
+                ? cleanSourceText(block.content)
+                : ""
+
+            const cleanedBlockTitle =
+              typeof block.title === "string"
+                ? cleanSourceText(block.title)
+                : ""
+
             const hasBlockContent =
-              typeof block.content === "string" &&
-              block.content.trim().length > 0
+              cleanedBlockContent.length > 0 &&
+              !isHiddenSourceMetadata(cleanedBlockContent)
 
             const hasItems = items.some(
               (item) =>
                 typeof item.content === "string" &&
-                item.content.trim().length > 0
+                cleanSourceText(item.content).length > 0 &&
+                !isHiddenSourceMetadata(
+                  cleanSourceText(item.content)
+                )
             )
 
             const hasTitle =
-              typeof block.title === "string" &&
-              block.title.trim().length > 0
+              cleanedBlockTitle.length > 0 &&
+              !isHiddenSourceMetadata(cleanedBlockTitle)
 
             return (
               hasBlockContent ||
@@ -2274,11 +2380,15 @@ export default function AccountingTopicPage() {
               {topic.title}
             </h1>
 
-            {topic.description && (
-              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-                {topic.description}
-              </p>
-            )}
+            {topic.description &&
+              !/^Imported from revised accounting source materials\.?$/i.test(
+                topic.description.trim()
+              ) &&
+              !isHiddenSourceMetadata(topic.description) && (
+                <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
+                  {cleanSourceText(topic.description)}
+                </p>
+              )}
           </div>
         </div>
       </section>
@@ -2304,16 +2414,13 @@ export default function AccountingTopicPage() {
                 <nav className="mt-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-1">
                   <ol className="space-y-1">
                     {finalSections.map(
-                      ({ section }, index) => (
+                      ({ section }) => (
                         <li key={section.id}>
                           <a
                             href={`#section-${section.id}`}
                             className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
                           >
-                            {index + 1}.{" "}
-                            {formatSidebarHeading(
-                              section.title
-                            )}
+                            {section.title}
                           </a>
                         </li>
                       )
@@ -2325,7 +2432,7 @@ export default function AccountingTopicPage() {
                           href="#topic-quiz"
                           className="block rounded-xl px-3 py-2 text-sm font-semibold leading-5 text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
                         >
-                          {finalSections.length + 1}. topic assessment
+                          Topic assessment
                         </a>
                       </li>
                     )}
@@ -2359,22 +2466,17 @@ export default function AccountingTopicPage() {
                     {
                       section,
                       blocks: sectionBlocks,
-                    },
-                    sectionIndex
+                    }
                   ) => (
                     <article
                       key={section.id}
                       id={`section-${section.id}`}
-                      className="scroll-mt-24 rounded-[30px] border border-slate-200 bg-white p-7 shadow-[0_8px_30px_rgba(7,27,73,0.05)] md:p-10"
+                      className="scroll-mt-24 rounded-[30px] border border-slate-200 bg-white p-7 md:p-10"
                     >
                       {/* SECTION HEADING */}
 
                       <div className="border-b border-slate-100 pb-6">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-                          Section {sectionIndex + 1}
-                        </p>
-
-                        <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071B49] md:text-3xl">
+                        <h2 className="text-2xl font-semibold leading-8 text-[#071B49] md:text-3xl">
                           {section.title}
                         </h2>
                       </div>
@@ -2384,16 +2486,7 @@ export default function AccountingTopicPage() {
                       <div className="mt-8 space-y-8">
                         {sectionBlocks.map(
                           (contentBlock) => (
-                            <AccountingSourceIllustration
-                              key={contentBlock.block.id}
-                              sourceText={[
-                                contentBlock.block.title || "",
-                                contentBlock.block.content || "",
-                                ...contentBlock.items.map(
-                                  (item) => item.content || ""
-                                ),
-                              ].join(" ")}
-                            >
+                            <div key={contentBlock.block.id}>
                               <RenderSourceBlock
                                 contentBlock={contentBlock}
                                 sectionTitle={section.title}
@@ -2402,13 +2495,34 @@ export default function AccountingTopicPage() {
                                     contentBlock.block.id
                                   ) || []
                                 }
-                                assets={
-                                  assetsByBlock.get(
+                                assets={[
+                                  ...(assetsByBlock.get(
                                     contentBlock.block.id
-                                  ) || []
-                                }
+                                  ) || []),
+                                ]}
                               />
-                            </AccountingSourceIllustration>
+
+                              {(
+                                assetsByBlock.get(
+                                  contentBlock.block.id
+                                ) || []
+                              ).length === 0 &&
+                                getStaticIllustrations(
+                                  topic,
+                                  contentBlock
+                                ).map((illustration) => (
+                                <figure
+                                  key={illustration.id}
+                                  className="my-8"
+                                >
+                                  <img
+                                    src={illustration.asset}
+                                    alt={illustration.sourceLabel}
+                                    className="mx-auto h-auto max-w-full"
+                                  />
+                                </figure>
+                              ))}
+                            </div>
                           )
                         )}
                       </div>
