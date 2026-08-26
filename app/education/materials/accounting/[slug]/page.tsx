@@ -7,7 +7,6 @@ import { useParams } from "next/navigation"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
 import { createClient } from "@/lib/supabase/client"
-import { accountingIllustrations } from "../data/illustrations"
 
 type Topic = {
   id: string
@@ -129,75 +128,6 @@ function isHiddenSourceMetadata(value: string) {
   )
 }
 
-function normalizeForMatch(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[–—]/g, "-")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function sourceMatchesIllustration(
-  illustration: {
-    sourceFile: string
-    sourceLabel: string
-  },
-  topic: Topic,
-  contentBlock: ContentBlock
-) {
-  const sourceReference = normalizeForMatch(
-    topic.source_reference || ""
-  )
-
-  const sourceFile = normalizeForMatch(
-    illustration.sourceFile.replace(/\.pdf$/i, "")
-  )
-
-  const blockText = normalizeForMatch(
-    [
-      contentBlock.block.title || "",
-      contentBlock.block.content || "",
-      ...contentBlock.items.map((item) => item.content || ""),
-    ].join(" ")
-  )
-
-  const sourceMatch =
-    sourceReference.includes(sourceFile) ||
-    sourceFile.includes(sourceReference)
-
-  if (!sourceMatch) {
-    return false
-  }
-
-  const label = normalizeForMatch(
-    illustration.sourceLabel
-  )
-
-  const labelWithoutIllustration = label
-    .replace(/^illustration\s*/, "")
-    .trim()
-
-  return (
-    blockText.includes(label) ||
-    (labelWithoutIllustration.length > 0 &&
-      blockText.includes(labelWithoutIllustration))
-  )
-}
-
-function getStaticIllustrations(
-  topic: Topic,
-  contentBlock: ContentBlock
-) {
-  return accountingIllustrations.filter((illustration) =>
-    sourceMatchesIllustration(
-      illustration,
-      topic,
-      contentBlock
-    )
-  )
-}
-
 /*
  * Determine whether a block should visually behave as an illustration.
  *
@@ -205,16 +135,15 @@ function getStaticIllustrations(
  * material contains illustration headings in different structures.
  */
 function isIllustration(block: Block) {
-  const type = (block.block_type || "").toLowerCase()
-  const title = (block.title || "").toLowerCase()
-  const content = (block.content || "").toLowerCase()
+  const type = (block.block_type || "").toLowerCase().trim()
+  const title = (block.title || "").toLowerCase().trim()
+  const content = (block.content || "").toLowerCase().trim()
 
   return (
+    type === "illustration" ||
     type.includes("illustration") ||
-    type === "example" ||
-    title.includes("illustration") ||
-    title.includes("illustration") ||
-    content.includes("illustration")
+    title.startsWith("illustration") ||
+    content.startsWith("illustration")
   )
 }
 
@@ -1081,6 +1010,75 @@ function SourceText({
  * IMPORTANT:
  * We do not rewrite or summarize source material here.
  */
+function isNumericSectionTitle(value: string) {
+  return /^\d+(?:\.\d+)?$/.test(value.trim())
+}
+
+function getDisplaySectionTitle(
+  section: Section,
+  sectionBlocks: ContentBlock[]
+) {
+  const sectionTitle = cleanSourceText(section.title || "").trim()
+
+  if (
+    sectionTitle &&
+    !isNumericSectionTitle(sectionTitle) &&
+    !isHiddenSourceMetadata(sectionTitle)
+  ) {
+    return sectionTitle
+  }
+
+  for (const contentBlock of sectionBlocks) {
+    const blockTitle = cleanSourceText(
+      contentBlock.block.title || ""
+    ).trim()
+
+    if (
+      blockTitle &&
+      !isNumericSectionTitle(blockTitle) &&
+      !isHiddenSourceMetadata(blockTitle)
+    ) {
+      return blockTitle
+    }
+
+    const blockContent = cleanSourceText(
+      contentBlock.block.content || ""
+    )
+
+    const lines = blockContent
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    for (const line of lines) {
+      if (
+        !isNumericSectionTitle(line) &&
+        !isHiddenSourceMetadata(line) &&
+        !/^[•·▪‣◦]$/.test(line)
+      ) {
+        return line
+      }
+    }
+
+    for (const item of contentBlock.items) {
+      const value = cleanSourceText(
+        item.content || ""
+      ).trim()
+
+      if (
+        value &&
+        !isNumericSectionTitle(value) &&
+        !isHiddenSourceMetadata(value) &&
+        !/^[•·▪‣◦]$/.test(value)
+      ) {
+        return value
+      }
+    }
+  }
+
+  return sectionTitle
+}
+
 function RenderSourceBlock({
   contentBlock,
   sectionTitle,
@@ -2414,16 +2412,24 @@ export default function AccountingTopicPage() {
                 <nav className="mt-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-1">
                   <ol className="space-y-1">
                     {finalSections.map(
-                      ({ section }) => (
-                        <li key={section.id}>
-                          <a
-                            href={`#section-${section.id}`}
-                            className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
-                          >
-                            {section.title}
-                          </a>
-                        </li>
-                      )
+                      ({ section, blocks: sectionBlocks }) => {
+                        const displayTitle =
+                          getDisplaySectionTitle(
+                            section,
+                            sectionBlocks
+                          )
+
+                        return (
+                          <li key={section.id}>
+                            <a
+                              href={`#section-${section.id}`}
+                              className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
+                            >
+                              {displayTitle}
+                            </a>
+                          </li>
+                        )
+                      }
                     )}
 
                     {quiz && (
@@ -2462,26 +2468,23 @@ export default function AccountingTopicPage() {
               <div className="space-y-8">
 
                 {finalSections.map(
-                  (
-                    {
-                      section,
-                      blocks: sectionBlocks,
-                    }
-                  ) => (
+                  ({
+                    section,
+                    blocks: sectionBlocks,
+                  }) => (
                     <article
                       key={section.id}
                       id={`section-${section.id}`}
                       className="scroll-mt-24 rounded-[30px] border border-slate-200 bg-white p-7 md:p-10"
                     >
-                      {/* SECTION HEADING */}
-
                       <div className="border-b border-slate-100 pb-6">
                         <h2 className="text-2xl font-semibold leading-8 text-[#071B49] md:text-3xl">
-                          {section.title}
+                          {getDisplaySectionTitle(
+                            section,
+                            sectionBlocks
+                          )}
                         </h2>
                       </div>
-
-                      {/* SOURCE BLOCKS */}
 
                       <div className="mt-8 space-y-8">
                         {sectionBlocks.map(
@@ -2489,39 +2492,21 @@ export default function AccountingTopicPage() {
                             <div key={contentBlock.block.id}>
                               <RenderSourceBlock
                                 contentBlock={contentBlock}
-                                sectionTitle={section.title}
+                                sectionTitle={getDisplaySectionTitle(
+                                  section,
+                                  sectionBlocks
+                                )}
                                 tables={
                                   tablesByBlock.get(
                                     contentBlock.block.id
                                   ) || []
                                 }
-                                assets={[
-                                  ...(assetsByBlock.get(
+                                assets={
+                                  assetsByBlock.get(
                                     contentBlock.block.id
-                                  ) || []),
-                                ]}
+                                  ) || []
+                                }
                               />
-
-                              {(
-                                assetsByBlock.get(
-                                  contentBlock.block.id
-                                ) || []
-                              ).length === 0 &&
-                                getStaticIllustrations(
-                                  topic,
-                                  contentBlock
-                                ).map((illustration) => (
-                                <figure
-                                  key={illustration.id}
-                                  className="my-8"
-                                >
-                                  <img
-                                    src={illustration.asset}
-                                    alt={illustration.sourceLabel}
-                                    className="mx-auto h-auto max-w-full"
-                                  />
-                                </figure>
-                              ))}
                             </div>
                           )
                         )}
