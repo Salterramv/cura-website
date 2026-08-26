@@ -1910,29 +1910,21 @@ export default function AccountingTopicPage() {
    * illustrations to retain their original structure.
    */
 
-  const tablesByBlock = useMemo(() => {
-    const result = new Map<string, EducationTable[]>()
+  const tablesByBlock = new Map<string, EducationTable[]>()
 
-    for (const table of tables) {
-      const current = result.get(table.block_id) || []
-      current.push(table)
-      result.set(table.block_id, current)
-    }
+  for (const table of tables) {
+    const current = tablesByBlock.get(table.block_id) || []
+    current.push(table)
+    tablesByBlock.set(table.block_id, current)
+  }
 
-    return result
-  }, [tables])
+  const assetsByBlock = new Map<string, EducationAsset[]>()
 
-  const assetsByBlock = useMemo(() => {
-    const result = new Map<string, EducationAsset[]>()
-
-    for (const asset of assets) {
-      const current = result.get(asset.block_id) || []
-      current.push(asset)
-      result.set(asset.block_id, current)
-    }
-
-    return result
-  }, [assets])
+  for (const asset of assets) {
+    const current = assetsByBlock.get(asset.block_id) || []
+    current.push(asset)
+    assetsByBlock.set(asset.block_id, current)
+  }
 
   const visibleSections = sections
     .map((section) => {
