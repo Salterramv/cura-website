@@ -101,9 +101,328 @@ const HIDDEN_SOURCE_METADATA = [
   /^Homework\s+TUU\s*\d+.*$/i,
 ]
 
+/*
+ * ===========================================================
+ * REMOVE FIRST-SLIDE LECTURER DETAILS
+ * ===========================================================
+ *
+ * Each imported PPT begins with a cover slide containing the
+ * lecturer's name and qualifications. That slide is useful for
+ * the original lecture file, but it is not part of the learning
+ * material and must not appear on the CURA topic page.
+ *
+ * We remove only lecturer metadata from the FIRST source section.
+ * We do not remove qualifications or names from later learning
+ * sections because those may be legitimate source content.
+ */
+
+const LECTURER_LABEL_PATTERNS = [
+  /^(?:lecturer|presented\s+by|prepared\s+by|facilitator|trainer|instructor)\s*[:\-]/i,
+  /^(?:lecturer|presenter|facilitator|trainer|instructor)\s*$/i,
+]
+
+const QUALIFICATION_PATTERN =
+  /\b(?:ACCA|FCA|MBA|BBA|BA|BSc|BS|MA|MSc|MCom|PhD|CPA|CFA|CIMA|CIA|CISA|ACA|CA|Cert\.?\s*[A-Za-z]+|Bachelor(?:'s)?|Master(?:'s)?|Doctorate)\b/i
+
+function isLecturerQualificationLine(value: string) {
+  const cleaned = value.trim()
+
+  if (!cleaned || !QUALIFICATION_PATTERN.test(cleaned)) {
+    return false
+  }
+
+  /*
+   * A qualification line on the cover slide normally contains
+   * several qualifications, separators, or a qualification phrase.
+   * This keeps ordinary source sentences containing one acronym
+   * from being treated as lecturer metadata.
+   */
+  const qualificationCount = (
+    cleaned.match(
+      /\b(?:ACCA|FCA|MBA|BBA|BA|BSc|BS|MA|MSc|MCom|PhD|CPA|CFA|CIMA|CIA|CISA|ACA|CA|Bachelor(?:'s)?|Master(?:'s)?|Doctorate)\b/gi
+    ) || []
+  ).length
+
+  return (
+    qualificationCount >= 2 ||
+    /[,;&|]/.test(cleaned) ||
+    /\b(?:Bachelor|Master|Doctorate)\b/i.test(cleaned)
+  )
+}
+
+function looksLikeLecturerName(value: string) {
+  const cleaned = value.trim()
+
+  if (!cleaned || /\d/.test(cleaned)) {
+    return false
+  }
+
+  if (!/^[A-Z][A-Za-z.'-]*(?:\s+[A-Z][A-Za-z.'-]*){1,4}$/.test(cleaned)) {
+    return false
+  }
+
+  /*
+   * Do not mistake common source headings for a person's name.
+   */
+  const headingWords = new Set([
+    "scope",
+    "definitions",
+    "objective",
+    "objectives",
+    "recognition",
+    "measurement",
+    "presentation",
+    "accounting",
+    "agriculture",
+    "assets",
+    "liabilities",
+    "equity",
+    "revenue",
+    "expenses",
+    "examples",
+    "illustration",
+    "illustrations",
+    "introduction",
+    "conclusion",
+    "summary",
+    "background",
+  ])
+
+  const words = cleaned.toLowerCase().split(/\s+/)
+
+  if (words.some((word) => headingWords.has(word))) {
+    return false
+  }
+
+  /*
+   * Cover-slide names are commonly presented in all capitals.
+   * We also allow title-case names so the rule works with different
+   * PPT extraction formats.
+   */
+  return true
+}
+
+function isLecturerMetadataLine(value: string, nextValue = "") {
+  const cleaned = value.trim()
+
+  if (!cleaned) {
+    return false
+  }
+
+  if (
+    LECTURER_LABEL_PATTERNS.some((pattern) =>
+      pattern.test(cleaned)
+    )
+  ) {
+    return true
+  }
+
+  if (isLecturerQualificationLine(cleaned)) {
+    return true
+  }
+
+  /*
+   * A standalone lecturer name is removed only when the following
+   * source line is clearly a qualification line. This prevents
+   * ordinary all-capital accounting headings from being removed.
+   */
+  if (
+    looksLikeLecturerName(cleaned) &&
+    isLecturerQualificationLine(nextValue)
+  ) {
+    return true
+  }
+
+  return false
+}
+
+function stripLecturerMetadataFromText(
+  value: string,
+  nextValue = ""
+) {
+  if (!value) {
+    return value
+  }
+
+  const lines = cleanSourceText(value)
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+
+  const output: string[] = []
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    const followingLine =
+      lines[index + 1] || nextValue
+
+    if (isLecturerMetadataLine(line, followingLine)) {
+      continue
+    }
+
+    output.push(line)
+  }
+
+  return output.join("\n").trim()
+}
+
+function stripLecturerMetadataFromFirstSection(
+  entry: ContentBlock[]
+) {
+  /*
+   * Build a flattened sequence of all textual units so a lecturer
+   * name in one database item can still be recognised when its
+   * qualification line is stored in the next item.
+   */
+  const sourceValues: Array<{
+    kind: "block-title" | "block-content" | "item"
+    blockIndex: number
+    itemIndex?: number
+    value: string
+  }> = []
+
+  entry.forEach((contentBlock, blockIndex) => {
+    if (contentBlock.block.title?.trim()) {
+      sourceValues.push({
+        kind: "block-title",
+        blockIndex,
+        value: contentBlock.block.title,
+      })
+    }
+
+    if (contentBlock.block.content?.trim()) {
+      sourceValues.push({
+        kind: "block-content",
+        blockIndex,
+        value: contentBlock.block.content,
+      })
+    }
+
+    contentBlock.items.forEach((item, itemIndex) => {
+      if (item.content?.trim()) {
+        sourceValues.push({
+          kind: "item",
+          blockIndex,
+          itemIndex,
+          value: item.content,
+        })
+      }
+    })
+  })
+
+  const nextTextByIndex = new Map<number, string>()
+
+  for (let index = 0; index < sourceValues.length; index += 1) {
+    nextTextByIndex.set(
+      index,
+      sourceValues[index + 1]?.value || ""
+    )
+  }
+
+  return entry
+    .map((contentBlock, blockIndex) => {
+      const blockTitleIndex = sourceValues.findIndex(
+        (value) =>
+          value.kind === "block-title" &&
+          value.blockIndex === blockIndex
+      )
+
+      const blockContentIndex = sourceValues.findIndex(
+        (value) =>
+          value.kind === "block-content" &&
+          value.blockIndex === blockIndex
+      )
+
+      const nextForTitle =
+        blockTitleIndex >= 0
+          ? nextTextByIndex.get(blockTitleIndex) || ""
+          : ""
+
+      const nextForContent =
+        blockContentIndex >= 0
+          ? nextTextByIndex.get(blockContentIndex) || ""
+          : ""
+
+      const revisedBlock = {
+        ...contentBlock.block,
+        title:
+          contentBlock.block.title &&
+          !isLecturerMetadataLine(
+            contentBlock.block.title,
+            nextForTitle
+          )
+            ? stripLecturerMetadataFromText(
+                contentBlock.block.title,
+                nextForTitle
+              )
+            : "",
+        content:
+          contentBlock.block.content &&
+          !isLecturerMetadataLine(
+            contentBlock.block.content,
+            nextForContent
+          )
+            ? stripLecturerMetadataFromText(
+                contentBlock.block.content,
+                nextForContent
+              )
+            : "",
+      }
+
+      const revisedItems = contentBlock.items
+        .map((item, itemIndex) => {
+          const itemSourceIndex = sourceValues.findIndex(
+            (value) =>
+              value.kind === "item" &&
+              value.blockIndex === blockIndex &&
+              value.itemIndex === itemIndex
+          )
+
+          const nextForItem =
+            itemSourceIndex >= 0
+              ? nextTextByIndex.get(itemSourceIndex) || ""
+              : ""
+
+          if (
+            isLecturerMetadataLine(
+              item.content,
+              nextForItem
+            )
+          ) {
+            return {
+              ...item,
+              content: "",
+            }
+          }
+
+          return {
+            ...item,
+            content: stripLecturerMetadataFromText(
+              item.content,
+              nextForItem
+            ),
+          }
+        })
+        .filter((item) => item.content.trim().length > 0)
+
+      return {
+        ...contentBlock,
+        block: revisedBlock,
+        items: revisedItems,
+      }
+    })
+    .filter(
+      ({ block, items }) =>
+        Boolean(block.title?.trim()) ||
+        Boolean(block.content?.trim()) ||
+        items.length > 0
+    )
+}
+
+
 function cleanSourceText(value: string) {
   return value
-    .replace(/\\t/g, "\t")
+    .replace(/\t/g, "\t")
     .replace(/\u00a0/g, " ")
     .split("\n")
     .map((line) => line.trimEnd())
@@ -2095,6 +2414,43 @@ export default function AccountingTopicPage() {
 
   /*
    * ===========================================================
+   * REMOVE THE LECTURER COVER SLIDE
+   * ===========================================================
+   *
+   * The first slide of each source PPT contains lecturer details.
+   * Those details are not learning content, so remove them from
+   * the first source section before the page is rendered.
+   *
+   * The operation is intentionally limited to the FIRST section.
+   * It does not alter lecturer/qualification references that are
+   * part of the actual accounting material later in the document.
+   */
+  const sourceSectionsWithoutLecturerCover =
+    visibleSections.map((entry, index) => {
+      if (index !== 0) {
+        return entry
+      }
+
+      return {
+        ...entry,
+        blocks: stripLecturerMetadataFromFirstSection(
+          entry.blocks
+        ),
+      }
+    })
+
+  /*
+   * Remove any empty first section left after the cover metadata
+   * has been removed.
+   */
+  const visibleSectionsWithoutLecturerCover =
+    sourceSectionsWithoutLecturerCover.filter(
+      ({ blocks: sectionBlocks }) =>
+        sectionBlocks.length > 0
+    )
+
+  /*
+   * ===========================================================
    * GLOBAL DUPLICATE SECTION CLEANUP
    * ===========================================================
    *
@@ -2136,7 +2492,7 @@ export default function AccountingTopicPage() {
       .trim()
 
   const getSectionContentFingerprint = (
-    entry: (typeof visibleSections)[number]
+    entry: (typeof visibleSectionsWithoutLecturerCover)[number]
   ) => {
     const parts: string[] = []
 
@@ -2206,9 +2562,9 @@ export default function AccountingTopicPage() {
   const seenSectionFingerprints =
     new Set<string>()
 
-  const cleanedSections: typeof visibleSections = []
+  const cleanedSections: typeof visibleSectionsWithoutLecturerCover = []
 
-  for (const current of visibleSections) {
+  for (const current of visibleSectionsWithoutLecturerCover) {
     const fingerprint =
       getSectionContentFingerprint(current)
 
