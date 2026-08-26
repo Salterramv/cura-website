@@ -6,7 +6,12 @@ import { useParams } from "next/navigation"
 
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
+import AccountingSourceIllustration from "@/components/education/AccountingSourceIllustration"
 import { createClient } from "@/lib/supabase/client"
+
+/* ============================================================
+   TYPES
+   ============================================================ */
 
 type Topic = {
   id: string
@@ -69,704 +74,407 @@ type EducationAsset = {
   display_order: number
 }
 
-type QuizQuestion = {
-  id: string
-  quiz_id: string
-  question_text: string
-  options: unknown
-  correct_option: number
-  explanation: string | null
-  sort_order: number
-  points: number
-}
-
 type ContentBlock = {
   block: Block
   items: Item[]
+  tables: EducationTable[]
+  assets: EducationAsset[]
 }
 
-/*
- * SOURCE PRESENTATION RULES
- *
- * The PDFs are the authority. The website must not invent labels,
- * lecture metadata, or generic headings that are not present in the
- * source material.
- */
+/* ============================================================
+   SOURCE TEXT NORMALISATION
+   ============================================================ */
 
-const HIDDEN_SOURCE_METADATA = [
-  /^SBR\s+New\s+Knowledge$/i,
-  /^FR\s+Knowledge$/i,
-  /^F\d+\s+Knowledge$/i,
-  /^TUU\s*\d+(?:\s+.*)?$/i,
-  /^Homework\s+TUU\s*\d+.*$/i,
-]
-
-function cleanSourceText(value: string) {
+function normalizeSourceText(value: string) {
   return value
     .replace(/\\t/g, "\t")
     .replace(/\u00a0/g, " ")
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .filter(
-      (line) =>
-        line.trim().length > 0 &&
-        !HIDDEN_SOURCE_METADATA.some((pattern) =>
-          pattern.test(line.trim())
-        )
-    )
-    .join("\n")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
     .trim()
 }
-
-function isHiddenSourceMetadata(value: string) {
-  const cleaned = value.trim()
-  return (
-    !cleaned ||
-    HIDDEN_SOURCE_METADATA.some((pattern) =>
-      pattern.test(cleaned)
-    )
-  )
-}
-
-/*
- * Determine whether a block should visually behave as an illustration.
- *
- * We use both the database block_type and title because the source
- * material contains illustration headings in different structures.
- */
-function isIllustration(block: Block) {
-  const type = (block.block_type || "").toLowerCase().trim()
-  const title = (block.title || "").toLowerCase().trim()
-  const content = (block.content || "").toLowerCase().trim()
-
-  return (
-    type === "illustration" ||
-    type.includes("illustration") ||
-    title.startsWith("illustration") ||
-    content.startsWith("illustration")
-  )
-}
-
-/*
- * Determine whether a block is an example.
- */
-function isExample(block: Block) {
-  const type = (block.block_type || "").toLowerCase()
-  const title = (block.title || "").toLowerCase()
-
-  return (
-    type === "example" ||
-    type.includes("example") ||
-    title.startsWith("example")
-  )
-}
-
-/*
- * Normalize block type so the presentation is controlled by the
- * actual source structure rather than by generic paragraph styling.
- */
 
 /* ============================================================
- * GLOBAL SOURCE-MATERIAL FORMAT PRESERVATION
- *
- * Source material is not always plain bullet-point text.
- *
- * Tabs are meaningful in the original materials and are used
- * for:
- *
- *   - accounting journal columns
- *   - debit / credit layouts
- *   - amount columns
- *   - formulas
- *   - calculation layouts
- *   - other structured source material
- *
- * Therefore tab-separated content must NEVER automatically be
- * converted into an ordinary bullet.
- * ============================================================ */
+   SOURCE LABEL FILTERING
+   ============================================================ */
 
-function getSourceColumns(content: string) {
-  /*
-   * Keep empty columns because multiple tabs represent
-   * intentional horizontal spacing in the source.
-   */
-  return content
-    .split("\t")
-    .map((value) => value.trim())
-}
+/*
+ * These are presentation/lecture labels found in the source
+ * material. They are NOT learning content and must never appear
+ * on CURA.
+ */
+function isSourceNoise(value: string) {
+  const text = normalizeSourceText(value)
 
-function hasSourceColumns(content: string) {
-  return content.includes("\t")
-}
+  if (!text) return true
 
-function isCurrencyOnlySourceRow(content: string) {
-  const columns = getSourceColumns(content)
-  const nonEmpty = columns.filter(Boolean)
+  const normalized = text
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
 
-  return (
-    nonEmpty.length >= 2 &&
-    nonEmpty.every((value) => /^\$+$/.test(value))
-  )
-}
+  const exactNoise = new Set([
+    "sbr new knowledge",
+    "fr knowledge",
+    "f7 knowledge",
+    "tuu",
+    "tuu 1",
+    "tuu 2",
+    "tuu 3",
+    "tuu 4",
+    "tuu 5",
+    "tuu 6",
+    "tuu 7",
+    "tuu 8",
+    "tuu 9",
+    "tuu 10",
+    "tuu 11",
+    "tuu 12",
+    "lecture",
+    "lecture notes",
+    "lecture note",
+    "student notes",
+    "students notes",
+    "chapter notes",
+  ])
 
-function renderSourceStructuredRow(item: Item) {
-  const content = item.content || ""
-  const columns = getSourceColumns(content)
-
-  /*
-   * Remove only trailing empty columns.
-   * Internal empty columns are preserved because they represent
-   * source positioning.
-   */
-  while (
-    columns.length > 0 &&
-    columns[columns.length - 1] === ""
-  ) {
-    columns.pop()
+  if (exactNoise.has(normalized)) {
+    return true
   }
 
   /*
-   * A simple two-column source layout.
+   * Examples:
+   * TUU 7
+   * TUU 9
+   * F7 Knowledge
+   * SBR: Chapter 17
    */
-  if (columns.length <= 2) {
-    return (
-      <div
-        className="
-          grid
-          grid-cols-[minmax(0,1fr)_120px]
-          items-start
-          gap-6
-          py-1
-          text-base
-          leading-8
-          text-slate-700
-        "
-      >
-        <div className="whitespace-pre-wrap break-words">
-          {columns[0] || ""}
-        </div>
+  if (/^(tuu|tuu\s*\d+)\b/i.test(normalized)) {
+    return true
+  }
 
-        <div className="whitespace-pre-wrap text-right">
-          {columns[1] || ""}
-        </div>
-      </div>
-    )
+  if (/^f7\s+knowledge\b/i.test(normalized)) {
+    return true
+  }
+
+  if (/^sbr\s+new\s+knowledge\b/i.test(normalized)) {
+    return true
+  }
+
+  if (/^fr\s+knowledge\b/i.test(normalized)) {
+    return true
+  }
+
+  if (/^sbr\s*:/i.test(normalized)) {
+    return true
   }
 
   /*
-   * Three-column source layout.
-   *
-   * This covers common accounting material such as:
-   *
-   * Account description | X | Explanation
+   * Source-page labels such as:
+   * TUU 11 HOMEWORK
+   * TUU 13
    */
-  return (
-    <div
-      className="
-        grid
-        grid-cols-[minmax(0,1fr)_120px_minmax(0,1fr)]
-        items-start
-        gap-6
-        py-1
-        text-base
-        leading-8
-        text-slate-700
-      "
-    >
-      <div className="whitespace-pre-wrap break-words">
-        {columns[0] || ""}
-      </div>
+  if (/^tuu\b.*\b(homework|exercise|question)\b/i.test(normalized)) {
+    return true
+  }
 
-      <div className="whitespace-pre-wrap text-center">
-        {columns[1] || ""}
-      </div>
-
-      <div className="whitespace-pre-wrap break-words">
-        {columns
-          .slice(2)
-          .filter(Boolean)
-          .join(" ")}
-      </div>
-    </div>
-  )
+  return false
 }
 
+/* ============================================================
+   HEADING NORMALISATION
+   ============================================================ */
 
-function normalizeSourceContent(value: string) {
-  return cleanSourceText(value)
-}
-
-function isJournalRow(content: string) {
-  const value = normalizeSourceContent(content).trim()
-
-  return (
-    /^(Dr|Cr)\b/i.test(value) &&
-    /\bX\s*$/i.test(value)
-  )
-}
-
-function getJournalDescription(content: string) {
-  const value =
-    normalizeSourceContent(content)
-      .replace(/\t+/g, " ")
-      .trim()
-
-  /*
-   * Remove the final X from the description.
-   */
-  return value
-    .replace(/\s+X\s*$/i, "")
+function normalizeHeading(value: string) {
+  return normalizeSourceText(value)
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
     .trim()
 }
 
-function getJournalType(content: string) {
-  const value =
-    normalizeSourceContent(content).trim()
-
-  if (/^Dr\b/i.test(value)) {
-    return "Dr"
-  }
-
-  if (/^Cr\b/i.test(value)) {
-    return "Cr"
-  }
-
-  return ""
+function sameHeading(a: string, b: string) {
+  return normalizeHeading(a) === normalizeHeading(b)
 }
 
+/* ============================================================
+   MARKER DETECTION
+   ============================================================ */
 
-function renderJournalHeader(item: Item) {
-  return (
-    <div
-      key={item.id}
-      className="
-        grid
-        grid-cols-[minmax(0,1fr)_110px_110px]
-        items-center
-        py-1
-        text-base
-        leading-8
-        text-black
-      "
-    >
-      <div />
-
-      <div className="text-center font-medium">
-        $
-      </div>
-
-      <div className="text-center font-medium">
-        $
-      </div>
-    </div>
+function isBulletMarker(value: string) {
+  return /^[•●▪◦‣·\-]\s*$/.test(
+    normalizeSourceText(value)
   )
 }
 
-function renderJournalRow(item: Item) {
-  const content =
-    normalizeSourceContent(item.content || "")
-      .trim()
+function isNumberMarker(value: string) {
+  return /^(?:\d+\.|\(\d+\)|\d+\))\s*$/.test(
+    normalizeSourceText(value)
+  )
+}
 
-  const type =
-    getJournalType(content)
-
-  const description =
-    getJournalDescription(content)
-
-  const isCredit = type === "Cr"
-
-  return (
-    <div
-      key={item.id}
-      className="
-        grid
-        grid-cols-[minmax(0,1fr)_110px_110px]
-        items-start
-        py-1
-        text-base
-        leading-8
-      "
-    >
-      <div className="whitespace-pre-wrap break-words text-black">
-        <span
-          className={
-            type === "Dr"
-              ? "font-bold text-[#16A34A]"
-              : "font-bold text-[#DC2626]"
-          }
-        >
-          {type}
-        </span>
-
-        <span className="text-[#102A5F]">
-          {" "}
-          {description.replace(
-            /^(Dr|Cr)\s+/i,
-            ""
-          )}
-        </span>
-      </div>
-
-      <div className="text-center text-black">
-        {!isCredit && "X"}
-      </div>
-
-      <div className="text-center text-black">
-        {isCredit && "X"}
-      </div>
-    </div>
+function isLetterMarker(value: string) {
+  return /^[a-zA-Z][.)]\s*$/.test(
+    normalizeSourceText(value)
   )
 }
 
 /*
- * ------------------------------------------------------------
- * SOURCE-SPECIFIC TEXT FORMATTING
- * ------------------------------------------------------------
- *
- * The source material contains some formatting that is carried
- * in the wording itself rather than in the database item type.
- *
- * These helpers preserve that formatting without changing the
- * actual source wording.
+ * Removes a marker that has accidentally been stored together
+ * with its text.
  */
+function splitInlineMarker(value: string) {
+  const text = normalizeSourceText(value)
 
-function renderSourceFormattedText(
-  content: string
-) {
-  const value =
-    normalizeSourceContent(content)
-      .trim()
-
-  /*
-   * "Steps:"
-   */
-  if (
-    /^Steps:\s*$/i.test(value)
-  ) {
-    return (
-      <span className="font-bold text-black">
-        Steps:
-      </span>
-    )
-  }
-
-  /*
-   * Journal heading.
-   */
-  if (
-    /^Journal\s*\(/i.test(value)
-  ) {
-    return (
-      <span
-        className="
-          font-bold
-          italic
-          underline
-          decoration-1
-          underline-offset-2
-          text-black
-        "
-      >
-        {value}
-      </span>
-    )
-  }
-
-  /*
-   * The source specifically highlights:
-   *
-   * "Assuming a revaluation Gain"
-   *
-   * in green and bold.
-   */
-  const gainMatch =
-    value.match(
-      /^(.*?)(Assuming a revaluation Gain)(.*)$/i
-    )
-
-  if (gainMatch) {
-    return (
-      <>
-        <span className="text-[#102A5F]">
-          {gainMatch[1]}
-        </span>
-
-        <span className="font-bold text-[#16A34A]">
-          {gainMatch[2]}
-        </span>
-
-        <span className="text-[#102A5F]">
-          {gainMatch[3]}
-        </span>
-      </>
-    )
-  }
-
-  return (
-    <span className="text-[#102A5F]">
-      {value}
-    </span>
+  const numbered = text.match(
+    /^(\d+\.|\(\d+\)|\d+\))\s+(.+)$/
   )
-}
-
-function isNumberedSourceLine(
-  content: string
-) {
-  return /^\(\d+\)\s*/.test(
-    normalizeSourceContent(content).trim()
-  )
-}
-
-function renderNumberedSourceLine(
-  item: Item
-) {
-  const value =
-    normalizeSourceContent(item.content || "")
-      .trim()
-
-  const match =
-    value.match(
-      /^\((\d+)\)\s*(.*)$/
-    )
-
-  if (!match) {
-    return null
-  }
-
-  return (
-    <div
-      key={item.id}
-      className="
-        grid
-        grid-cols-[64px_minmax(0,1fr)]
-        items-start
-        py-1
-        text-base
-        leading-8
-      "
-    >
-      <div
-        className="
-          font-medium
-          text-[#168BC4]
-        "
-      >
-        ({match[1]})
-      </div>
-
-      <div className="text-base leading-8 text-[#102A5F]">
-        {match[2]}
-      </div>
-    </div>
-  )
-}
-
-
-
-/*
- * ============================================================
- * GLOBAL CURA SOURCE TYPOGRAPHY
- * ============================================================
- *
- * All accounting source material uses the same typography.
- * Do not create section-specific font sizes.
- *
- * The accounting page inherits the CURA font from the
- * application layout.
- */
-
-const CURA_SOURCE_TEXT =
-  "text-base leading-8 text-[#102A5F]"
-
-const CURA_SOURCE_SMALL =
-  "text-sm leading-7 text-[#102A5F]"
-
-const CURA_SOURCE_NUMBER =
-  "text-base leading-8 text-[#168BC4]"
-
-function sourceTextClass(content: string) {
-  const value = content.trim()
-
-  /*
-   * Source headings / sub-headings
-   */
-  if (
-    /^steps?:?$/i.test(value) ||
-    /^journal\s*\(/i.test(value) ||
-    /^definitions$/i.test(value)
-  ) {
-    return "font-bold"
-  }
-
-  return ""
-}
-
-function isJournalHeader(content: string) {
-  return /^journal\s*\(/i.test(content.trim())
-}
-
-function isJournalAmountLine(content: string) {
-  const value = content.trim()
-
-  return (
-    value === "$ $" ||
-    value === "$   $" ||
-    /^\$\s+\$/.test(value)
-  )
-}
-
-function isJournalDebit(content: string) {
-  return /^\s*Dr\b/i.test(content)
-}
-
-function isJournalCredit(content: string) {
-  return /^\s*Cr\b/i.test(content)
-}
-
-function renderFormattedSourceText(content: string) {
-  const value = content.trim()
-
-  /*
-   * Journal heading:
-   * bold + italic + underline, matching the source.
-   */
-  if (isJournalHeader(value)) {
-    return (
-      <span className="font-bold italic underline decoration-2 underline-offset-4">
-        {value}
-      </span>
-    )
-  }
-
-  /*
-   * Journal debit rows:
-   * "Dr" is green and bold in the source.
-   */
-  if (isJournalDebit(value)) {
-    const match = value.match(/^(\s*Dr\b)(.*)$/i)
-
-    if (match) {
-      return (
-        <>
-          <span className="font-bold text-[#00A651]">
-            {match[1]}
-          </span>
-          <span>{match[2]}</span>
-        </>
-      )
-    }
-  }
-
-  /*
-   * Journal credit rows:
-   * "Cr" is red and bold in the source.
-   */
-  if (isJournalCredit(value)) {
-    const match = value.match(/^(\s*Cr\b)(.*)$/i)
-
-    if (match) {
-      return (
-        <>
-          <span className="font-bold text-[#D00000]">
-            {match[1]}
-          </span>
-          <span>{match[2]}</span>
-        </>
-      )
-    }
-  }
-
-  /*
-   * Numbered source steps.
-   *
-   * The source uses:
-   * (1), (2), (3)
-   *
-   * These must NOT become ordinary bullet points.
-   */
-  const numbered = value.match(/^\((\d+)\)\s*(.*)$/)
 
   if (numbered) {
-    return (
-      <div className="flex items-start gap-4">
-        <span className="shrink-0 font-medium text-[#168BC4]">
-          ({numbered[1]})
-        </span>
-
-        <span>{numbered[2]}</span>
-      </div>
-    )
-  }
-
-  /*
-   * Preserve the green phrase in the revaluation source.
-   *
-   * This is deliberately limited to the source phrase rather
-   * than recolouring an entire paragraph.
-   */
-  if (/^assuming a revaluation gain\b/i.test(value)) {
-    const match = value.match(
-      /^(Assuming a revaluation Gain)(.*)$/i
-    )
-
-    if (match) {
-      return (
-        <>
-          <span className="text-[#00A651]">
-            {match[1]}
-          </span>
-          <span>{match[2]}</span>
-        </>
-      )
+    return {
+      marker: numbered[1],
+      text: numbered[2].trim(),
+      type: "numbered" as const,
     }
   }
 
-  return value
+  const bullet = text.match(
+    /^[•●▪◦‣·\-]\s+(.+)$/
+  )
+
+  if (bullet) {
+    return {
+      marker: "•",
+      text: bullet[1].trim(),
+      type: "bullet" as const,
+    }
+  }
+
+  const letter = text.match(
+    /^([a-zA-Z][.)])\s+(.+)$/
+  )
+
+  if (letter) {
+    return {
+      marker: letter[1],
+      text: letter[2].trim(),
+      type: "letter" as const,
+    }
+  }
+
+  return null
 }
 
-function renderJournalAmountColumns(content: string) {
-  /*
-   * The source journal has two fixed amount columns.
-   *
-   * We deliberately use a grid rather than spaces in the text.
-   * This prevents browser whitespace collapsing from moving
-   * the $ and X values.
-   */
-  const value = content.trim()
+/* ============================================================
+   SOURCE ITEM CLEANING
+   ============================================================ */
 
-  if (isJournalAmountLine(value)) {
-    return (
-      <div
-        className="
-          grid
-          grid-cols-[minmax(0,1fr)_140px_140px]
-          items-center
-          min-h-[42px]
-          text-base
-          font-medium
-        "
-      >
-        <div />
+type RenderItem = {
+  id: string
+  content: string
+  type: "paragraph" | "bullet" | "numbered" | "letter"
+}
 
-        <div className="text-center">
-          $
-        </div>
+/*
+ * This is the most important part of the renderer.
+ *
+ * The imported source sometimes stores:
+ *
+ *   item 1 = "•"
+ *   item 2 = "First point..."
+ *
+ * Instead of displaying:
+ *
+ *   •
+ *   First point...
+ *
+ * we convert it to:
+ *
+ *   • First point...
+ */
+function prepareItems(
+  items: Item[],
+  sectionTitle: string,
+  blockTitle: string
+): RenderItem[] {
+  const output: RenderItem[] = []
 
-        <div className="text-center">
-          $
-        </div>
-      </div>
+  const sourceItems = [...items]
+    .sort(
+      (a, b) =>
+        a.display_order - b.display_order
     )
+    .map((item) => ({
+      ...item,
+      content: normalizeSourceText(
+        item.content || ""
+      ),
+    }))
+    .filter(
+      (item) =>
+        item.content &&
+        !isSourceNoise(item.content)
+    )
+
+  let pendingMarker:
+    | "bullet"
+    | "numbered"
+    | "letter"
+    | null = null
+
+  for (const item of sourceItems) {
+    let value = item.content
+
+    /*
+     * Marker-only item.
+     */
+    if (isBulletMarker(value)) {
+      pendingMarker = "bullet"
+      continue
+    }
+
+    if (isNumberMarker(value)) {
+      pendingMarker = "numbered"
+      continue
+    }
+
+    if (isLetterMarker(value)) {
+      pendingMarker = "letter"
+      continue
+    }
+
+    /*
+     * If a previous item was only a marker, attach it to
+     * the current text.
+     */
+    if (pendingMarker) {
+      output.push({
+        id: item.id,
+        content: value,
+        type: pendingMarker,
+      })
+
+      pendingMarker = null
+      continue
+    }
+
+    /*
+     * Inline markers.
+     */
+    const inline = splitInlineMarker(value)
+
+    if (inline) {
+      output.push({
+        id: item.id,
+        content: inline.text,
+        type: inline.type,
+      })
+
+      continue
+    }
+
+    /*
+     * Remove duplicated section/block headings when the same
+     * heading has already been rendered structurally.
+     */
+    if (
+      sameHeading(value, sectionTitle) ||
+      (blockTitle &&
+        sameHeading(value, blockTitle))
+    ) {
+      continue
+    }
+
+    output.push({
+      id: item.id,
+      content: value,
+      type: "paragraph",
+    })
   }
 
-  const debit = isJournalDebit(value)
-  const credit = isJournalCredit(value)
+  return output
+}
 
-  if (!debit && !credit) {
-    return null
+/* ============================================================
+   BLOCK TYPE
+   ============================================================ */
+
+function getBlockType(block: Block) {
+  const type = (
+    block.block_type || ""
+  )
+    .toLowerCase()
+    .trim()
+
+  if (
+    type.includes("illustration") ||
+    type === "image"
+  ) {
+    return "illustration"
   }
 
-  const match = value.match(
+  if (
+    type.includes("example")
+  ) {
+    return "example"
+  }
+
+  if (
+    type.includes("bullet")
+  ) {
+    return "bullet"
+  }
+
+  if (
+    type.includes("number") ||
+    type.includes("ordered")
+  ) {
+    return "numbered"
+  }
+
+  if (type === "table") {
+    return "table"
+  }
+
+  return "paragraph"
+}
+
+/* ============================================================
+   SOURCE SPECIAL CONTENT
+   ============================================================ */
+
+function isJournalHeader(value: string) {
+  return /^journal\s*\(/i.test(
+    normalizeSourceText(value)
+  )
+}
+
+function isJournalRow(value: string) {
+  const text =
+    normalizeSourceText(value)
+
+  return (
+    /^(Dr|Cr)\b/i.test(text) &&
+    /\bX\s*$/i.test(text)
+  )
+}
+
+function isJournalAmountHeader(value: string) {
+  const text =
+    normalizeSourceText(value)
+
+  return (
+    /^\$\s+\$/.test(text) ||
+    text === "$ $" ||
+    text === "$   $"
+  )
+}
+
+function renderJournalRow(value: string) {
+  const text =
+    normalizeSourceText(value)
+
+  const match = text.match(
     /^(Dr|Cr)\s+(.*?)(?:\s+)(X)\s*$/i
   )
 
@@ -774,16 +482,21 @@ function renderJournalAmountColumns(content: string) {
     return null
   }
 
+  const type = match[1]
   const account = match[2]
   const amount = match[3]
+
+  const debit =
+    type.toLowerCase() === "dr"
 
   return (
     <div
       className="
         grid
-        grid-cols-[minmax(0,1fr)_140px_140px]
+        grid-cols-[minmax(0,1fr)_120px_120px]
         items-start
-        min-h-[42px]
+        gap-2
+        py-1
         text-base
         leading-8
         text-[#102A5F]
@@ -797,7 +510,7 @@ function renderJournalAmountColumns(content: string) {
               : "font-bold text-[#D00000]"
           }
         >
-          {match[1]}
+          {type}
         </span>{" "}
         {account}
       </div>
@@ -807,180 +520,16 @@ function renderJournalAmountColumns(content: string) {
       </div>
 
       <div className="text-center">
-        {credit ? amount : ""}
+        {!debit ? amount : ""}
       </div>
     </div>
   )
 }
 
-function renderSourceItem(item: Item) {
-  const content =
-    normalizeSourceContent(item.content || "")
-      .trim()
+/* ============================================================
+   SOURCE TEXT
+   ============================================================ */
 
-  if (!content) {
-    return null
-  }
-
-  /*
-   * Journal content gets its own source-faithful renderer.
-   * This prevents the browser from collapsing the spaces
-   * between $ and X columns.
-   */
-  if (
-    isJournalAmountLine(content) ||
-    isJournalDebit(content) ||
-    isJournalCredit(content)
-  ) {
-    return (
-      <div
-        key={item.id}
-        className="my-1 w-full"
-      >
-        {renderJournalAmountColumns(content)}
-      </div>
-    )
-  }
-
-  /*
-   * Journal heading is not a bullet.
-   */
-  if (isJournalHeader(content)) {
-    return (
-      <div
-        key={item.id}
-        className="
-          mt-5
-          mb-4
-          text-base
-          leading-8
-          text-[#111111]
-        "
-      >
-        {renderFormattedSourceText(content)}
-      </div>
-    )
-  }
-
-  /*
-   * Numbered source material should remain numbered.
-   */
-  if (/^\(\d+\)\s*/.test(content)) {
-    return (
-      <div
-        key={item.id}
-        className="
-          my-3
-          text-base
-          leading-8
-          text-[#111111]
-        "
-      >
-        {renderFormattedSourceText(content)}
-      </div>
-    )
-  }
-
-  /*
-   * Ordinary source content.
-   *
-   * Keep the CURA bullet only where the source item itself
-   * is represented as a bullet. Do not force every source
-   * line into a bullet.
-   */
-  return (
-    <div
-      key={item.id}
-      className={`
-        text-base
-        leading-8
-        text-[#111111]
-        ${sourceTextClass(content)}
-      `}
-    >
-      {renderFormattedSourceText(content)}
-    </div>
-  )
-}
-
-function shouldRenderAsBullet(item: Item) {
-  const value = (item.content || "").trim()
-
-  if (!value) {
-    return false
-  }
-
-  /*
-   * Currency/calculation placeholders from the source material
-   * are not bullet points.
-   *
-   * Examples:
-   *   $ $
-   *   $   $
-   *   $       $
-   */
-  const withoutWhitespace = value.replace(/\s+/g, "")
-
-  if (
-    /^\$+$/.test(withoutWhitespace) ||
-    /^\$+\$+$/.test(withoutWhitespace)
-  ) {
-    return false
-  }
-
-  /*
-   * Lines containing only accounting separators or formatting
-   * characters should remain source-format content rather than
-   * becoming bullets.
-   */
-  if (
-    /^[\$\-_=.,:;|]+$/.test(
-      withoutWhitespace
-    )
-  ) {
-    return false
-  }
-
-  return true
-}
-
-function getBlockType(block: Block) {
-  const type = (block.block_type || "").toLowerCase().trim()
-
-  if (
-    type === "bullet_list" ||
-    type === "bullet-list" ||
-    type === "bullets" ||
-    type === "bullet"
-  ) {
-    return "bullet"
-  }
-
-  if (
-    type === "numbered_list" ||
-    type === "numbered-list" ||
-    type === "numbered" ||
-    type === "ordered_list" ||
-    type === "ordered-list"
-  ) {
-    return "numbered"
-  }
-
-  if (type === "example" || type.includes("example")) {
-    return "example"
-  }
-
-  if (type === "illustration" || type.includes("illustration")) {
-    return "illustration"
-  }
-
-  return "paragraph"
-}
-
-/*
- * Keep the source text intact while allowing line breaks and tabs
- * contained in the imported source material to remain visible.
- */
 function SourceText({
   children,
   className = "",
@@ -993,7 +542,7 @@ function SourceText({
       className={[
         "whitespace-pre-wrap",
         "break-words",
-        "text-base",
+        "text-[16px]",
         "leading-8",
         "text-[#102A5F]",
         className,
@@ -1004,570 +553,654 @@ function SourceText({
   )
 }
 
-/*
- * Render a single source block according to its actual source type.
- *
- * IMPORTANT:
- * We do not rewrite or summarize source material here.
- */
-function isNumericSectionTitle(value: string) {
-  return /^\d+(?:\.\d+)?$/.test(value.trim())
-}
+/* ============================================================
+   SOURCE ITEM RENDERER
+   ============================================================ */
 
-function getDisplaySectionTitle(
-  section: Section,
-  sectionBlocks: ContentBlock[]
-) {
-  const sectionTitle = cleanSourceText(section.title || "").trim()
-
-  if (
-    sectionTitle &&
-    !isNumericSectionTitle(sectionTitle) &&
-    !isHiddenSourceMetadata(sectionTitle)
-  ) {
-    return sectionTitle
-  }
-
-  for (const contentBlock of sectionBlocks) {
-    const blockTitle = cleanSourceText(
-      contentBlock.block.title || ""
-    ).trim()
-
-    if (
-      blockTitle &&
-      !isNumericSectionTitle(blockTitle) &&
-      !isHiddenSourceMetadata(blockTitle)
-    ) {
-      return blockTitle
-    }
-
-    const blockContent = cleanSourceText(
-      contentBlock.block.content || ""
-    )
-
-    const lines = blockContent
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-
-    for (const line of lines) {
-      if (
-        !isNumericSectionTitle(line) &&
-        !isHiddenSourceMetadata(line) &&
-        !/^[•·▪‣◦]$/.test(line)
-      ) {
-        return line
-      }
-    }
-
-    for (const item of contentBlock.items) {
-      const value = cleanSourceText(
-        item.content || ""
-      ).trim()
-
-      if (
-        value &&
-        !isNumericSectionTitle(value) &&
-        !isHiddenSourceMetadata(value) &&
-        !/^[•·▪‣◦]$/.test(value)
-      ) {
-        return value
-      }
-    }
-  }
-
-  return sectionTitle
-}
-
-function RenderSourceBlock({
-  contentBlock,
-  sectionTitle,
-  tables = [],
-  assets = [],
+function RenderPreparedItem({
+  item,
 }: {
-  contentBlock: ContentBlock
-  sectionTitle: string
-  tables?: EducationTable[]
-  assets?: EducationAsset[]
+  item: RenderItem
 }) {
-  const { block, items } = contentBlock
-  const blockType = getBlockType(block)
+  const value =
+    normalizeSourceText(item.content)
 
-  const validItems = items
-    .map((item) => ({
-      ...item,
-      content: cleanSourceText(item.content || ""),
-    }))
-    .filter(
-      (item) =>
-        typeof item.content === "string" &&
-        item.content.trim().length > 0 &&
-        !isHiddenSourceMetadata(item.content)
+  if (!value) {
+    return null
+  }
+
+  /*
+   * Journal rows are not ordinary list items.
+   */
+  if (
+    isJournalRow(value)
+  ) {
+    return (
+      <div key={item.id}>
+        {renderJournalRow(value)}
+      </div>
     )
+  }
 
-  const blockTitle =
-    typeof block.title === "string"
-      ? cleanSourceText(block.title)
-      : ""
+  /*
+   * Journal heading.
+   */
+  if (
+    isJournalHeader(value)
+  ) {
+    return (
+      <div
+        key={item.id}
+        className="
+          mt-5
+          mb-3
+          font-bold
+          italic
+          underline
+          decoration-2
+          underline-offset-4
+          text-[#111111]
+        "
+      >
+        {value}
+      </div>
+    )
+  }
 
-  const normalizedSectionTitle =
-    sectionTitle
-      .toLowerCase()
-      .replace(/[–—-]/g, "-")
-      .replace(/\s+/g, " ")
-      .trim()
+  /*
+   * Numbered item.
+   */
+  if (
+    item.type === "numbered"
+  ) {
+    return (
+      <div
+        key={item.id}
+        className="
+          grid
+          grid-cols-[44px_minmax(0,1fr)]
+          gap-2
+          items-start
+          py-1
+        "
+      >
+        <span className="font-semibold text-[#168BC4]">
+          {value.match(
+            /^\d+|/
+          )?.[0]
+            ? `${value.match(/^\d+/)?.[0] || ""}.`
+            : ""}
+        </span>
 
-  const normalizedBlockTitle =
-    blockTitle
-      .toLowerCase()
-      .replace(/[–—-]/g, "-")
-      .replace(/\s+/g, " ")
-      .trim()
+        <span className="text-[16px] leading-8 text-[#102A5F]">
+          {value}
+        </span>
+      </div>
+    )
+  }
 
-  const duplicateBlockTitle =
-    normalizedBlockTitle.length > 0 &&
-    normalizedBlockTitle === normalizedSectionTitle
+  /*
+   * Lettered item.
+   */
+  if (
+    item.type === "letter"
+  ) {
+    return (
+      <div
+        key={item.id}
+        className="
+          grid
+          grid-cols-[36px_minmax(0,1fr)]
+          gap-2
+          items-start
+          py-1
+        "
+      >
+        <span className="font-semibold text-[#168BC4]">
+          •
+        </span>
 
-  const renderEducationTable = (
-    table: EducationTable
-  ) => {
-    const columns = Array.isArray(table.columns)
+        <span className="text-[16px] leading-8 text-[#102A5F]">
+          {value}
+        </span>
+      </div>
+    )
+  }
+
+  /*
+   * Genuine bullet.
+   */
+  if (
+    item.type === "bullet"
+  ) {
+    return (
+      <div
+        key={item.id}
+        className="
+          grid
+          grid-cols-[20px_minmax(0,1fr)]
+          gap-2
+          items-start
+          py-1
+        "
+      >
+        <span
+          className="
+            mt-[13px]
+            h-1.5
+            w-1.5
+            rounded-full
+            bg-[#168BC4]
+          "
+        />
+
+        <span className="text-[16px] leading-8 text-[#102A5F]">
+          {value}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <SourceText key={item.id}>
+      {value}
+    </SourceText>
+  )
+}
+
+/* ============================================================
+   TABLE
+   ============================================================ */
+
+function RenderTable({
+  table,
+}: {
+  table: EducationTable
+}) {
+  const columns =
+    Array.isArray(table.columns)
       ? table.columns
       : []
 
-    const rows = Array.isArray(table.rows)
+  const rows =
+    Array.isArray(table.rows)
       ? table.rows
       : []
 
-    return (
-      <div
-        key={table.id}
-        className="my-6 overflow-x-auto rounded-2xl border border-slate-200"
-      >
-        <table className="w-full border-collapse text-base">
-          {columns.length > 0 && (
-            <thead>
-              <tr>
-                {columns.map((column, index) => (
+  return (
+    <div
+      className="
+        my-7
+        overflow-x-auto
+        rounded-2xl
+        border
+        border-slate-200
+        bg-white
+      "
+    >
+      <table className="w-full border-collapse text-sm">
+        {columns.length > 0 && (
+          <thead>
+            <tr>
+              {columns.map(
+                (column, index) => (
                   <th
                     key={index}
-                    className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-left font-bold text-[#071B49]"
+                    className="
+                      border-b
+                      border-slate-200
+                      bg-[#071B49]
+                      px-4
+                      py-3
+                      text-left
+                      font-bold
+                      text-white
+                    "
                   >
-                    {String(column ?? "")}
+                    {String(
+                      column ?? ""
+                    )}
                   </th>
-                ))}
-              </tr>
-            </thead>
-          )}
+                )
+              )}
+            </tr>
+          </thead>
+        )}
 
-          <tbody>
-            {rows.map((row, rowIndex) => {
+        <tbody>
+          {rows.map(
+            (row, rowIndex) => {
               const cells =
                 Array.isArray(row)
                   ? row
                   : row &&
-                      typeof row === "object"
-                  ? Object.values(row)
-                  : [row]
+                      typeof row ===
+                        "object"
+                    ? Object.values(
+                        row
+                      )
+                    : [row]
 
               return (
-                <tr key={rowIndex}>
+                <tr
+                  key={rowIndex}
+                >
                   {cells.map(
-                    (cell, cellIndex) => (
+                    (
+                      cell,
+                      cellIndex
+                    ) => (
                       <td
-                        key={cellIndex}
-                        className="border-b border-slate-100 px-4 py-3 align-top text-[#102A5F]"
+                        key={
+                          cellIndex
+                        }
+                        className="
+                          border-b
+                          border-slate-100
+                          px-4
+                          py-3
+                          align-top
+                          text-[#102A5F]
+                        "
                       >
-                        {String(cell ?? "")}
+                        {String(
+                          cell ??
+                            ""
+                        )}
                       </td>
                     )
                   )}
                 </tr>
               )
-            })}
-          </tbody>
-        </table>
-
-        {table.caption && (
-          <p className="px-4 py-3 text-sm text-slate-500">
-            {table.caption}
-          </p>
-        )}
-      </div>
-    )
-  }
-
-  const renderEducationAsset = (
-    asset: EducationAsset
-  ) => (
-    <figure
-      key={asset.id}
-      className="my-6"
-    >
-      <img
-        src={asset.url}
-        alt={asset.alt_text || ""}
-        className="mx-auto max-w-full rounded-2xl"
-      />
-
-      {asset.caption && (
-        <figcaption className="mt-3 text-center text-sm text-slate-500">
-          {asset.caption}
-        </figcaption>
-      )}
-    </figure>
-  )
-
-  /*
-   * Illustration
-   */
-  if (isIllustration(block) || blockType === "illustration") {
-    return (
-      <div className="space-y-5">
-        {blockTitle &&
-          !duplicateBlockTitle &&
-          !isHiddenSourceMetadata(blockTitle) && (
-            <h3 className="text-xl font-semibold leading-8 text-[#071B49]">
-              {blockTitle}
-            </h3>
+            }
           )}
+        </tbody>
+      </table>
 
-        {block.content &&
-          cleanSourceText(block.content).length > 0 && (
-            <SourceText className="mb-2">
-              {cleanSourceText(block.content)}
-            </SourceText>
-          )}
-
-        {validItems.length > 0 && (
-          <div className="space-y-3">
-            {validItems.map((item) =>
-              renderSourceItem(item)
-            )}
-          </div>
-        )}
-
-        {tables.map((table) =>
-          renderEducationTable(table)
-        )}
-
-        {assets.map((asset) =>
-          renderEducationAsset(asset)
-        )}
-      </div>
-    )
-  }
-
-  /*
-   * Example
-   */
-  if (isExample(block) || blockType === "example") {
-    return (
-      <div className="space-y-5">
-        {blockTitle &&
-          !duplicateBlockTitle &&
-          !isHiddenSourceMetadata(blockTitle) && (
-            <h3 className="text-xl font-semibold leading-8 text-[#071B49]">
-              {blockTitle}
-            </h3>
-          )}
-
-        {block.content &&
-          cleanSourceText(block.content).length > 0 && (
-            <SourceText className="mb-2">
-              {cleanSourceText(block.content)}
-            </SourceText>
-          )}
-
-        {validItems.length > 0 && (
-          <div className="space-y-4">
-            {validItems.map((item) =>
-              renderSourceItem(item)
-            )}
-          </div>
-        )}
-
-        {tables.map((table) =>
-          renderEducationTable(table)
-        )}
-
-        {assets.map((asset) =>
-          renderEducationAsset(asset)
-        )}
-      </div>
-    )
-  }
-
-  /*
-   * Bullet list
-   *
-   * IMPORTANT:
-   *
-   * Not every database item inside a bullet block is actually
-   * a source bullet.
-   *
-   * Accounting source material can contain:
-   *
-   *   - journal headings
-   *   - $ amount headings
-   *   - Dr / Cr journal rows
-   *   - numbered steps
-   *   - specially coloured source text
-   *
-   * These must bypass the generic <li> renderer.
-   */
-  if (blockType === "bullet") {
-    return (
-      <div className="mt-2">
-        {blockTitle && !duplicateBlockTitle && (
-          <h3 className="mb-4 text-lg font-semibold text-[#071B49]">
-            {blockTitle}
-          </h3>
-        )}
-
-        {block.content &&
-          block.content.trim().length > 0 && (
-            <div className="mb-4">
-              {renderFormattedSourceText(block.content)}
-            </div>
-          )}
-
-        {validItems.length > 0 && (
-          <div className="space-y-3">
-            {validItems.map((item) => {
-              const value =
-                normalizeSourceContent(
-                  item.content || ""
-                ).trim()
-
-              /*
-               * --------------------------------------------------
-               * SOURCE-SPECIFIC NON-BULLET CONTENT
-               * --------------------------------------------------
-               */
-
-              /*
-               * Journal heading
-               */
-              if (isJournalHeader(value)) {
-                return (
-                  <div
-                    key={item.id}
-                    className="
-                      mt-5
-                      mb-2
-                      text-base
-                      leading-8
-                      text-[#102A5F]
-                    "
-                  >
-                    {renderFormattedSourceText(value)}
-                  </div>
-                )
-              }
-
-              /*
-               * Journal $ header.
-               */
-              if (isJournalAmountLine(value)) {
-                return (
-                  <div
-                    key={item.id}
-                    className="w-full"
-                  >
-                    {renderJournalAmountColumns(value)}
-                  </div>
-                )
-              }
-
-              /*
-               * Journal Dr / Cr rows.
-               *
-               * These are NOT bullets.
-               */
-              if (
-                isJournalDebit(value) ||
-                isJournalCredit(value)
-              ) {
-                return (
-                  <div
-                    key={item.id}
-                    className="w-full"
-                  >
-                    {renderJournalAmountColumns(value)}
-                  </div>
-                )
-              }
-
-              /*
-               * Numbered source lines:
-               *
-               * (1)
-               * (2)
-               * (3)
-               *
-               * These must not receive a bullet.
-               */
-              if (isNumberedSourceLine(value)) {
-                return renderNumberedSourceLine(item)
-              }
-
-              /*
-               * "Steps:" is a source heading.
-               *
-               * The original source uses a square marker rather
-               * than the ordinary CURA round bullet.
-               */
-              if (/^Steps:\s*$/i.test(value)) {
-                return (
-                  <div
-                    key={item.id}
-                    className="
-                      flex
-                      items-start
-                      gap-4
-                      text-base
-                      leading-8
-                      text-black
-                    "
-                  >
-                    <span
-                      className="
-                        mt-[11px]
-                        h-[8px]
-                        w-[8px]
-                        shrink-0
-                        bg-[#168BC4]
-                      "
-                    />
-
-                    <span className="font-bold">
-                      Steps:
-                    </span>
-                  </div>
-                )
-              }
-
-              /*
-               * --------------------------------------------------
-               * ORDINARY SOURCE BULLET
-               * --------------------------------------------------
-               */
-
-              if (!shouldRenderAsBullet(item)) {
-                return (
-                  <div
-                    key={item.id}
-                    className="
-                      whitespace-pre-wrap
-                      break-words
-                      text-base
-                      leading-8
-                      text-black
-                    "
-                  >
-                    {renderFormattedSourceText(value)}
-                  </div>
-                )
-              }
-
-              return (
-                <ul
-                  key={item.id}
-                  className="
-                    list-disc
-                    pl-7
-                    marker:text-[#168BC4]
-                  "
-                >
-                  <li
-                    className="
-                      pl-1
-                      text-base
-                      leading-8
-                      text-black
-                    "
-                  >
-                    <span className="whitespace-pre-wrap break-words">
-                      {renderFormattedSourceText(value)}
-                    </span>
-                  </li>
-                </ul>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  /*
-   * Numbered list
-   */
-  if (blockType === "numbered") {
-    return (
-      <div className="mt-2">
-        {blockTitle && !duplicateBlockTitle && (
-          <h3 className="mb-4 text-lg font-semibold text-[#071B49]">
-            {blockTitle}
-          </h3>
-        )}
-
-        {block.content &&
-          block.content.trim().length > 0 && (
-            <SourceText className="mb-4">
-              {cleanSourceText(block.content)}
-            </SourceText>
-          )}
-
-        {validItems.length > 0 && (
-          <ol className="list-decimal space-y-3 pl-7 marker:font-semibold marker:text-[#168BC4]">
-            {validItems.map((item) => (
-              <li
-                key={item.id}
-                className="pl-1 text-base leading-8 text-slate-700"
-              >
-                <span className="whitespace-pre-wrap break-words">
-                  {cleanSourceText(item.content)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    )
-  }
-
-  /*
-   * Normal paragraph
-   */
-  return (
-    <div>
-      {blockTitle && (
-        <h3 className="mb-4 text-lg font-semibold text-[#071B49]">
-          {blockTitle}
-        </h3>
-      )}
-
-      {block.content &&
-        block.content.trim().length > 0 && (
-          <SourceText className="mb-5">
-            {block.content}
-          </SourceText>
-        )}
-
-      {validItems.length > 0 && (
-        <div className="space-y-5">
-          {validItems.map((item) => (
-            <SourceText key={item.id}>
-              {item.content}
-            </SourceText>
-          ))}
+      {table.caption && (
+        <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+          {table.caption}
         </div>
       )}
     </div>
   )
 }
+
+/* ============================================================
+   ILLUSTRATION
+   ============================================================ */
+
+function RenderAsset({
+  asset,
+}: {
+  asset: EducationAsset
+}) {
+  return (
+    <figure
+      className="
+        my-8
+        overflow-hidden
+        rounded-2xl
+        border
+        border-[#168BC4]/20
+        bg-white
+      "
+    >
+      <div className="bg-[#F4FAFD] p-4 md:p-6">
+        <img
+          src={asset.url}
+          alt={
+            asset.alt_text ||
+            "Accounting illustration"
+          }
+          className="
+            mx-auto
+            block
+            h-auto
+            max-w-full
+            object-contain
+          "
+          loading="lazy"
+        />
+      </div>
+
+      {asset.caption && (
+        <figcaption
+          className="
+            border-t
+            border-slate-100
+            px-5
+            py-3
+            text-center
+            text-xs
+            text-slate-500
+          "
+        >
+          {asset.caption}
+        </figcaption>
+      )}
+    </figure>
+  )
+}
+
+/* ============================================================
+   BLOCK RENDERER
+   ============================================================ */
+
+function RenderSourceBlock({
+  contentBlock,
+}: {
+  contentBlock: ContentBlock
+}) {
+  const {
+    block,
+    items,
+    tables,
+    assets,
+  } = contentBlock
+
+  const blockType =
+    getBlockType(block)
+
+  const rawTitle =
+    normalizeSourceText(
+      block.title || ""
+    )
+
+  const rawContent =
+    normalizeSourceText(
+      block.content || ""
+    )
+
+  const preparedItems =
+    prepareItems(
+      items,
+      "",
+      rawTitle
+    )
+
+  /*
+   * Do not repeat block titles that are
+   * merely source slide headings.
+   */
+  const showTitle =
+    rawTitle &&
+    !isSourceNoise(rawTitle)
+
+  /*
+   * Do not repeat block content if it
+   * exactly duplicates the block title.
+   */
+  const showContent =
+    rawContent &&
+    !isSourceNoise(rawContent) &&
+    !sameHeading(
+      rawContent,
+      rawTitle
+    )
+
+  /*
+   * ------------------------------------------------------------
+   * ILLUSTRATION
+   * ------------------------------------------------------------
+   */
+
+  if (
+    blockType ===
+      "illustration" ||
+    assets.length > 0
+  ) {
+    return (
+      <div
+        className="
+          overflow-hidden
+          rounded-2xl
+          border
+          border-[#168BC4]/25
+          bg-gradient-to-br
+          from-[#F4FAFD]
+          to-white
+          p-5
+          md:p-7
+        "
+      >
+        {showTitle && (
+          <div className="mb-5">
+            <div className="flex items-center gap-3">
+              <span
+                className="
+                  h-2
+                  w-2
+                  rounded-full
+                  bg-[#168BC4]
+                "
+              />
+
+              <span
+                className="
+                  text-xs
+                  font-bold
+                  uppercase
+                  tracking-[0.2em]
+                  text-[#168BC4]
+                "
+              >
+                Illustration
+              </span>
+            </div>
+
+            <h3
+              className="
+                mt-2
+                text-xl
+                font-semibold
+                leading-7
+                text-[#071B49]
+              "
+            >
+              {rawTitle}
+            </h3>
+          </div>
+        )}
+
+        {showContent && (
+          <SourceText className="mb-5">
+            {rawContent}
+          </SourceText>
+        )}
+
+        {preparedItems.length > 0 && (
+          <div className="space-y-2">
+            {preparedItems.map(
+              (item) => (
+                <RenderPreparedItem
+                  key={item.id}
+                  item={item}
+                />
+              )
+            )}
+          </div>
+        )}
+
+        {tables.map(
+          (table) => (
+            <RenderTable
+              key={table.id}
+              table={table}
+            />
+          )
+        )}
+
+        {assets.map(
+          (asset) => (
+            <RenderAsset
+              key={asset.id}
+              asset={asset}
+            />
+          )
+        )}
+      </div>
+    )
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * EXAMPLE
+   * ------------------------------------------------------------
+   */
+
+  if (
+    blockType === "example"
+  ) {
+    return (
+      <div
+        className="
+          rounded-2xl
+          border
+          border-[#168BC4]/20
+          bg-[#F8FCFE]
+          p-5
+          md:p-7
+        "
+      >
+        {showTitle && (
+          <div className="mb-5">
+            <span
+              className="
+                inline-flex
+                rounded-full
+                bg-[#E8F6FC]
+                px-3
+                py-1
+                text-[11px]
+                font-bold
+                uppercase
+                tracking-[0.18em]
+                text-[#168BC4]
+              "
+            >
+              Example
+            </span>
+
+            <h3
+              className="
+                mt-3
+                text-xl
+                font-semibold
+                leading-7
+                text-[#071B49]
+              "
+            >
+              {rawTitle}
+            </h3>
+          </div>
+        )}
+
+        {showContent && (
+          <SourceText className="mb-5">
+            {rawContent}
+          </SourceText>
+        )}
+
+        <div className="space-y-2">
+          {preparedItems.map(
+            (item) => (
+              <RenderPreparedItem
+                key={item.id}
+                item={item}
+              />
+            )
+          )}
+        </div>
+
+        {tables.map(
+          (table) => (
+            <RenderTable
+              key={table.id}
+              table={table}
+            />
+          )
+        )}
+      </div>
+    )
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * NORMAL SOURCE BLOCK
+   * ------------------------------------------------------------
+   */
+
+  return (
+    <div className="space-y-3">
+      {showTitle && (
+        <h3
+          className="
+            text-lg
+            font-semibold
+            leading-7
+            text-[#071B49]
+          "
+        >
+          {rawTitle}
+        </h3>
+      )}
+
+      {showContent && (
+        <SourceText>
+          {rawContent}
+        </SourceText>
+      )}
+
+      {preparedItems.length > 0 && (
+        <div className="space-y-2">
+          {preparedItems.map(
+            (item) => (
+              <RenderPreparedItem
+                key={item.id}
+                item={item}
+              />
+            )
+          )}
+        </div>
+      )}
+
+      {tables.map(
+        (table) => (
+          <RenderTable
+            key={table.id}
+            table={table}
+          />
+        )
+      )}
+
+      {assets.map(
+        (asset) => (
+          <RenderAsset
+            key={asset.id}
+            asset={asset}
+          />
+        )
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
+   SIDEBAR HEADING
+   ============================================================ */
+
+function formatSidebarHeading(
+  value: string
+) {
+  return normalizeSourceText(
+    value
+  )
+}
+
+/* ============================================================
+   MAIN PAGE
+   ============================================================ */
 
 export default function AccountingTopicPage() {
   const params = useParams()
@@ -1579,23 +1212,52 @@ export default function AccountingTopicPage() {
         ? params.slug[0]
         : ""
 
-  const supabase = useMemo(() => createClient(), [])
+  const supabase =
+    useMemo(
+      () => createClient(),
+      []
+    )
 
-  const [topic, setTopic] = useState<Topic | null>(null)
-  const [sections, setSections] = useState<Section[]>([])
-  const [blocks, setBlocks] = useState<Block[]>([])
-  const [items, setItems] = useState<Item[]>([])
-  const [quiz, setQuiz] = useState<Quiz | null>(null)
-  const [tables, setTables] = useState<EducationTable[]>([])
-  const [assets, setAssets] = useState<EducationAsset[]>([])
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([])
+  const [topic, setTopic] =
+    useState<Topic | null>(
+      null
+    )
 
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [sections, setSections] =
+    useState<Section[]>([])
+
+  const [blocks, setBlocks] =
+    useState<Block[]>([])
+
+  const [items, setItems] =
+    useState<Item[]>([])
+
+  const [quiz, setQuiz] =
+    useState<Quiz | null>(null)
+
+  const [tables, setTables] =
+    useState<EducationTable[]>([])
+
+  const [assets, setAssets] =
+    useState<EducationAsset[]>([])
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [error, setError] =
+    useState<string | null>(
+      null
+    )
+
+  /* ==========================================================
+     LOAD DATA
+     ========================================================== */
 
   useEffect(() => {
     if (!slug) {
-      setError("Topic not found.")
+      setError(
+        "Topic not found."
+      )
       setLoading(false)
       return
     }
@@ -1605,297 +1267,331 @@ export default function AccountingTopicPage() {
       setError(null)
 
       /*
-       * =========================================================
-       * 1. TOPIC
-       * =========================================================
+       * TOPIC
        */
 
-      const { data: topicData, error: topicError } =
-        await supabase
-          .from("education_topics")
-          .select(
-            "id,slug,title,standard,description,source_reference"
-          )
-          .eq("slug", slug)
-          .eq("category", "Accounting")
-          .eq("is_published", true)
-          .eq("status", "published")
-          .maybeSingle()
+      const {
+        data: topicData,
+        error: topicError,
+      } = await supabase
+        .from(
+          "education_topics"
+        )
+        .select(
+          "id,slug,title,standard,description,source_reference"
+        )
+        .eq("slug", slug)
+        .eq(
+          "category",
+          "Accounting"
+        )
+        .eq(
+          "is_published",
+          true
+        )
+        .eq(
+          "status",
+          "published"
+        )
+        .maybeSingle()
 
       if (topicError) {
-        console.error(
-          "Topic loading error:",
-          topicError
+        setError(
+          topicError.message
         )
-
-        setError(topicError.message)
         setLoading(false)
         return
       }
 
       if (!topicData) {
-        setError("Topic not found.")
+        setError(
+          "Topic not found."
+        )
         setLoading(false)
         return
       }
 
       const loadedTopic =
-        topicData as unknown as Topic
+        topicData as Topic
 
       /*
-       * =========================================================
-       * 2. SECTIONS
-       * =========================================================
+       * SECTIONS
        */
 
       const {
         data: sectionData,
         error: sectionError,
       } = await supabase
-        .from("education_sections")
+        .from(
+          "education_sections"
+        )
         .select(
           "id,title,section_type,display_order,presentation"
         )
-        .eq("topic_id", loadedTopic.id)
-        .eq("is_published", true)
-        .order("display_order", {
-          ascending: true,
-        })
-
-      if (sectionError) {
-        console.error(
-          "Section loading error:",
-          sectionError
+        .eq(
+          "topic_id",
+          loadedTopic.id
+        )
+        .eq(
+          "is_published",
+          true
+        )
+        .order(
+          "display_order",
+          {
+            ascending: true,
+          }
         )
 
-        setError(sectionError.message)
+      if (sectionError) {
+        setError(
+          sectionError.message
+        )
         setLoading(false)
         return
       }
 
       const loadedSections =
-        (sectionData ?? []) as unknown as Section[]
+        (sectionData ||
+          []) as Section[]
 
-      const sectionIds = loadedSections.map(
-        (section) => section.id
-      )
+      const sectionIds =
+        loadedSections.map(
+          (section) =>
+            section.id
+        )
 
       /*
-       * =========================================================
-       * 3. CONTENT BLOCKS
-       * =========================================================
+       * BLOCKS
        */
 
-      let loadedBlocks: Block[] = []
+      let loadedBlocks: Block[] =
+        []
 
-      if (sectionIds.length > 0) {
+      if (
+        sectionIds.length >
+        0
+      ) {
         const {
           data: blockData,
           error: blockError,
         } = await supabase
-          .from("education_content_blocks")
+          .from(
+            "education_content_blocks"
+          )
           .select(
             "id,section_id,block_type,title,content,display_order,presentation"
           )
-          .in("section_id", sectionIds)
-          .eq("is_published", true)
-          .order("display_order", {
-            ascending: true,
-          })
-
-        if (blockError) {
-          console.error(
-            "Block loading error:",
-            blockError
+          .in(
+            "section_id",
+            sectionIds
+          )
+          .eq(
+            "is_published",
+            true
+          )
+          .order(
+            "display_order",
+            {
+              ascending: true,
+            }
           )
 
-          setError(blockError.message)
+        if (blockError) {
+          setError(
+            blockError.message
+          )
           setLoading(false)
           return
         }
 
         loadedBlocks =
-          (blockData ?? []) as unknown as Block[]
+          (blockData ||
+            []) as Block[]
       }
 
       /*
-       * =========================================================
-       * 4. SOURCE ITEMS
-       * =========================================================
+       * ITEMS
        */
 
-      const blockIds = loadedBlocks.map(
-        (block) => block.id
-      )
+      const blockIds =
+        loadedBlocks.map(
+          (block) =>
+            block.id
+        )
 
-      let loadedItems: Item[] = []
+      let loadedItems: Item[] =
+        []
 
-      if (blockIds.length > 0) {
+      if (
+        blockIds.length >
+        0
+      ) {
         const {
           data: itemData,
           error: itemError,
         } = await supabase
-          .from("education_block_items")
+          .from(
+            "education_block_items"
+          )
           .select(
             "id,block_id,content,item_type,display_order"
           )
-          .in("block_id", blockIds)
-          .order("display_order", {
-            ascending: true,
-          })
-
-        if (itemError) {
-          console.error(
-            "Item loading error:",
-            itemError
+          .in(
+            "block_id",
+            blockIds
+          )
+          .order(
+            "display_order",
+            {
+              ascending: true,
+            }
           )
 
-          setError(itemError.message)
+        if (itemError) {
+          setError(
+            itemError.message
+          )
           setLoading(false)
           return
         }
 
         loadedItems =
-          (itemData ?? []) as unknown as Item[]
+          (itemData ||
+            []) as Item[]
       }
 
       /*
-       * =========================================================
-       * 5. TABLES
-       * =========================================================
+       * TABLES
        */
 
-      let loadedTables: EducationTable[] = []
+      let loadedTables:
+        EducationTable[] = []
 
-      if (blockIds.length > 0) {
-        const { data, error } = await supabase
-          .from("education_tables")
+      if (
+        blockIds.length >
+        0
+      ) {
+        const {
+          data,
+          error: tableError,
+        } = await supabase
+          .from(
+            "education_tables"
+          )
           .select(
             "id,block_id,columns,rows,caption"
           )
-          .in("block_id", blockIds)
-
-        if (error) {
-          console.warn(
-            "Education table loading warning:",
-            error.message
+          .in(
+            "block_id",
+            blockIds
           )
-        } else {
+
+        if (!tableError) {
           loadedTables =
-            (data ?? []) as unknown as EducationTable[]
+            (data ||
+              []) as EducationTable[]
         }
       }
 
       /*
-       * =========================================================
-       * 6. ILLUSTRATIONS / ASSETS
-       * =========================================================
+       * ASSETS / ILLUSTRATIONS
        */
 
-      let loadedAssets: EducationAsset[] = []
+      let loadedAssets:
+        EducationAsset[] = []
 
-      if (blockIds.length > 0) {
-        const { data, error } = await supabase
-          .from("education_assets")
+      if (
+        blockIds.length >
+        0
+      ) {
+        const {
+          data,
+          error: assetError,
+        } = await supabase
+          .from(
+            "education_assets"
+          )
           .select(
             "id,block_id,asset_type,url,alt_text,caption,display_order"
           )
-          .in("block_id", blockIds)
-          .order("display_order", {
-            ascending: true,
-          })
-
-        if (error) {
-          console.warn(
-            "Education asset loading warning:",
-            error.message
+          .in(
+            "block_id",
+            blockIds
           )
-        } else {
+          .order(
+            "display_order",
+            {
+              ascending: true,
+            }
+          )
+
+        if (!assetError) {
           loadedAssets =
-            (data ?? []) as unknown as EducationAsset[]
+            (data ||
+              []) as EducationAsset[]
         }
       }
 
       /*
-       * =========================================================
-       * 7. QUIZ
-       * =========================================================
+       * QUIZ
        */
 
-      const expectedQuizTitle =
+      const quizTitle =
         `${loadedTopic.title} — Topic Quiz`
 
       const {
         data: quizData,
-        error: quizError,
       } = await supabase
-        .from("education_quizzes")
+        .from(
+          "education_quizzes"
+        )
         .select(
           "id,title,description,time_limit_seconds,is_published"
         )
-        .eq("category", "Accounting")
-        .eq("is_published", true)
-        .eq("title", expectedQuizTitle)
+        .eq(
+          "category",
+          "Accounting"
+        )
+        .eq(
+          "is_published",
+          true
+        )
+        .eq(
+          "title",
+          quizTitle
+        )
         .maybeSingle()
 
-      if (quizError) {
-        console.warn(
-          "Quiz loading warning:",
-          quizError.message
-        )
-      }
+      setTopic(
+        loadedTopic
+      )
 
-      const loadedQuiz = quizData
-        ? (quizData as unknown as Quiz)
-        : null
+      setSections(
+        loadedSections
+      )
 
-      /*
-       * =========================================================
-       * 8. QUIZ QUESTIONS
-       * =========================================================
-       */
+      setBlocks(
+        loadedBlocks
+      )
 
-      let loadedQuizQuestions: QuizQuestion[] = []
+      setItems(
+        loadedItems
+      )
 
-      if (loadedQuiz) {
-        const {
-          data: questionData,
-          error: questionError,
-        } = await supabase
-          .from("education_questions")
-          .select(
-            "id,quiz_id,question_text,options,correct_option,explanation,sort_order,points"
-          )
-          .eq("quiz_id", loadedQuiz.id)
-          .order("sort_order", {
-            ascending: true,
-          })
+      setTables(
+        loadedTables
+      )
 
-        if (questionError) {
-          console.warn(
-            "Quiz question loading warning:",
-            questionError.message
-          )
-        } else {
-          loadedQuizQuestions =
-            (questionData ?? []) as unknown as QuizQuestion[]
-        }
-      }
+      setAssets(
+        loadedAssets
+      )
 
-      /*
-       * =========================================================
-       * SAVE
-       * =========================================================
-       */
-
-      setTopic(loadedTopic)
-      setSections(loadedSections)
-      setBlocks(loadedBlocks)
-      setItems(loadedItems)
-      setQuiz(loadedQuiz)
-      setTables(loadedTables)
-      setAssets(loadedAssets)
-      setQuizQuestions(loadedQuizQuestions)
+      setQuiz(
+        quizData
+          ? (quizData as Quiz)
+          : null
+      )
 
       setLoading(false)
     }
@@ -1903,11 +1599,9 @@ export default function AccountingTopicPage() {
     void loadTopic()
   }, [slug, supabase])
 
-  /*
-   * ===========================================================
-   * LOADING
-   * ===========================================================
-   */
+  /* ==========================================================
+     LOADING
+     ========================================================== */
 
   if (loading) {
     return (
@@ -1915,25 +1609,25 @@ export default function AccountingTopicPage() {
         <CuraHeader />
 
         <section className="bg-[#071B49]">
-          <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-            <div className="h-4 w-28 animate-pulse rounded bg-white/20" />
+          <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+            <div className="h-5 w-28 animate-pulse rounded bg-white/20" />
 
-            <div className="mt-8 h-6 w-24 animate-pulse rounded-full bg-white/20" />
+            <div className="mt-8 h-6 w-36 animate-pulse rounded-full bg-white/20" />
 
-            <div className="mt-6 h-14 w-2/3 animate-pulse rounded bg-white/20" />
+            <div className="mt-6 h-14 max-w-3xl animate-pulse rounded bg-white/20" />
 
-            <div className="mt-6 h-5 w-2/3 animate-pulse rounded bg-white/10" />
+            <div className="mt-6 h-5 max-w-2xl animate-pulse rounded bg-white/10" />
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[250px_minmax(0,1fr)]">
-            <div className="h-80 animate-pulse rounded-3xl bg-white" />
-
-            <div className="space-y-10">
+        <section className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="space-y-8">
               <div className="h-96 animate-pulse rounded-3xl bg-white" />
               <div className="h-96 animate-pulse rounded-3xl bg-white" />
             </div>
+
+            <div className="h-80 animate-pulse rounded-3xl bg-white" />
           </div>
         </section>
 
@@ -1942,13 +1636,14 @@ export default function AccountingTopicPage() {
     )
   }
 
-  /*
-   * ===========================================================
-   * ERROR
-   * ===========================================================
-   */
+  /* ==========================================================
+     ERROR
+     ========================================================== */
 
-  if (error || !topic) {
+  if (
+    error ||
+    !topic
+  ) {
     return (
       <main className="min-h-screen bg-[#F5F8FC]">
         <CuraHeader />
@@ -1965,7 +1660,19 @@ export default function AccountingTopicPage() {
 
           <Link
             href="/education/materials/accounting"
-            className="mt-8 inline-flex rounded-full bg-[#071B49] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#102A5F]"
+            className="
+              mt-8
+              inline-flex
+              rounded-full
+              bg-[#071B49]
+              px-6
+              py-3
+              text-sm
+              font-semibold
+              text-white
+              transition
+              hover:bg-[#102A5F]
+            "
           >
             Back to Accounting
           </Link>
@@ -1976,572 +1683,505 @@ export default function AccountingTopicPage() {
     )
   }
 
-  /*
-   * ===========================================================
-   * PREPARE SOURCE STRUCTURE
-   * ===========================================================
-   *
-   * IMPORTANT:
-   *
-   * We keep the block boundaries.
-   *
-   * Previously the page flattened all blocks into a single list
-   * of items. That destroyed the source presentation.
-   *
-   * Now:
-   *
-   * Section
-   *   ├── Block
-   *   │    ├── Block type
-   *   │    └── Items
-   *   ├── Block
-   *   └── Block
-   *
-   * This allows bullet lists, paragraphs, examples and
-   * illustrations to retain their original structure.
-   */
+  /* ==========================================================
+     PREPARE STRUCTURE
+     ========================================================== */
 
-  const tablesByBlock = new Map<string, EducationTable[]>()
+  const finalSections =
+    useMemo(() => {
+      const seen =
+        new Set<string>()
 
-  for (const table of tables) {
-    const current = tablesByBlock.get(table.block_id) || []
-    current.push(table)
-    tablesByBlock.set(table.block_id, current)
-  }
+      return sections
+        .map(
+          (section) => {
+            const sectionBlocks =
+              blocks
+                .filter(
+                  (block) =>
+                    block.section_id ===
+                    section.id
+                )
+                .sort(
+                  (a, b) =>
+                    a.display_order -
+                    b.display_order
+                )
 
-  const assetsByBlock = new Map<string, EducationAsset[]>()
+            const contentBlocks =
+              sectionBlocks
+                .map(
+                  (block) => {
+                    const blockItems =
+                      items
+                        .filter(
+                          (item) =>
+                            item.block_id ===
+                            block.id
+                        )
+                        .sort(
+                          (a, b) =>
+                            a.display_order -
+                            b.display_order
+                        )
 
-  for (const asset of assets) {
-    const current = assetsByBlock.get(asset.block_id) || []
-    current.push(asset)
-    assetsByBlock.set(asset.block_id, current)
-  }
+                    const blockTables =
+                      tables
+                        .filter(
+                          (table) =>
+                            table.block_id ===
+                            block.id
+                        )
 
-  const visibleSections = sections
-    .map((section) => {
-      const sectionBlocks = blocks
-        .filter(
-          (block) =>
-            block.section_id === section.id
-        )
-        .sort(
-          (a, b) =>
-            a.display_order - b.display_order
-        )
+                    const blockAssets =
+                      assets
+                        .filter(
+                          (asset) =>
+                            asset.block_id ===
+                            block.id
+                        )
+                        .sort(
+                          (a, b) =>
+                            a.display_order -
+                            b.display_order
+                        )
 
-      const contentBlocks: ContentBlock[] =
-        sectionBlocks
-          .map((block) => {
-            const blockItems = items
-              .filter(
-                (item) =>
-                  item.block_id === block.id
+                    return {
+                      block,
+                      items:
+                        blockItems,
+                      tables:
+                        blockTables,
+                      assets:
+                        blockAssets,
+                    }
+                  }
+                )
+                .filter(
+                  ({
+                    block,
+                    items,
+                    assets,
+                    tables,
+                  }) =>
+                    Boolean(
+                      normalizeSourceText(
+                        block.title ||
+                          ""
+                      )
+                    ) ||
+                    Boolean(
+                      normalizeSourceText(
+                        block.content ||
+                          ""
+                      )
+                    ) ||
+                    items.some(
+                      (item) =>
+                        !isSourceNoise(
+                          item.content
+                        )
+                    ) ||
+                    assets.length >
+                      0 ||
+                    tables.length >
+                      0
+                )
+
+            /*
+             * Remove exact duplicate sections.
+             */
+            const fingerprint =
+              [
+                section.title,
+                ...contentBlocks.flatMap(
+                  ({
+                    block,
+                    items,
+                  }) => [
+                    block.block_type,
+                    block.title,
+                    block.content,
+                    ...items.map(
+                      (item) =>
+                        item.content
+                    ),
+                  ]
+                ),
+              ]
+                .map(
+                  (value) =>
+                    normalizeHeading(
+                      value ||
+                        ""
+                    )
+                )
+                .join("|")
+
+            if (
+              seen.has(
+                fingerprint
               )
-              .sort(
-                (a, b) =>
-                  a.display_order -
-                  b.display_order
-              )
+            ) {
+              return null
+            }
+
+            seen.add(
+              fingerprint
+            )
 
             return {
-              block,
-              items: blockItems,
+              section,
+              blocks:
+                contentBlocks,
             }
-          })
-          .filter(({ block, items }) => {
-            const cleanedBlockContent =
-              typeof block.content === "string"
-                ? cleanSourceText(block.content)
-                : ""
-
-            const cleanedBlockTitle =
-              typeof block.title === "string"
-                ? cleanSourceText(block.title)
-                : ""
-
-            const hasBlockContent =
-              cleanedBlockContent.length > 0 &&
-              !isHiddenSourceMetadata(cleanedBlockContent)
-
-            const hasItems = items.some(
-              (item) =>
-                typeof item.content === "string" &&
-                cleanSourceText(item.content).length > 0 &&
-                !isHiddenSourceMetadata(
-                  cleanSourceText(item.content)
-                )
-            )
-
-            const hasTitle =
-              cleanedBlockTitle.length > 0 &&
-              !isHiddenSourceMetadata(cleanedBlockTitle)
-
-            return (
-              hasBlockContent ||
-              hasItems ||
-              hasTitle
-            )
-          })
-
-      return {
-        section,
-        blocks: contentBlocks,
-      }
-    })
-    .filter(
-      ({ blocks: sectionBlocks }) =>
-        sectionBlocks.length > 0
-    )
-
-  /*
-   * ===========================================================
-   * GLOBAL DUPLICATE SECTION CLEANUP
-   * ===========================================================
-   *
-   * Source imports can contain a complete chapter twice:
-   *
-   *   Section A
-   *   Section B
-   *   Section C
-   *
-   *   Section A
-   *   Section B
-   *   Section C
-   *
-   * The existing cleanup only removed adjacent duplicate
-   * headings. That does not catch a duplicated chapter because
-   * the duplicated sections are separated by other sections.
-   *
-   * We therefore compare the COMPLETE SOURCE CONTENT of each
-   * section.
-   *
-   * IMPORTANT:
-   *
-   * We do NOT remove a section simply because its title matches
-   * another section.
-   *
-   * Two sections can legitimately have the same heading.
-   *
-   * A section is removed only when its normalized title AND
-   * normalized complete source content are identical.
-   */
-
-  const normalizeDuplicateSectionText = (
-    value: string
-  ) =>
-    value
-      .toLowerCase()
-      .replace(/[–—]/g, "-")
-      .replace(/\s+/g, " ")
-      .trim()
-
-  const getSectionContentFingerprint = (
-    entry: (typeof visibleSections)[number]
-  ) => {
-    const parts: string[] = []
-
-    /*
-     * Section title
-     */
-    parts.push(
-      normalizeDuplicateSectionText(
-        entry.section.title || ""
-      )
-    )
-
-    /*
-     * Block order is significant.
-     *
-     * This means the same material in a different order is NOT
-     * treated as a duplicate.
-     */
-    for (const contentBlock of entry.blocks) {
-      const block = contentBlock.block
-
-      parts.push(
-        normalizeDuplicateSectionText(
-          block.block_type || ""
+          }
         )
-      )
-
-      parts.push(
-        normalizeDuplicateSectionText(
-          block.title || ""
-        )
-      )
-
-      parts.push(
-        normalizeDuplicateSectionText(
-          block.content || ""
-        )
-      )
-
-      for (const item of contentBlock.items) {
-        parts.push(
-          normalizeDuplicateSectionText(
-            item.item_type || ""
-          )
-        )
-
-        parts.push(
-          normalizeDuplicateSectionText(
-            item.content || ""
-          )
-        )
-      }
-    }
-
-    return parts.join("|")
-  }
-
-  /*
-   * Remove exact duplicate sections globally.
-   *
-   * This is deliberately NOT:
-   *
-   *   title-only deduplication
-   *
-   * because legitimate repeated headings may exist.
-   */
-  const seenSectionFingerprints =
-    new Set<string>()
-
-  const cleanedSections: typeof visibleSections = []
-
-  for (const current of visibleSections) {
-    const fingerprint =
-      getSectionContentFingerprint(current)
-
-    /*
-     * Empty fingerprints should never be treated as duplicates.
-     */
-    if (!fingerprint) {
-      cleanedSections.push(current)
-      continue
-    }
-
-    if (
-      seenSectionFingerprints.has(
-        fingerprint
-      )
-    ) {
-      /*
-       * This section is an exact source-content duplicate
-       * of a section already rendered earlier.
-       *
-       * Do not render it again.
-       */
-      continue
-    }
-
-    seenSectionFingerprints.add(
-      fingerprint
-    )
-
-    cleanedSections.push(current)
-  }
-
-  /*
-   * ===========================================================
-   * REMOVE TOPIC-TITLE PLACEHOLDER SECTIONS
-   * ===========================================================
-   *
-   * Some imported source material creates a section containing
-   * nothing except the topic title itself.
-   *
-   * Example:
-   *
-   *   Section 22
-   *   IAS 20 Accounting for Government Grants...
-   *
-   * followed by:
-   *
-   *   Section 23
-   *   Definitions
-   *   [actual learning content]
-   *
-   * The first section is a source/import artefact, not a
-   * substantive learning section. Remove it from the page.
-   *
-   * This is deliberately limited to sections that:
-   *   1. have the same title as the topic;
-   *   2. contain no substantive text/items.
-   */
-
-  const normalizeTitleForComparison = (
-    value: string
-  ) =>
-    value
-      .toLowerCase()
-      .replace(/[–—-]/g, "-")
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-
-  const normalizedTopicTitle =
-    normalizeTitleForComparison(topic.title)
-
-  /*
-   * ===========================================================
-   * REMOVE TOPIC-TITLE-ONLY SECTIONS
-   * ===========================================================
-   *
-   * Some source imports create a section such as:
-   *
-   *   Section 22
-   *   IAS 20 Accounting for Government Grants...
-   *
-   * with a block containing the exact same title.
-   *
-   * This is not a learning section. It is the title slide/header
-   * from the source material.
-   *
-   * Remove it only when ALL substantive content in the section
-   * is effectively the same as the topic title.
-   */
-
-  const normalizeForComparison = (value: string) =>
-    value
-      .toLowerCase()
-      .replace(/[–—-]/g, " ")
-      .replace(/[^a-z0-9\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-
-
-  /*
-   * ===========================================================
-   * FINAL SOURCE SECTIONS
-   * ===========================================================
-   *
-   * The revised Accounting source has already been structured
-   * into sections, blocks and items in Supabase.
-   *
-   * Keep every section that contains actual source material.
-   * Exact duplicate sections have already been removed above.
-   *
-   * Do NOT compare section titles with the topic title here.
-   * A legitimate source section may have the same or similar
-   * heading as the topic and can still contain real material.
-   */
-
-  const finalSections = cleanedSections.filter(
-    ({ blocks: sectionBlocks }) =>
-      sectionBlocks.some(
-        ({ block, items }) =>
+        .filter(
           (
-            typeof block.content === "string" &&
-            block.content.trim().length > 0
-          ) ||
-          (
-            typeof block.title === "string" &&
-            block.title.trim().length > 0
-          ) ||
-          items.some(
-            (item) =>
-              typeof item.content === "string" &&
-              item.content.trim().length > 0
-          ) ||
-          ["table", "image", "illustration"].includes(
-            (block.block_type || "").toLowerCase()
-          )
-      )
-  )
+            entry
+          ): entry is NonNullable<
+            typeof entry
+          > =>
+            entry !== null &&
+            entry.blocks.length >
+              0
+        )
+    }, [
+      sections,
+      blocks,
+      items,
+      tables,
+      assets,
+    ])
+
+  /* ==========================================================
+     RENDER
+     ========================================================== */
 
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
       <CuraHeader />
 
-      {/* =====================================================
+      {/* ======================================================
           HERO
-          ===================================================== */}
+          ====================================================== */}
 
       <section className="relative overflow-hidden bg-[#071B49] text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(53,181,229,0.16),transparent_30%),radial-gradient(circle_at_10%_90%,rgba(22,139,196,0.12),transparent_35%)]" />
+        <div
+          className="
+            absolute
+            inset-0
+            bg-[radial-gradient(circle_at_85%_20%,rgba(53,181,229,0.18),transparent_30%),radial-gradient(circle_at_10%_90%,rgba(22,139,196,0.15),transparent_35%)]
+          "
+        />
 
         <div className="relative mx-auto max-w-7xl px-6 py-14 lg:px-8 lg:py-20">
           <Link
             href="/education/materials/accounting"
-            className="inline-flex items-center text-sm font-semibold text-white transition hover:text-[#35B5E5]"
+            className="
+              inline-flex
+              items-center
+              text-sm
+              font-semibold
+              text-white
+              transition
+              hover:text-[#35B5E5]
+            "
           >
             ← Accounting
           </Link>
 
           <div className="mt-8 max-w-4xl">
             {topic.standard && (
-              <span className="inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#35B5E5]">
+              <span
+                className="
+                  inline-flex
+                  rounded-full
+                  bg-white/10
+                  px-4
+                  py-2
+                  text-xs
+                  font-bold
+                  uppercase
+                  tracking-[0.2em]
+                  text-[#35B5E5]
+                "
+              >
                 {topic.standard}
               </span>
             )}
 
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-6xl">
+            <h1
+              className="
+                mt-6
+                text-4xl
+                font-semibold
+                tracking-tight
+                md:text-6xl
+              "
+            >
               {topic.title}
             </h1>
 
-            {topic.description &&
-              !/^Imported from revised accounting source materials\.?$/i.test(
-                topic.description.trim()
-              ) &&
-              !isHiddenSourceMetadata(topic.description) && (
-                <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-                  {cleanSourceText(topic.description)}
-                </p>
-              )}
+            {topic.description && (
+              <p
+                className="
+                  mt-6
+                  max-w-3xl
+                  text-lg
+                  leading-8
+                  text-slate-300
+                "
+              >
+                {topic.description}
+              </p>
+            )}
           </div>
         </div>
       </section>
 
-      {/* =====================================================
+      {/* ======================================================
           CONTENT
-          ===================================================== */}
+          ====================================================== */}
 
       <section className="mx-auto max-w-7xl px-6 py-10 lg:px-8 lg:py-14">
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_250px] lg:items-start lg:gap-10">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_270px]">
+          {/* ==================================================
+              MAIN
+              ================================================== */}
 
-          {/* =================================================
-              RIGHT-FIXED / STICKY SIDE PANEL
-              ================================================= */}
-
-          <aside className="order-2 mb-8 lg:sticky lg:top-24 lg:mb-0">
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(7,27,73,0.05)]">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-                On this page
-              </p>
-
-              {finalSections.length > 0 ? (
-                <nav className="mt-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-1">
-                  <ol className="space-y-1">
-                    {finalSections.map(
-                      ({ section, blocks: sectionBlocks }) => {
-                        const displayTitle =
-                          getDisplaySectionTitle(
-                            section,
-                            sectionBlocks
-                          )
-
-                        return (
-                          <li key={section.id}>
-                            <a
-                              href={`#section-${section.id}`}
-                              className="block rounded-xl px-3 py-2 text-sm leading-5 text-slate-600 transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
-                            >
-                              {displayTitle}
-                            </a>
-                          </li>
-                        )
-                      }
-                    )}
-
-                    {quiz && (
-                      <li>
-                        <a
-                          href="#topic-quiz"
-                          className="block rounded-xl px-3 py-2 text-sm font-semibold leading-5 text-[#071B49] transition hover:bg-[#F1F7FB] hover:text-[#168BC4]"
-                        >
-                          Topic assessment
-                        </a>
-                      </li>
-                    )}
-                  </ol>
-                </nav>
-              ) : (
-                <p className="mt-4 text-sm leading-6 text-slate-500">
-                  No published material is available.
-                </p>
-              )}
-            </div>
-          </aside>
-
-          {/* =================================================
-              MAIN SOURCE CONTENT
-              ================================================= */}
-
-          <div className="order-1 min-w-0">
-            {finalSections.length === 0 ? (
+          <div className="min-w-0">
+            {finalSections.length ===
+            0 ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-10">
-                <p className="text-sm leading-6 text-slate-500">
-                  No published source content is currently
-                  available for this topic.
+                <p className="text-sm text-slate-500">
+                  No published source
+                  content is currently
+                  available for this
+                  topic.
                 </p>
               </div>
             ) : (
               <div className="space-y-8">
-
                 {finalSections.map(
-                  ({
-                    section,
-                    blocks: sectionBlocks,
-                  }) => (
+                  (
+                    {
+                      section,
+                      blocks:
+                        sectionBlocks,
+                    },
+                    sectionIndex
+                  ) => (
                     <article
-                      key={section.id}
+                      key={
+                        section.id
+                      }
                       id={`section-${section.id}`}
-                      className="scroll-mt-24 rounded-[30px] border border-slate-200 bg-white p-7 md:p-10"
+                      className="
+                        scroll-mt-24
+                        overflow-hidden
+                        rounded-[30px]
+                        border
+                        border-slate-200
+                        bg-white
+                        shadow-[0_8px_30px_rgba(7,27,73,0.05)]
+                      "
                     >
-                      <div className="border-b border-slate-100 pb-6">
-                        <h2 className="text-2xl font-semibold leading-8 text-[#071B49] md:text-3xl">
-                          {getDisplaySectionTitle(
-                            section,
-                            sectionBlocks
-                          )}
-                        </h2>
-                      </div>
+                      {/* SECTION HEADER */}
 
-                      <div className="mt-8 space-y-8">
-                        {sectionBlocks.map(
-                          (contentBlock) => (
-                            <div key={contentBlock.block.id}>
-                              <RenderSourceBlock
-                                contentBlock={contentBlock}
-                                sectionTitle={getDisplaySectionTitle(
-                                  section,
-                                  sectionBlocks
-                                )}
-                                tables={
-                                  tablesByBlock.get(
-                                    contentBlock.block.id
-                                  ) || []
+                      <header
+                        className="
+                          border-b
+                          border-slate-100
+                          bg-gradient-to-r
+                          from-white
+                          to-[#F4FAFD]
+                          px-7
+                          py-7
+                          md:px-10
+                          md:py-9
+                        "
+                      >
+                        <div className="flex items-start gap-4">
+                          <div
+                            className="
+                              flex
+                              h-9
+                              min-w-9
+                              items-center
+                              justify-center
+                              rounded-full
+                              bg-[#E8F6FC]
+                              px-2
+                              text-sm
+                              font-bold
+                              text-[#168BC4]
+                            "
+                          >
+                            {sectionIndex +
+                              1}
+                          </div>
+
+                          <div>
+                            <p
+                              className="
+                                text-[11px]
+                                font-bold
+                                uppercase
+                                tracking-[0.2em]
+                                text-[#168BC4]
+                              "
+                            >
+                              Accounting source
+                            </p>
+
+                            <h2
+                              className="
+                                mt-2
+                                text-2xl
+                                font-semibold
+                                leading-tight
+                                text-[#071B49]
+                                md:text-3xl
+                              "
+                            >
+                              {
+                                section.title
+                              }
+                            </h2>
+                          </div>
+                        </div>
+                      </header>
+
+                      {/* SOURCE BODY */}
+
+                      <div className="px-7 py-8 md:px-10 md:py-10">
+                        <div className="space-y-8">
+                          {sectionBlocks.map(
+                            (
+                              contentBlock
+                            ) => (
+                              <AccountingSourceIllustration
+                                key={
+                                  contentBlock
+                                    .block
+                                    .id
                                 }
-                                assets={
-                                  assetsByBlock.get(
-                                    contentBlock.block.id
-                                  ) || []
-                                }
-                              />
-                            </div>
-                          )
-                        )}
+                                sourceText={[
+                                  contentBlock
+                                    .block
+                                    .title ||
+                                    "",
+                                  contentBlock
+                                    .block
+                                    .content ||
+                                    "",
+                                  ...contentBlock.items.map(
+                                    (
+                                      item
+                                    ) =>
+                                      item.content ||
+                                      ""
+                                  ),
+                                ]
+                                  .filter(
+                                    (
+                                      value
+                                    ) =>
+                                      value &&
+                                      !isSourceNoise(
+                                        value
+                                      )
+                                  )
+                                  .join(
+                                    " "
+                                  )}
+                              >
+                                <RenderSourceBlock
+                                  contentBlock={
+                                    contentBlock
+                                  }
+                                />
+                              </AccountingSourceIllustration>
+                            )
+                          )}
+                        </div>
                       </div>
                     </article>
                   )
                 )}
 
-                {/* =================================================
-                    QUIZ — ALWAYS LAST
-                    ================================================= */}
+                {/* ==================================================
+                    QUIZ
+                    ================================================== */}
 
                 {quiz && (
                   <section
                     id="topic-quiz"
-                    className="scroll-mt-24 rounded-[30px] border border-[#168BC4]/20 bg-white p-7 shadow-[0_8px_30px_rgba(7,27,73,0.05)] md:p-10"
+                    className="
+                      scroll-mt-24
+                      rounded-[30px]
+                      border
+                      border-[#168BC4]/20
+                      bg-white
+                      p-7
+                      shadow-[0_8px_30px_rgba(7,27,73,0.05)]
+                      md:p-10
+                    "
                   >
                     <div className="flex flex-col gap-7 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+                        <p
+                          className="
+                            text-xs
+                            font-bold
+                            uppercase
+                            tracking-[0.2em]
+                            text-[#168BC4]
+                          "
+                        >
                           Topic assessment
                         </p>
 
-                        <h2 className="mt-2 text-2xl font-semibold text-[#071B49] md:text-3xl">
+                        <h2
+                          className="
+                            mt-2
+                            text-2xl
+                            font-semibold
+                            text-[#071B49]
+                            md:text-3xl
+                          "
+                        >
                           {quiz.title}
                         </h2>
 
-                        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                          {quiz.description ||
-                            "Test your understanding of this topic."}
-                        </p>
+                        {quiz.description && (
+                          <p
+                            className="
+                              mt-3
+                              max-w-2xl
+                              text-sm
+                              leading-6
+                              text-slate-500
+                            "
+                          >
+                            {
+                              quiz.description
+                            }
+                          </p>
+                        )}
 
                         {quiz.time_limit_seconds >
                           0 && (
-                          <p className="mt-3 text-xs font-semibold text-slate-400">
+                          <p
+                            className="
+                              mt-3
+                              text-xs
+                              font-semibold
+                              text-slate-400
+                            "
+                          >
                             Time limit:{" "}
                             {Math.ceil(
                               quiz.time_limit_seconds /
@@ -2554,7 +2194,21 @@ export default function AccountingTopicPage() {
 
                       <Link
                         href={`/education/test?quiz=${quiz.id}`}
-                        className="inline-flex shrink-0 items-center justify-center rounded-full bg-[#071B49] px-7 py-3.5 text-sm font-bold text-white transition hover:bg-[#102A5F]"
+                        className="
+                          inline-flex
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-[#071B49]
+                          px-7
+                          py-3.5
+                          text-sm
+                          font-bold
+                          text-white
+                          transition
+                          hover:bg-[#168BC4]
+                        "
                       >
                         Start quiz →
                       </Link>
@@ -2564,6 +2218,109 @@ export default function AccountingTopicPage() {
               </div>
             )}
           </div>
+
+          {/* ==================================================
+              SIDEBAR
+              ================================================== */}
+
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <div
+              className="
+                rounded-3xl
+                border
+                border-slate-200
+                bg-white
+                p-5
+                shadow-[0_8px_30px_rgba(7,27,73,0.05)]
+              "
+            >
+              <p
+                className="
+                  text-xs
+                  font-bold
+                  uppercase
+                  tracking-[0.2em]
+                  text-[#168BC4]
+                "
+              >
+                On this page
+              </p>
+
+              <nav className="mt-4 max-h-[calc(100vh-150px)] overflow-y-auto pr-1">
+                <ol className="space-y-1">
+                  {finalSections.map(
+                    (
+                      {
+                        section,
+                      },
+                      index
+                    ) => (
+                      <li
+                        key={
+                          section.id
+                        }
+                      >
+                        <a
+                          href={`#section-${section.id}`}
+                          className="
+                            block
+                            rounded-xl
+                            px-3
+                            py-2.5
+                            text-sm
+                            leading-5
+                            text-slate-600
+                            transition
+                            hover:bg-[#F1F7FB]
+                            hover:text-[#168BC4]
+                          "
+                        >
+                          <span className="mr-2 font-semibold text-[#168BC4]">
+                            {index +
+                              1}.
+                          </span>
+
+                          {formatSidebarHeading(
+                            section.title
+                          )}
+                        </a>
+                      </li>
+                    )
+                  )}
+
+                  {quiz && (
+                    <li>
+                      <a
+                        href="#topic-quiz"
+                        className="
+                          mt-2
+                          block
+                          rounded-xl
+                          bg-[#F1F7FB]
+                          px-3
+                          py-2.5
+                          text-sm
+                          font-semibold
+                          leading-5
+                          text-[#071B49]
+                          transition
+                          hover:bg-[#E8F6FC]
+                          hover:text-[#168BC4]
+                        "
+                      >
+                        <span className="mr-2 font-semibold text-[#168BC4]">
+                          {finalSections.length +
+                            1}
+                          .
+                        </span>
+                        Topic assessment
+                      </a>
+                    </li>
+                  )}
+                </ol>
+              </nav>
+            </div>
+          </aside>
         </div>
       </section>
 
