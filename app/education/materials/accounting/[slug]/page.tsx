@@ -2213,100 +2213,44 @@ export default function AccountingTopicPage() {
       .trim()
 
 
-  const finalSections =
-    cleanedSections.filter((entry) => {
-      const normalizedSectionTitle =
-        normalizeForComparison(
-          entry.section.title
-        )
-
-      /*
-       * If the section heading itself is not the topic title,
-       * it is a genuine learning section.
-       */
-      if (
-        normalizedSectionTitle !==
-        normalizedTopicTitle
-      ) {
-        return true
-      }
-
-      /*
-       * Collect ALL actual source text in the section.
-       */
-      const sourceTexts: string[] = []
-
-      for (const contentBlock of entry.blocks) {
-        const block = contentBlock.block
-
-        if (
-          typeof block.content === "string" &&
-          block.content.trim().length > 0
-        ) {
-          sourceTexts.push(block.content.trim())
-        }
-
-        if (
-          typeof block.title === "string" &&
-          block.title.trim().length > 0
-        ) {
-          sourceTexts.push(block.title.trim())
-        }
-
-        for (const item of contentBlock.items) {
-          if (
-            typeof item.content === "string" &&
-            item.content.trim().length > 0
-          ) {
-            sourceTexts.push(item.content.trim())
-          }
-        }
-      }
-
-      /*
-       * Remove empty strings and compare the remaining content.
-       */
-      const meaningfulTexts =
-        sourceTexts
-          .map(normalizeForComparison)
-          .filter(Boolean)
-
-      /*
-       * No content at all:
-       * definitely a title placeholder.
-       */
-      if (meaningfulTexts.length === 0) {
-        return false
-      }
-
-      /*
-       * Every piece of content is just the topic title:
-       * this is a title/header section, not learning content.
-       */
-      const containsOnlyTopicTitle =
-        meaningfulTexts.every(
-          (text) =>
-            text === normalizedTopicTitle
-        )
-
-      if (containsOnlyTopicTitle) {
-        return false
-      }
-
-      /*
-       * If the section contains any substantive content,
-       * retain it.
-       */
-      return true
-    })
-
   /*
    * ===========================================================
-   * PAGE
+   * FINAL SOURCE SECTIONS
    * ===========================================================
+   *
+   * The revised Accounting source has already been structured
+   * into sections, blocks and items in Supabase.
+   *
+   * Keep every section that contains actual source material.
+   * Exact duplicate sections have already been removed above.
+   *
+   * Do NOT compare section titles with the topic title here.
+   * A legitimate source section may have the same or similar
+   * heading as the topic and can still contain real material.
    */
 
-
+  const finalSections = cleanedSections.filter(
+    ({ blocks: sectionBlocks }) =>
+      sectionBlocks.some(
+        ({ block, items }) =>
+          (
+            typeof block.content === "string" &&
+            block.content.trim().length > 0
+          ) ||
+          (
+            typeof block.title === "string" &&
+            block.title.trim().length > 0
+          ) ||
+          items.some(
+            (item) =>
+              typeof item.content === "string" &&
+              item.content.trim().length > 0
+          ) ||
+          ["table", "image", "illustration"].includes(
+            (block.block_type || "").toLowerCase()
+          )
+      )
+  )
 
   return (
     <main className="min-h-screen bg-[#F5F8FC] text-[#071B49]">
