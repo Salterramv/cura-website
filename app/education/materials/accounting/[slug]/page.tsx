@@ -52,6 +52,35 @@ type Quiz = {
   is_published: boolean
 }
 
+type EducationTable = {
+  id: string
+  block_id: string
+  columns: unknown
+  rows: unknown
+  caption: string | null
+}
+
+type EducationAsset = {
+  id: string
+  block_id: string
+  asset_type: string
+  url: string
+  alt_text: string | null
+  caption: string | null
+  display_order: number
+}
+
+type QuizQuestion = {
+  id: string
+  quiz_id: string
+  question_text: string
+  options: unknown
+  correct_option: number
+  explanation: string | null
+  sort_order: number
+  points: number
+}
+
 type ContentBlock = {
   block: Block
   items: Item[]
@@ -966,9 +995,13 @@ function SourceText({
 function RenderSourceBlock({
   contentBlock,
   sectionTitle,
+  tables = [],
+  assets = [],
 }: {
   contentBlock: ContentBlock
   sectionTitle: string
+  tables?: EducationTable[]
+  assets?: EducationAsset[]
 }) {
   const { block, items } = contentBlock
   const blockType = getBlockType(block)
@@ -1002,6 +1035,96 @@ function RenderSourceBlock({
     normalizedBlockTitle.length > 0 &&
     normalizedBlockTitle === normalizedSectionTitle
 
+  const renderEducationTable = (
+    table: EducationTable
+  ) => {
+    const columns = Array.isArray(table.columns)
+      ? table.columns
+      : []
+
+    const rows = Array.isArray(table.rows)
+      ? table.rows
+      : []
+
+    return (
+      <div
+        key={table.id}
+        className="my-6 overflow-x-auto rounded-2xl border border-slate-200"
+      >
+        <table className="w-full border-collapse text-base">
+          {columns.length > 0 && (
+            <thead>
+              <tr>
+                {columns.map((column, index) => (
+                  <th
+                    key={index}
+                    className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-left font-bold text-[#071B49]"
+                  >
+                    {String(column ?? "")}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          )}
+
+          <tbody>
+            {rows.map((row, rowIndex) => {
+              const cells =
+                Array.isArray(row)
+                  ? row
+                  : row &&
+                      typeof row === "object"
+                  ? Object.values(row)
+                  : [row]
+
+              return (
+                <tr key={rowIndex}>
+                  {cells.map(
+                    (cell, cellIndex) => (
+                      <td
+                        key={cellIndex}
+                        className="border-b border-slate-100 px-4 py-3 align-top text-[#102A5F]"
+                      >
+                        {String(cell ?? "")}
+                      </td>
+                    )
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+
+        {table.caption && (
+          <p className="px-4 py-3 text-sm text-slate-500">
+            {table.caption}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  const renderEducationAsset = (
+    asset: EducationAsset
+  ) => (
+    <figure
+      key={asset.id}
+      className="my-6"
+    >
+      <img
+        src={asset.url}
+        alt={asset.alt_text || ""}
+        className="mx-auto max-w-full rounded-2xl"
+      />
+
+      {asset.caption && (
+        <figcaption className="mt-3 text-center text-sm text-slate-500">
+          {asset.caption}
+        </figcaption>
+      )}
+    </figure>
+  )
+
   /*
    * Illustration
    */
@@ -1028,10 +1151,20 @@ function RenderSourceBlock({
           )}
 
         {validItems.length > 0 && (
-  <div className="space-y-3">
-    {validItems.map((item) => renderSourceItem(item))}
-  </div>
-)}
+          <div className="space-y-3">
+            {validItems.map((item) =>
+              renderSourceItem(item)
+            )}
+          </div>
+        )}
+
+        {tables.map((table) =>
+          renderEducationTable(table)
+        )}
+
+        {assets.map((asset) =>
+          renderEducationAsset(asset)
+        )}
       </div>
     )
   }
@@ -1362,6 +1495,9 @@ export default function AccountingTopicPage() {
   const [blocks, setBlocks] = useState<Block[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [quiz, setQuiz] = useState<Quiz | null>(null)
+  const [tables, setTables] = useState<EducationTable[]>([])
+  const [assets, setAssets] = useState<EducationAsset[]>([])
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1534,7 +1670,64 @@ export default function AccountingTopicPage() {
 
       /*
        * =========================================================
-       * 5. QUIZ
+       * 5. TABLES
+       * =========================================================
+       */
+
+      let loadedTables: EducationTable[] = []
+
+      if (blockIds.length > 0) {
+        const { data, error } = await supabase
+          .from("education_tables")
+          .select(
+            "id,block_id,columns,rows,caption"
+          )
+          .in("block_id", blockIds)
+
+        if (error) {
+          console.warn(
+            "Education table loading warning:",
+            error.message
+          )
+        } else {
+          loadedTables =
+            (data ?? []) as unknown as EducationTable[]
+        }
+      }
+
+      /*
+       * =========================================================
+       * 6. ILLUSTRATIONS / ASSETS
+       * =========================================================
+       */
+
+      let loadedAssets: EducationAsset[] = []
+
+      if (blockIds.length > 0) {
+        const { data, error } = await supabase
+          .from("education_assets")
+          .select(
+            "id,block_id,asset_type,url,alt_text,caption,display_order"
+          )
+          .in("block_id", blockIds)
+          .order("display_order", {
+            ascending: true,
+          })
+
+        if (error) {
+          console.warn(
+            "Education asset loading warning:",
+            error.message
+          )
+        } else {
+          loadedAssets =
+            (data ?? []) as unknown as EducationAsset[]
+        }
+      }
+
+      /*
+       * =========================================================
+       * 7. QUIZ
        * =========================================================
        */
 
@@ -1567,6 +1760,39 @@ export default function AccountingTopicPage() {
 
       /*
        * =========================================================
+       * 8. QUIZ QUESTIONS
+       * =========================================================
+       */
+
+      let loadedQuizQuestions: QuizQuestion[] = []
+
+      if (loadedQuiz) {
+        const {
+          data: questionData,
+          error: questionError,
+        } = await supabase
+          .from("education_questions")
+          .select(
+            "id,quiz_id,question_text,options,correct_option,explanation,sort_order,points"
+          )
+          .eq("quiz_id", loadedQuiz.id)
+          .order("sort_order", {
+            ascending: true,
+          })
+
+        if (questionError) {
+          console.warn(
+            "Quiz question loading warning:",
+            questionError.message
+          )
+        } else {
+          loadedQuizQuestions =
+            (questionData ?? []) as unknown as QuizQuestion[]
+        }
+      }
+
+      /*
+       * =========================================================
        * SAVE
        * =========================================================
        */
@@ -1576,6 +1802,9 @@ export default function AccountingTopicPage() {
       setBlocks(loadedBlocks)
       setItems(loadedItems)
       setQuiz(loadedQuiz)
+      setTables(loadedTables)
+      setAssets(loadedAssets)
+      setQuizQuestions(loadedQuizQuestions)
 
       setLoading(false)
     }
@@ -1680,6 +1909,30 @@ export default function AccountingTopicPage() {
    * This allows bullet lists, paragraphs, examples and
    * illustrations to retain their original structure.
    */
+
+  const tablesByBlock = useMemo(() => {
+    const result = new Map<string, EducationTable[]>()
+
+    for (const table of tables) {
+      const current = result.get(table.block_id) || []
+      current.push(table)
+      result.set(table.block_id, current)
+    }
+
+    return result
+  }, [tables])
+
+  const assetsByBlock = useMemo(() => {
+    const result = new Map<string, EducationAsset[]>()
+
+    for (const asset of assets) {
+      const current = result.get(asset.block_id) || []
+      current.push(asset)
+      result.set(asset.block_id, current)
+    }
+
+    return result
+  }, [assets])
 
   const visibleSections = sections
     .map((section) => {
@@ -2208,6 +2461,16 @@ export default function AccountingTopicPage() {
                               <RenderSourceBlock
                                 contentBlock={contentBlock}
                                 sectionTitle={section.title}
+                                tables={
+                                  tablesByBlock.get(
+                                    contentBlock.block.id
+                                  ) || []
+                                }
+                                assets={
+                                  assetsByBlock.get(
+                                    contentBlock.block.id
+                                  ) || []
+                                }
                               />
                             </AccountingSourceIllustration>
                           )
