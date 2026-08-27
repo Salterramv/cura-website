@@ -1906,18 +1906,24 @@ export default function AccountingTopicPage() {
    * the new CURA content.
    */
 
-  const curaSections = sections
-    .filter(
-      (section) =>
-        section.section_type === "summary"
-    )
-    .sort(
-      (a, b) =>
-        a.display_order - b.display_order
-    )
+  /*
+   * Render the complete topic lesson.
+   *
+   * CURA Learning Map and CURA Key Takeaways are part of the
+   * lesson, followed by the substantive accounting sections.
+   *
+   * We deliberately do not filter to "summary" here because
+   * doing so hides the actual topic content.
+   */
+  const publicSections =
+    [...sections]
+      .sort(
+        (a, b) =>
+          a.display_order - b.display_order
+      )
 
   const sectionsWithBlocks =
-    curaSections
+    publicSections
       .map((section) => {
         const sectionBlocks =
           blocks
@@ -2261,7 +2267,7 @@ export default function AccountingTopicPage() {
             ← Accounting
           </Link>
 
-          <div className="mt-8 grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="mt-8 max-w-5xl">
             <div>
               <div className="flex flex-wrap gap-3">
                 <span className="inline-flex rounded-full bg-[#168BC4] px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-white">
@@ -2373,7 +2379,7 @@ export default function AccountingTopicPage() {
                       <li>
                         <a
                           href="#topic-quiz"
-                          className="
+                          className="bg-[#168BC4] text-white 
                             block
                             rounded-xl
                             px-3
