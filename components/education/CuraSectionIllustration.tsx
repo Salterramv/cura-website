@@ -12,211 +12,74 @@ type Props = {
   visual?: CuraSectionVisual | null
 }
 
-const NAVY = "#071B49"
-const BLUE = "#168BC4"
-const CYAN = "#35B5E5"
-const PALE = "#E8F6FB"
-const BORDER = "#D7E6EE"
+const NAVY = "#071B3A"
+const BLUE = "#145D8F"
+const CYAN = "#24B8ED"
+const BORDER = "#DFE7EF"
+const PALE = "#F5F8FB"
+const LIGHT_BLUE = "#E8F6FB"
 
-function Box({
+function Card({
   children,
   active = false,
-  muted = false,
+  dark = false,
 }: {
   children: React.ReactNode
   active?: boolean
-  muted?: boolean
+  dark?: boolean
 }) {
   return (
     <div
       className={[
-        "rounded-2xl border px-4 py-3 text-center",
-        "shadow-[0_6px_18px_rgba(7,27,73,0.06)]",
-        active
-          ? "border-[#168BC4] bg-[#E8F6FB]"
-          : muted
-            ? "border-[#D7E6EE] bg-[#F5F8FC]"
-            : "border-[#D7E6EE] bg-white",
+        "rounded-2xl border p-4 text-center shadow-[0_6px_18px_rgba(7,27,58,0.06)]",
+        dark
+          ? "border-[#071B3A] bg-[#071B3A] text-white"
+          : active
+            ? "border-[#24B8ED] bg-[#E8F6FB]"
+            : "border-[#DFE7EF] bg-white",
       ].join(" ")}
     >
-      <span className="text-sm font-semibold leading-5 text-[#071B49]">
+      <div
+        className={[
+          "text-sm font-semibold leading-5",
+          dark ? "text-white" : "text-[#071B3A]",
+        ].join(" ")}
+      >
         {children}
-      </span>
+      </div>
     </div>
   )
 }
 
 function Arrow() {
   return (
-    <span
-      aria-hidden="true"
-      className="shrink-0 text-lg font-bold text-[#168BC4]"
-    >
+    <span className="shrink-0 text-xl font-bold text-[#24B8ED]">
       →
     </span>
   )
 }
 
-function DownArrow() {
-  return (
-    <span
-      aria-hidden="true"
-      className="text-lg font-bold text-[#168BC4]"
-    >
-      ↓
-    </span>
-  )
-}
-
-/* ============================================================
-   AGRICULTURE MAP
-   ============================================================ */
-
-function AgricultureMap({
+function Flow({
   nodes,
 }: {
   nodes: string[]
 }) {
   return (
-    <div className="relative">
-      <div className="hidden md:block absolute left-[8%] right-[8%] top-[34px] h-px bg-[#BFE7F4]" />
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      {nodes.map((node, index) => (
+        <React.Fragment key={`${node}-${index}`}>
+          <Card active={index === 0}>
+            {node}
+          </Card>
 
-      <div className="relative grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-        {nodes.map((node, index) => (
-          <div
-            key={`${node}-${index}`}
-            className="relative rounded-2xl border border-[#D7E6EE] bg-white p-4 text-center shadow-sm"
-          >
-            <div
-              className={[
-                "mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-full",
-                index === 0
-                  ? "bg-[#168BC4] text-white"
-                  : "bg-[#E8F6FB] text-[#168BC4]",
-              ].join(" ")}
-            >
-              <span className="text-xs font-bold">
-                {index + 1}
-              </span>
-            </div>
-
-            <div className="text-sm font-semibold leading-5 text-[#071B49]">
-              {node}
-            </div>
-          </div>
-        ))}
-      </div>
+          {index < nodes.length - 1 && <Arrow />}
+        </React.Fragment>
+      ))}
     </div>
   )
 }
 
-/* ============================================================
-   AGRICULTURE DECISION CHAIN
-   ============================================================ */
-
-function AgricultureChain({
-  nodes,
-}: {
-  nodes: string[]
-}) {
-  return (
-    <div className="relative">
-      <div className="hidden lg:block absolute left-[5%] right-[5%] top-[34px] h-px bg-[#BFE7F4]" />
-
-      <div className="relative flex flex-wrap items-center justify-center gap-2">
-        {nodes.map((node, index) => (
-          <React.Fragment key={`${node}-${index}`}>
-            <div className="min-w-[170px] max-w-[220px]">
-              <Box active={index === 0}>
-                {node}
-              </Box>
-            </div>
-
-            {index < nodes.length - 1 && (
-              <Arrow />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/* ============================================================
-   SCOPE
-   ============================================================ */
-
-function AgricultureScope({
-  nodes,
-}: {
-  nodes: string[]
-}) {
-  return (
-    <div className="grid gap-5 md:grid-cols-2">
-      <div className="rounded-[24px] border border-[#168BC4]/20 bg-[#F5FBFD] p-5">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#168BC4] text-white">
-            ✓
-          </div>
-
-          <div>
-            <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">
-              Within the model
-            </div>
-            <div className="mt-1 text-sm font-semibold text-[#071B49]">
-              IAS 41
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {nodes.slice(0, 3).map((node, index) => (
-            <Box
-              key={`${node}-${index}`}
-              active={index === 0}
-            >
-              {node}
-            </Box>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-[24px] border border-[#071B49]/10 bg-white p-5">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F5F8FC] text-[#071B49]">
-            →
-          </div>
-
-          <div>
-            <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#071B49]/60">
-              Boundary
-            </div>
-            <div className="mt-1 text-sm font-semibold text-[#071B49]">
-              Other standards
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {nodes.slice(3).map((node, index) => (
-            <Box
-              key={`${node}-${index}`}
-              muted
-            >
-              {node}
-            </Box>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ============================================================
-   RECOGNITION GATES
-   ============================================================ */
-
-function RecognitionGates({
+function Decision({
   nodes,
 }: {
   nodes: string[]
@@ -224,127 +87,92 @@ function RecognitionGates({
   return (
     <div className="mx-auto max-w-3xl">
       <div className="grid gap-3">
-        {nodes.slice(0, -1).map((node, index) => (
+        {nodes.map((node, index) => (
           <React.Fragment key={`${node}-${index}`}>
-            <div className="flex items-center gap-4 rounded-2xl border border-[#D7E6EE] bg-white p-4 shadow-sm">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8F6FB] text-sm font-bold text-[#168BC4]">
+            <div className="flex items-center gap-4 rounded-2xl border border-[#DFE7EF] bg-white p-4 shadow-sm">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8F6FB] text-sm font-bold text-[#145D8F]">
                 {index + 1}
               </div>
 
-              <span className="text-sm font-semibold text-[#071B49]">
+              <div className="flex-1 text-left text-sm font-semibold text-[#071B3A]">
                 {node}
-              </span>
+              </div>
 
-              <span className="ml-auto text-[#168BC4]">
-                ✓
-              </span>
+              {index === nodes.length - 1 && (
+                <div className="text-lg font-bold text-[#24B8ED]">
+                  ✓
+                </div>
+              )}
             </div>
 
-            {index < nodes.length - 2 && (
-              <div className="flex justify-center">
-                <DownArrow />
+            {index < nodes.length - 1 && (
+              <div className="flex justify-center text-[#24B8ED]">
+                ↓
               </div>
             )}
           </React.Fragment>
         ))}
-
-        <div className="mt-2 rounded-2xl border-2 border-[#168BC4] bg-[#E8F6FB] p-5 text-center">
-          <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">
-            Recognition
-          </div>
-
-          <div className="mt-2 text-base font-bold text-[#071B49]">
-            {nodes[nodes.length - 1]}
-          </div>
-        </div>
       </div>
     </div>
   )
 }
 
-/* ============================================================
-   MEASUREMENT BRIDGE
-   ============================================================ */
-
-function MeasurementBridge({
+function Measurement({
   nodes,
 }: {
   nodes: string[]
 }) {
+  const first = nodes[0]
+  const middle = nodes.slice(1, -1)
+  const result = nodes[nodes.length - 1]
+
   return (
-    <div className="mx-auto max-w-4xl">
-      <div className="grid gap-3 md:grid-cols-[1fr_70px_1fr_70px_1fr] md:items-center">
-        <Box>
-          {nodes[0]}
-        </Box>
+    <div className="mx-auto max-w-5xl">
+      <div className="grid gap-4 md:grid-cols-[1fr_60px_1.2fr_60px_1fr] md:items-center">
+        <Card>{first}</Card>
 
-        <div className="flex justify-center text-2xl font-bold text-[#168BC4]">
-          −
+        <div className="text-center text-2xl font-bold text-[#24B8ED]">
+          →
         </div>
 
-        <Box>
-          {nodes[1]}
-        </Box>
-
-        <div className="flex justify-center text-2xl font-bold text-[#168BC4]">
-          =
+        <div className="space-y-2">
+          {middle.map((node, index) => (
+            <Card key={`${node}-${index}`}>
+              {node}
+            </Card>
+          ))}
         </div>
 
-        <Box active>
-          {nodes[2]}
-        </Box>
+        <div className="text-center text-2xl font-bold text-[#24B8ED]">
+          →
+        </div>
+
+        <Card active>{result}</Card>
       </div>
-
-      {nodes[3] && (
-        <div className="mt-5 flex items-center justify-center gap-3">
-          <Arrow />
-
-          <div className="rounded-2xl border border-[#168BC4]/20 bg-[#F5FBFD] px-6 py-4 text-center">
-            <div className="text-xs font-bold uppercase tracking-[0.16em] text-[#168BC4]">
-              Result
-            </div>
-
-            <div className="mt-1 text-sm font-semibold text-[#071B49]">
-              {nodes[3]}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-/* ============================================================
-   AGRICULTURE LIFECYCLE
-   ============================================================ */
-
-function AgricultureLifecycle({
+function Timeline({
   nodes,
 }: {
   nodes: string[]
 }) {
   return (
     <div className="relative">
-      <div className="hidden lg:block absolute left-[6%] right-[6%] top-[36px] h-px bg-[#BFE7F4]" />
+      <div className="hidden md:block absolute left-[6%] right-[6%] top-[32px] h-px bg-[#BFE7F4]" />
 
-      <div className="relative grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <div className="relative grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         {nodes.map((node, index) => (
           <div
             key={`${node}-${index}`}
-            className="rounded-2xl border border-[#D7E6EE] bg-white p-4 text-center shadow-sm"
+            className="rounded-2xl border border-[#DFE7EF] bg-white p-4 shadow-sm"
           >
-            <div
-              className={[
-                "mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold",
-                index === nodes.length - 1
-                  ? "bg-[#071B49] text-white"
-                  : "bg-[#E8F6FB] text-[#168BC4]",
-              ].join(" ")}
-            >
+            <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-[#E8F6FB] text-xs font-bold text-[#145D8F]">
               {index + 1}
             </div>
 
-            <div className="text-sm font-semibold leading-5 text-[#071B49]">
+            <div className="text-sm font-semibold leading-5 text-[#071B3A]">
               {node}
             </div>
           </div>
@@ -354,120 +182,7 @@ function AgricultureLifecycle({
   )
 }
 
-/* ============================================================
-   HARVEST TRANSITION
-   ============================================================ */
-
-function HarvestTransition({
-  nodes,
-}: {
-  nodes: string[]
-}) {
-  return (
-    <div className="mx-auto max-w-4xl">
-      <div className="grid gap-3 md:grid-cols-5 md:items-center">
-        {nodes.map((node, index) => (
-          <React.Fragment key={`${node}-${index}`}>
-            <div
-              className={[
-                "rounded-2xl border p-5 text-center",
-                index === 1
-                  ? "border-[#168BC4] bg-[#E8F6FB]"
-                  : index === 4
-                    ? "border-[#071B49] bg-[#071B49]"
-                    : "border-[#D7E6EE] bg-white",
-              ].join(" ")}
-            >
-              <div
-                className={[
-                  "mb-2 text-[10px] font-bold uppercase tracking-[0.18em]",
-                  index === 4
-                    ? "text-[#35B5E5]"
-                    : "text-[#168BC4]",
-                ].join(" ")}
-              >
-                {index === 1
-                  ? "Critical point"
-                  : index === 4
-                    ? "Next standard"
-                    : `Step ${index + 1}`}
-              </div>
-
-              <div
-                className={[
-                  "text-sm font-semibold leading-5",
-                  index === 4
-                    ? "text-white"
-                    : "text-[#071B49]",
-                ].join(" ")}
-              >
-                {node}
-              </div>
-            </div>
-
-            {index < nodes.length - 1 && (
-              <div className="hidden justify-center md:flex">
-                <Arrow />
-              </div>
-            )}
-          </React.Fragment>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/* ============================================================
-   BEARER PLANT SPLIT
-   ============================================================ */
-
-function BearerSplit({
-  nodes,
-}: {
-  nodes: string[]
-}) {
-  return (
-    <div className="grid gap-5 md:grid-cols-3">
-      {nodes.map((node, index) => (
-        <div
-          key={`${node}-${index}`}
-          className="relative rounded-[24px] border border-[#D7E6EE] bg-white p-5 text-center shadow-sm"
-        >
-          <div
-            className={[
-              "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full",
-              index === 0
-                ? "bg-[#071B49] text-white"
-                : index === 1
-                  ? "bg-[#E8F6FB] text-[#168BC4]"
-                  : "bg-[#F5F8FC] text-[#071B49]",
-            ].join(" ")}
-          >
-            <span className="text-lg font-bold">
-              {index + 1}
-            </span>
-          </div>
-
-          <div className="text-sm font-semibold leading-6 text-[#071B49]">
-            {node}
-          </div>
-
-          {index < nodes.length - 1 && (
-            <div className="mt-4 text-[#168BC4]">
-              ↓
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/* ============================================================
-   OUTSIDE SCOPE
-   ============================================================ */
-
-function OutsideScope({
+function Comparison({
   nodes,
 }: {
   nodes: string[]
@@ -477,13 +192,20 @@ function OutsideScope({
       {nodes.map((node, index) => (
         <div
           key={`${node}-${index}`}
-          className="flex items-center gap-4 rounded-2xl border border-[#D7E6EE] bg-white p-4 shadow-sm"
+          className={[
+            "rounded-[22px] border p-5",
+            index === nodes.length - 1
+              ? "border-[#24B8ED] bg-[#E8F6FB]"
+              : "border-[#DFE7EF] bg-white",
+          ].join(" ")}
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F5F8FC] text-sm font-bold text-[#071B49]">
-            {index + 1}
+          <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#168BC4]">
+            {index === nodes.length - 1
+              ? "CURA conclusion"
+              : `Option ${index + 1}`}
           </div>
 
-          <div className="text-sm font-semibold leading-5 text-[#071B49]">
+          <div className="text-sm font-semibold leading-6 text-[#071B3A]">
             {node}
           </div>
         </div>
@@ -492,38 +214,139 @@ function OutsideScope({
   )
 }
 
-/* ============================================================
-   GOVERNMENT GRANT DECISION
-   ============================================================ */
-
-function GrantDecision({
+function Process({
   nodes,
 }: {
   nodes: string[]
 }) {
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-5 rounded-2xl border-2 border-[#168BC4] bg-[#E8F6FB] p-5 text-center">
-        <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">
-          Start here
-        </div>
+      <div className="grid gap-3">
+        {nodes.map((node, index) => (
+          <React.Fragment key={`${node}-${index}`}>
+            <div className="flex items-center gap-4 rounded-2xl border border-[#DFE7EF] bg-white p-4 shadow-sm">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#071B3A] text-xs font-bold text-white">
+                {index + 1}
+              </div>
 
-        <div className="mt-2 text-sm font-bold text-[#071B49]">
-          {nodes[0]}
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        {nodes.slice(1).map((node, index) => (
-          <div
-            key={`${node}-${index}`}
-            className="rounded-3xl border border-[#D7E6EE] bg-white p-5 text-center shadow-sm"
-          >
-            <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">
-              Route {index + 1}
+              <div className="text-sm font-semibold text-[#071B3A]">
+                {node}
+              </div>
             </div>
 
-            <div className="text-sm font-semibold leading-6 text-[#071B49]">
+            {index < nodes.length - 1 && (
+              <div className="ml-5 text-[#24B8ED]">
+                ↓
+              </div>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Journal({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  return (
+    <div className="mx-auto max-w-4xl">
+      <div className="rounded-[24px] border border-[#DFE7EF] bg-white p-5 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-2">
+          {nodes.map((node, index) => (
+            <div
+              key={`${node}-${index}`}
+              className="rounded-xl bg-[#F5F8FB] p-4"
+            >
+              <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#168BC4]">
+                Step {index + 1}
+              </div>
+
+              <div className="text-sm font-semibold leading-5 text-[#071B3A]">
+                {node}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-xl border-2 border-[#24B8ED] bg-[#E8F6FB] p-4 text-center text-sm font-bold text-[#071B3A]">
+          Accounting entry follows from the identified movement.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Matrix({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      {nodes.map((node, index) => (
+        <div
+          key={`${node}-${index}`}
+          className="rounded-2xl border border-[#DFE7EF] bg-white p-5"
+        >
+          <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-[#E8F6FB] text-xs font-bold text-[#145D8F]">
+            {index + 1}
+          </div>
+
+          <div className="text-sm font-semibold leading-5 text-[#071B3A]">
+            {node}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Example({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  return (
+    <div className="mx-auto max-w-5xl">
+      <div className="grid gap-4 md:grid-cols-5">
+        {nodes.map((node, index) => (
+          <div
+            key={`${node}-${index}`}
+            className={[
+              "relative rounded-[22px] border p-5 text-center",
+              index === 0
+                ? "border-[#DFE7EF] bg-white"
+                : index === nodes.length - 1
+                  ? "border-[#071B3A] bg-[#071B3A]"
+                  : "border-[#24B8ED] bg-[#E8F6FB]",
+            ].join(" ")}
+          >
+            <div
+              className={[
+                "mb-3 text-[10px] font-bold uppercase tracking-[0.16em]",
+                index === nodes.length - 1
+                  ? "text-[#35B5E5]"
+                  : "text-[#168BC4]",
+              ].join(" ")}
+            >
+              {index === 0
+                ? "Facts"
+                : index === nodes.length - 1
+                  ? "Result"
+                  : `Step ${index}`}
+            </div>
+
+            <div
+              className={[
+                "text-sm font-semibold leading-5",
+                index === nodes.length - 1
+                  ? "text-white"
+                  : "text-[#071B3A]",
+              ].join(" ")}
+            >
               {node}
             </div>
           </div>
@@ -532,36 +355,6 @@ function GrantDecision({
     </div>
   )
 }
-
-/* ============================================================
-   STANDARD FLOW
-   ============================================================ */
-
-function StandardFlow({
-  nodes,
-}: {
-  nodes: string[]
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-2">
-      {nodes.map((node, index) => (
-        <React.Fragment key={`${node}-${index}`}>
-          <Box active={index === 0}>
-            {node}
-          </Box>
-
-          {index < nodes.length - 1 && (
-            <Arrow />
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  )
-}
-
-/* ============================================================
-   MAIN COMPONENT
-   ============================================================ */
 
 export default function CuraSectionIllustration({
   visual,
@@ -576,112 +369,68 @@ export default function CuraSectionIllustration({
   }
 
   const nodes = visual.nodes.filter(
-    (node): node is string =>
-      typeof node === "string" &&
-      node.trim().length > 0
+    (n): n is string =>
+      typeof n === "string" && n.trim().length > 0
   )
 
-  if (nodes.length === 0) {
-    return null
-  }
-
-  const type =
-    String(visual.type || "flow").toLowerCase()
+  if (!nodes.length) return null
 
   let content: React.ReactNode
 
-  switch (type) {
-    case "agriculture-map":
-      content = (
-        <AgricultureMap nodes={nodes} />
-      )
-      break
-
-    case "agriculture-chain":
-      content = (
-        <AgricultureChain nodes={nodes} />
-      )
-      break
-
-    case "agriculture-scope":
-    case "scope":
-      content = (
-        <AgricultureScope nodes={nodes} />
-      )
-      break
-
+  switch (String(visual.type || "flow").toLowerCase()) {
+    case "decision":
     case "recognition-gates":
-      content = (
-        <RecognitionGates nodes={nodes} />
-      )
-      break
-
-    case "measurement-bridge":
-      content = (
-        <MeasurementBridge nodes={nodes} />
-      )
-      break
-
-    case "agriculture-lifecycle":
-      content = (
-        <AgricultureLifecycle nodes={nodes} />
-      )
-      break
-
-    case "harvest-transition":
-      content = (
-        <HarvestTransition nodes={nodes} />
-      )
-      break
-
-    case "bearer-split":
-      content = (
-        <BearerSplit nodes={nodes} />
-      )
-      break
-
-    case "outside-scope":
-      content = (
-        <OutsideScope nodes={nodes} />
-      )
-      break
-
-    case "grant-decision":
-      content = (
-        <GrantDecision nodes={nodes} />
-      )
+      content = <Decision nodes={nodes} />
       break
 
     case "measurement":
-    case "fair-value":
-      content = (
-        <MeasurementBridge nodes={nodes} />
-      )
+    case "measurement-bridge":
+      content = <Measurement nodes={nodes} />
       break
 
-    case "lifecycle":
-    case "cycle":
     case "timeline":
-      content = (
-        <AgricultureLifecycle nodes={nodes} />
-      )
+    case "lifecycle":
+      content = <Timeline nodes={nodes} />
+      break
+
+    case "comparison":
+    case "bearer-split":
+    case "outside-scope":
+      content = <Comparison nodes={nodes} />
+      break
+
+    case "journal":
+      content = <Journal nodes={nodes} />
+      break
+
+    case "matrix":
+      content = <Matrix nodes={nodes} />
+      break
+
+    case "example":
+      content = <Example nodes={nodes} />
+      break
+
+    case "process":
+    case "agriculture-chain":
+    case "harvest-transition":
+      content = <Process nodes={nodes} />
       break
 
     default:
-      content = (
-        <StandardFlow nodes={nodes} />
-      )
+      content = <Flow nodes={nodes} />
+      break
   }
 
   return (
-    <div className="mb-8 overflow-hidden rounded-[28px] border border-[#168BC4]/15 bg-gradient-to-br from-[#F7FCFE] to-white">
+    <div className="mb-8 overflow-hidden rounded-[28px] border border-[#24B8ED]/15 bg-gradient-to-br from-[#F7FCFE] to-white">
       <div className="p-6 md:p-8">
         <div className="mb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#168BC4]">
+          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#168BC4]">
             {visual.eyebrow || "CURA concept visual"}
-          </p>
+          </div>
 
-          <h3 className="mt-2 text-lg font-semibold leading-7 text-[#071B49] md:text-xl">
+          <h3 className="mt-2 text-lg font-semibold leading-7 text-[#071B3A] md:text-xl">
             {visual.title}
           </h3>
         </div>
@@ -689,7 +438,7 @@ export default function CuraSectionIllustration({
         {content}
 
         {visual.note && (
-          <div className="mt-6 rounded-2xl bg-[#F5F8FC] px-5 py-4 text-sm leading-6 text-[#173565]">
+          <div className="mt-6 rounded-2xl bg-[#F5F8FB] px-5 py-4 text-sm leading-6 text-[#173565]">
             {visual.note}
           </div>
         )}
