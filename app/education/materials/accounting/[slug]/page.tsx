@@ -7,8 +7,6 @@ import { useParams } from "next/navigation"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
 import { createClient } from "@/lib/supabase/client"
-import CuraAccountingVisual from "@/components/education/CuraAccountingVisual"
-
 /* ============================================================
    TYPES
    ============================================================ */
@@ -2290,12 +2288,6 @@ export default function AccountingTopicPage() {
                 </p>
               )}
             </div>
-
-            <CuraAccountingVisual
-              topicTitle={topic.title}
-              standard={topic.standard || ""}
-              mode="hero"
-            />
           </div>
         </div>
       </section>
@@ -2465,11 +2457,6 @@ export default function AccountingTopicPage() {
                         )}
 
                         <div className="px-7 pt-7 md:px-10 md:pt-8">
-                          <CuraAccountingVisual
-                            topicTitle={topic.title}
-                            sectionTitle={sectionTitle}
-                            mode="section"
-                          />
                         </div>
 
                         {/* CURA CONTENT */}
