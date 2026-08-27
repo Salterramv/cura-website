@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { FormEvent, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { FormEvent, useEffect, useState } from "react"
 
 type ServiceType = "bookkeeping" | "payroll"
 
@@ -544,7 +545,110 @@ function InquiryForm({ service }: { service: ServiceType }) {
   )
 }
 
+type DatabasePackage = {
+  id: string
+  service_id: string
+  title: string
+  price: string | null
+  fixed_fee: string | null
+  variable_fee: string | null
+  setup_fee: string | null
+  inclusions: string[] | null
+  display_order: number
+  published: boolean
+}
+
 export default function OtherServicePage({ service }: Props) {
+
+  const supabase = createClient()
+
+  const [databasePackages, setDatabasePackages] =
+    useState<DatabasePackage[]>([])
+
+  const [packagesLoading, setPackagesLoading] =
+    useState(true)
+
+  const [packagesError, setPackagesError] =
+    useState("")
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPublishedPackages() {
+      setPackagesLoading(true)
+      setPackagesError("")
+
+      const {
+        data: serviceData,
+        error: serviceError,
+      } = await supabase
+        .from("other_services")
+        .select("id")
+        .eq("slug", service)
+        .eq("published", true)
+        .maybeSingle()
+
+      if (serviceError) {
+        if (!cancelled) {
+          setPackagesError(serviceError.message)
+          setDatabasePackages([])
+          setPackagesLoading(false)
+        }
+        return
+      }
+
+      if (!serviceData) {
+        if (!cancelled) {
+          setDatabasePackages([])
+          setPackagesLoading(false)
+        }
+        return
+      }
+
+      const {
+        data: packageData,
+        error: packageError,
+      } = await supabase
+        .from("other_service_packages")
+        .select(
+          "id, service_id, title, price, fixed_fee, variable_fee, setup_fee, inclusions, display_order, published"
+        )
+        .eq("service_id", serviceData.id)
+        .eq("published", true)
+        .order("display_order", {
+          ascending: true,
+        })
+
+      if (packageError) {
+        if (!cancelled) {
+          setPackagesError(packageError.message)
+          setDatabasePackages([])
+          setPackagesLoading(false)
+        }
+        return
+      }
+
+      if (!cancelled) {
+        setDatabasePackages(
+          (packageData ?? []).map((pkg) => ({
+            ...pkg,
+            inclusions: Array.isArray(pkg.inclusions)
+              ? pkg.inclusions
+              : [],
+          }))
+        )
+
+        setPackagesLoading(false)
+      }
+    }
+
+    loadPublishedPackages()
+
+    return () => {
+      cancelled = true
+    }
+  }, [service])
+
   const isBookkeeping = service === "bookkeeping"
 
   const title = isBookkeeping
@@ -759,10 +863,31 @@ export default function OtherServicePage({ service }: Props) {
             }
           </p>
 
-          {isBookkeeping ? (
+          {packagesLoading ? (
+            <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-10 text-center">
+              <p className="text-sm font-medium text-slate-500">
+                Loading packages…
+              </p>
+            </div>
+          ) : packagesError ? (
+            <div className="mt-12 rounded-2xl border border-red-200 bg-red-50 p-8">
+              <p className="font-semibold text-red-700">
+                Unable to load packages.
+              </p>
+              <p className="mt-2 text-sm text-red-600">
+                {packagesError}
+              </p>
+            </div>
+          ) : databasePackages.length === 0 ? (
+            <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-10 text-center">
+              <p className="text-sm font-medium text-slate-500">
+                No packages are currently published.
+              </p>
+            </div>
+          ) : isBookkeeping ? (
             <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
-              {bookkeepingPackages.map((pkg, index) => (
+              {databasePackages.map((pkg, index) => (
                 <details
                   key={pkg.title}
                   className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
@@ -801,7 +926,7 @@ export default function OtherServicePage({ service }: Props) {
 
                   <div className="border-t border-slate-200 px-7 pb-7 pt-6">
                     <ul className="space-y-3">
-                      {pkg.inclusions.map((item) => (
+                      {(pkg.inclusions ?? []).map((item) => (
                         <li
                           key={item}
                           className="flex gap-3 text-sm leading-6 text-slate-600"
@@ -821,7 +946,7 @@ export default function OtherServicePage({ service }: Props) {
           ) : (
             <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
-              {payrollPackages.map((pkg, index) => (
+              {databasePackages.map((pkg, index) => (
                 <details
                   key={pkg.title}
                   className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
@@ -854,7 +979,7 @@ export default function OtherServicePage({ service }: Props) {
                         </p>
 
                         <p className="mt-1 text-2xl font-semibold">
-                          {pkg.fixed}
+                          {pkg.fixed_fee}
                         </p>
 
                         <p className="text-xs text-slate-400">
@@ -868,7 +993,7 @@ export default function OtherServicePage({ service }: Props) {
                         </p>
 
                         <p className="mt-1 text-2xl font-semibold">
-                          {pkg.variable}
+                          {pkg.variable_fee}
                         </p>
 
                         <p className="text-xs text-slate-400">
@@ -882,7 +1007,7 @@ export default function OtherServicePage({ service }: Props) {
                         </p>
 
                         <p className="mt-1 text-2xl font-semibold">
-                          {pkg.setup}
+                          {pkg.setup_fee}
                         </p>
 
                         <p className="text-xs text-slate-400">
