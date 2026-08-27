@@ -418,12 +418,12 @@ export default function CuraHeader() {
                     setEducationOpen(false)
                   }}
                   aria-expanded={insightsOpen}
-                  className="flex w-full items-center justify-between py-3.5 text-left text-sm font-medium text-[#071B49]"
+                  className="flex w-full items-center justify-start gap-1.5 py-3.5 text-left text-sm font-medium text-[#071B49]"
                 >
                   <span>Cura Insights</span>
 
                   <svg
-                    className={`h-4 w-4 transition-transform ${
+                    className={`h-3.5 w-3.5 transition-transform ${
                       insightsOpen ? "rotate-180" : ""
                     }`}
                     viewBox="0 0 20 20"
@@ -489,12 +489,12 @@ export default function CuraHeader() {
                     setInsightsOpen(false)
                   }}
                   aria-expanded={servicesOpen}
-                  className="flex w-full items-center justify-between py-3.5 text-left text-sm font-medium text-[#071B49]"
+                  className="flex w-full items-center justify-start gap-1.5 py-3.5 text-left text-sm font-medium text-[#071B49]"
                 >
                   <span>Services</span>
 
                   <svg
-                    className={`h-4 w-4 transition-transform ${
+                    className={`h-3.5 w-3.5 transition-transform ${
                       servicesOpen ? "rotate-180" : ""
                     }`}
                     viewBox="0 0 20 20"
@@ -560,12 +560,12 @@ export default function CuraHeader() {
                     setInsightsOpen(false)
                   }}
                   aria-expanded={educationOpen}
-                  className="flex w-full items-center justify-between py-3.5 text-left text-sm font-medium text-[#071B49]"
+                  className="flex w-full items-center justify-start gap-1.5 py-3.5 text-left text-sm font-medium text-[#071B49]"
                 >
                   <span>Education</span>
 
                   <svg
-                    className={`h-4 w-4 transition-transform ${
+                    className={`h-3.5 w-3.5 transition-transform ${
                       educationOpen ? "rotate-180" : ""
                     }`}
                     viewBox="0 0 20 20"

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import CuraHeader from "@/components/CuraHeader"
+import CuraFooter from "@/components/CuraFooter"
 
 type Exchanger = {
   id: string
@@ -168,67 +170,12 @@ export default function ExchangeRatePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f7fb] text-[#071d41]">
-      {/* CURA HEADER */}
-<header className="border-b border-[#dce5ef] bg-white">
-  <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 md:px-10 lg:px-12">
-    
-    {/* CURA LOGO */}
-    <a href="/" className="shrink-0">
-      <img
-        src="/cura-logo.png"
-        alt="CURA - Audit Tax Advisory"
-        className="h-24 w-auto object-contain"
-      />
-    </a>
+    <>
+      <CuraHeader />
 
-    {/* NAVIGATION */}
-    <nav className="hidden items-center gap-8 text-sm font-medium md:flex">
-      <a
-        href="/"
-        className="border-b-2 border-[#D71920] pb-1 text-[#071B49]"
-      >
-        Home
-      </a>
+      <main className="min-h-screen bg-[#f4f7fb] text-[#071d41]">
+      <CuraHeader />
 
-      <a
-        href="/#knowledge"
-        className="text-slate-600 transition hover:text-[#071B49]"
-      >
-        Knowledge
-      </a>
-
-      <a
-        href="/#legal-cases"
-        className="text-slate-600 transition hover:text-[#071B49]"
-      >
-        Legal Cases
-      </a>
-
-      <a
-        href="/#updates"
-        className="text-slate-600 transition hover:text-[#071B49]"
-      >
-        Tax Updates
-      </a>
-
-      <a
-        href="/#education"
-        className="text-slate-600 transition hover:text-[#071B49]"
-      >
-        Education
-      </a>
-
-      <a
-        href="/#contact"
-        className="text-slate-600 transition hover:text-[#071B49]"
-      >
-        Contact
-      </a>
-    </nav>
-
-  </div>
-</header>
       {/* HERO */}
       <section className="border-b border-[#164a73] bg-gradient-to-r from-[#061b3a] to-[#0f4f7a] text-white">
         <div className="mx-auto max-w-7xl px-6 py-14 md:px-10 lg:px-12">
@@ -616,5 +563,8 @@ export default function ExchangeRatePage() {
   </div>
 </footer>
     </main>
+
+      <CuraFooter />
+    </>
   )
 }
