@@ -50,14 +50,29 @@ export default function OtherServicesAdminPage() {
   const [serviceType, setServiceType] =
     useState<ServiceType>("bookkeeping")
 
-  const [service, setService] = useState<Service | null>(null)
-  const [reasons, setReasons] = useState<Reason[]>([])
-  const [packages, setPackages] = useState<Package[]>([])
+  const [service, setService] =
+    useState<Service | null>(null)
 
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState("")
-  const [error, setError] = useState("")
+  const [reasons, setReasons] =
+    useState<Reason[]>([])
+
+  const [packages, setPackages] =
+    useState<Package[]>([])
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [saving, setSaving] =
+    useState(false)
+
+  const [savingPackageIndex, setSavingPackageIndex] =
+    useState<number | null>(null)
+
+  const [message, setMessage] =
+    useState("")
+
+  const [error, setError] =
+    useState("")
 
   useEffect(() => {
     loadService()
@@ -94,12 +109,14 @@ export default function OtherServicesAdminPage() {
 
     if (!allowed) return
 
-    const { data: serviceData, error: serviceError } =
-      await supabase
-        .from("other_services")
-        .select("*")
-        .eq("slug", serviceType)
-        .maybeSingle()
+    const {
+      data: serviceData,
+      error: serviceError,
+    } = await supabase
+      .from("other_services")
+      .select("*")
+      .eq("slug", serviceType)
+      .maybeSingle()
 
     if (serviceError) {
       setError(serviceError.message)
@@ -117,12 +134,16 @@ export default function OtherServicesAdminPage() {
 
     setService(serviceData)
 
-    const { data: reasonData, error: reasonError } =
-      await supabase
-        .from("other_service_reasons")
-        .select("*")
-        .eq("service_id", serviceData.id)
-        .order("display_order", { ascending: true })
+    const {
+      data: reasonData,
+      error: reasonError,
+    } = await supabase
+      .from("other_service_reasons")
+      .select("*")
+      .eq("service_id", serviceData.id)
+      .order("display_order", {
+        ascending: true,
+      })
 
     if (reasonError) {
       setError(reasonError.message)
@@ -130,12 +151,16 @@ export default function OtherServicesAdminPage() {
       return
     }
 
-    const { data: packageData, error: packageError } =
-      await supabase
-        .from("other_service_packages")
-        .select("*")
-        .eq("service_id", serviceData.id)
-        .order("display_order", { ascending: true })
+    const {
+      data: packageData,
+      error: packageError,
+    } = await supabase
+      .from("other_service_packages")
+      .select("*")
+      .eq("service_id", serviceData.id)
+      .order("display_order", {
+        ascending: true,
+      })
 
     if (packageError) {
       setError(packageError.message)
@@ -181,7 +206,11 @@ export default function OtherServicesAdminPage() {
     if (error) {
       setError(error.message)
     } else {
-      setMessage("Service content saved successfully.")
+      setMessage(
+        service.published
+          ? "Service published and saved successfully."
+          : "Service saved as draft.",
+      )
     }
 
     setSaving(false)
@@ -193,10 +222,20 @@ export default function OtherServicesAdminPage() {
 
     const payload = {
       service_id: reason.service_id,
-      title: reason.title,
-      text: reason.text,
+      title: reason.title.trim(),
+      text: reason.text.trim(),
       display_order: reason.display_order,
       published: reason.published,
+    }
+
+    if (!payload.title) {
+      setError("Please enter a title for the reason.")
+      return
+    }
+
+    if (!payload.text) {
+      setError("Please enter a description for the reason.")
+      return
     }
 
     const result = reason.id
@@ -220,6 +259,9 @@ export default function OtherServicesAdminPage() {
   async function deleteReason(id: string) {
     if (!confirm("Delete this reason?")) return
 
+    setError("")
+    setMessage("")
+
     const { error } = await supabase
       .from("other_service_reasons")
       .delete()
@@ -230,46 +272,108 @@ export default function OtherServicesAdminPage() {
       return
     }
 
-    setMessage("Reason deleted.")
+    setMessage("Reason deleted successfully.")
     await loadService()
   }
 
-  async function savePackage(pkg: Package) {
+  async function savePackage(
+    pkg: Package,
+    index: number,
+  ) {
     setError("")
     setMessage("")
+    setSavingPackageIndex(index)
 
-    const payload = {
-      service_id: pkg.service_id,
-      title: pkg.title,
-      price: pkg.price,
-      fixed_fee: pkg.fixed_fee,
-      variable_fee: pkg.variable_fee,
-      setup_fee: pkg.setup_fee,
-      inclusions: pkg.inclusions,
-      display_order: pkg.display_order,
-      published: pkg.published,
-    }
+    const title = pkg.title.trim()
 
-    const result = pkg.id
-      ? await supabase
-          .from("other_service_packages")
-          .update(payload)
-          .eq("id", pkg.id)
-      : await supabase
-          .from("other_service_packages")
-          .insert(payload)
-
-    if (result.error) {
-      setError(result.error.message)
+    if (!title) {
+      setError(
+        "Please enter the revenue range or employee range before saving the package.",
+      )
+      setSavingPackageIndex(null)
       return
     }
 
-    setMessage("Package saved successfully.")
-    await loadService()
+    const inclusions = pkg.inclusions
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    const payload = {
+      service_id: pkg.service_id,
+      title,
+      price:
+        serviceType === "bookkeeping"
+          ? pkg.price?.trim() || null
+          : null,
+      fixed_fee:
+        serviceType === "payroll"
+          ? pkg.fixed_fee?.trim() || null
+          : null,
+      variable_fee:
+        serviceType === "payroll"
+          ? pkg.variable_fee?.trim() || null
+          : null,
+      setup_fee:
+        serviceType === "payroll"
+          ? pkg.setup_fee?.trim() || null
+          : null,
+      inclusions,
+      display_order:
+        Number(pkg.display_order) || index + 1,
+      published: Boolean(pkg.published),
+    }
+
+    try {
+      let result
+
+      if (pkg.id) {
+        result = await supabase
+          .from("other_service_packages")
+          .update(payload)
+          .eq("id", pkg.id)
+          .select()
+          .single()
+      } else {
+        result = await supabase
+          .from("other_service_packages")
+          .insert(payload)
+          .select()
+          .single()
+      }
+
+      if (result.error) {
+        throw new Error(result.error.message)
+      }
+
+      if (!result.data) {
+        throw new Error(
+          "Supabase did not return the saved package.",
+        )
+      }
+
+      setMessage(
+        payload.published
+          ? "Package published successfully."
+          : "Package saved as draft.",
+      )
+
+      await loadService()
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to save the package.",
+      )
+    } finally {
+      setSavingPackageIndex(null)
+    }
   }
 
   async function deletePackage(id: string) {
-    if (!confirm("Delete this package?")) return
+    if (!confirm("Delete this package permanently?")) return
+
+    setError("")
+    setMessage("")
 
     const { error } = await supabase
       .from("other_service_packages")
@@ -281,7 +385,7 @@ export default function OtherServicesAdminPage() {
       return
     }
 
-    setMessage("Package deleted.")
+    setMessage("Package deleted successfully.")
     await loadService()
   }
 
@@ -310,7 +414,7 @@ export default function OtherServicesAdminPage() {
       | number
       | boolean
       | string[],
-      ) {
+  ) {
     setPackages((current) =>
       current.map((item, i) =>
         i === index
@@ -321,6 +425,55 @@ export default function OtherServicesAdminPage() {
           : item,
       ),
     )
+  }
+
+  function addPackage() {
+    if (!service) return
+
+    const nextOrder =
+      packages.length > 0
+        ? Math.max(
+            ...packages.map(
+              (item) =>
+                Number(item.display_order) || 0,
+            ),
+          ) + 1
+        : 1
+
+    const newPackage: Package = {
+      service_id: service.id,
+      title: "",
+      price:
+        serviceType === "bookkeeping"
+          ? ""
+          : null,
+      fixed_fee:
+        serviceType === "payroll"
+          ? ""
+          : null,
+      variable_fee:
+        serviceType === "payroll"
+          ? ""
+          : null,
+      setup_fee:
+        serviceType === "payroll"
+          ? ""
+          : null,
+      inclusions: [],
+      display_order: nextOrder,
+      published: true,
+    }
+
+    setPackages((current) => [
+      ...current,
+      newPackage,
+    ])
+
+    setMessage(
+      "New package added. Complete the details and click Publish Package.",
+    )
+
+    setError("")
   }
 
   if (loading) {
@@ -343,7 +496,6 @@ export default function OtherServicesAdminPage() {
       {/* HEADER */}
 
       <header className="bg-[#061b3d] text-white">
-
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-6 py-5">
 
           <div>
@@ -375,16 +527,12 @@ export default function OtherServicesAdminPage() {
             </a>
 
           </div>
-
         </div>
-
       </header>
 
       {/* MAIN */}
 
       <div className="mx-auto max-w-7xl px-6 py-10 lg:px-8">
-
-        {/* PAGE INTRO */}
 
         <section>
 
@@ -401,14 +549,11 @@ export default function OtherServicesAdminPage() {
               </h2>
 
               <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-                Edit CURA bookkeeping and payroll content, pricing,
-                packages and service information without changing
-                website code.
+                Edit CURA bookkeeping and payroll content,
+                pricing, packages and included services.
               </p>
 
             </div>
-
-            {/* SERVICE SWITCHER */}
 
             <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
 
@@ -472,8 +617,8 @@ export default function OtherServicesAdminPage() {
             </h3>
 
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              No corresponding Other Services record was found
-              in Supabase.
+              No corresponding Other Services record
+              was found in Supabase.
             </p>
 
           </section>
@@ -497,14 +642,6 @@ export default function OtherServicesAdminPage() {
                   <h3 className="mt-2 text-2xl font-bold text-[#071d41]">
                     Service Information
                   </h3>
-
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Edit the main content displayed on the
-                    {serviceType === "bookkeeping"
-                      ? " Bookkeeping"
-                      : " Payroll"}{" "}
-                    page.
-                  </p>
 
                 </div>
 
@@ -618,11 +755,6 @@ export default function OtherServicesAdminPage() {
                   Outsourcing Content
                 </h3>
 
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Add, edit, reorder and publish the reasons
-                  businesses should outsource this service.
-                </p>
-
               </div>
 
               <div className="mt-8 space-y-5">
@@ -630,13 +762,17 @@ export default function OtherServicesAdminPage() {
                 {reasons.map((reason, index) => (
 
                   <div
-                    key={reason.id ?? `new-${index}`}
+                    key={
+                      reason.id ??
+                      `new-reason-${index}`
+                    }
                     className="rounded-xl border border-slate-200 bg-[#f8fafc] p-5"
                   >
 
                     <div className="grid gap-5 lg:grid-cols-[1fr_1.7fr_auto]">
 
                       <div>
+
                         <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                           Title
                         </label>
@@ -650,12 +786,13 @@ export default function OtherServicesAdminPage() {
                               event.target.value,
                             )
                           }
-                          placeholder="Reason title"
-                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#071d41] outline-none transition focus:border-[#168bc4]"
+                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#071d41] outline-none focus:border-[#168bc4]"
                         />
+
                       </div>
 
                       <div>
+
                         <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                           Description
                         </label>
@@ -670,9 +807,9 @@ export default function OtherServicesAdminPage() {
                             )
                           }
                           rows={4}
-                          placeholder="Explain this reason..."
-                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#071d41] outline-none transition focus:border-[#168bc4]"
+                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#071d41] outline-none focus:border-[#168bc4]"
                         />
+
                       </div>
 
                       <div className="flex flex-row items-end gap-2 lg:flex-col">
@@ -682,7 +819,7 @@ export default function OtherServicesAdminPage() {
                           onClick={() =>
                             saveReason(reason)
                           }
-                          className="rounded-lg bg-[#061b3d] px-4 py-2.5 text-xs font-semibold !text-white transition hover:bg-[#0b2a55]"
+                          className="rounded-lg bg-[#061b3d] px-4 py-2.5 text-xs font-semibold !text-white"
                         >
                           Save
                         </button>
@@ -695,7 +832,7 @@ export default function OtherServicesAdminPage() {
                                 reason.id!,
                               )
                             }
-                            className="rounded-lg border border-red-200 bg-white px-4 py-2.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                            className="rounded-lg border border-red-200 bg-white px-4 py-2.5 text-xs font-semibold text-red-600"
                           >
                             Delete
                           </button>
@@ -733,7 +870,9 @@ export default function OtherServicesAdminPage() {
                         <input
                           type="number"
                           min="1"
-                          value={reason.display_order}
+                          value={
+                            reason.display_order
+                          }
                           onChange={(event) =>
                             updateReason(
                               index,
@@ -769,7 +908,7 @@ export default function OtherServicesAdminPage() {
                       },
                     ])
                   }
-                  className="rounded-lg border border-[#168bc4] bg-white px-5 py-3 text-sm font-semibold text-[#168bc4] transition hover:bg-[#effbff]"
+                  className="rounded-lg border border-[#168bc4] bg-white px-5 py-3 text-sm font-semibold text-[#168bc4] hover:bg-[#effbff]"
                 >
                   + Add Reason
                 </button>
@@ -792,18 +931,15 @@ export default function OtherServicesAdminPage() {
                   Why Choose CURA Content
                 </h3>
 
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Edit the heading and supporting text for the
-                  Why Choose CURA section.
-                </p>
-
               </div>
 
               <div className="mt-8 grid gap-6">
 
                 <TextArea
                   label="Section Heading"
-                  value={service.why_cura_heading}
+                  value={
+                    service.why_cura_heading
+                  }
                   rows={2}
                   onChange={(value) =>
                     setService({
@@ -815,7 +951,9 @@ export default function OtherServicesAdminPage() {
 
                 <TextArea
                   label="Section Description"
-                  value={service.why_cura_description}
+                  value={
+                    service.why_cura_description
+                  }
                   rows={4}
                   onChange={(value) =>
                     setService({
@@ -831,7 +969,7 @@ export default function OtherServicesAdminPage() {
                 type="button"
                 disabled={saving}
                 onClick={saveService}
-                className="mt-6 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold !text-white transition hover:bg-[#0b2a55] disabled:opacity-50"
+                className="mt-6 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold !text-white disabled:opacity-50"
               >
                 {saving
                   ? "Saving..."
@@ -840,7 +978,7 @@ export default function OtherServicesAdminPage() {
 
             </section>
 
-            {/* WHY OUTSOURCE HEADINGS */}
+            {/* SECTION SETTINGS */}
 
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
 
@@ -894,7 +1032,7 @@ export default function OtherServicesAdminPage() {
                 type="button"
                 disabled={saving}
                 onClick={saveService}
-                className="mt-6 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold !text-white transition hover:bg-[#0b2a55] disabled:opacity-50"
+                className="mt-6 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold !text-white disabled:opacity-50"
               >
                 {saving
                   ? "Saving..."
@@ -917,11 +1055,6 @@ export default function OtherServicesAdminPage() {
                   Customized Enquiry Content
                 </h3>
 
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Edit the text shown above the customized
-                  enquiry form.
-                </p>
-
               </div>
 
               <div className="mt-8 grid gap-6">
@@ -940,12 +1073,15 @@ export default function OtherServicesAdminPage() {
 
                 <TextArea
                   label="CTA Description"
-                  value={service.cta_description}
+                  value={
+                    service.cta_description
+                  }
                   rows={4}
                   onChange={(value) =>
                     setService({
                       ...service,
-                      cta_description: value,
+                      cta_description:
+                        value,
                     })
                   }
                 />
@@ -956,7 +1092,7 @@ export default function OtherServicesAdminPage() {
                 type="button"
                 disabled={saving}
                 onClick={saveService}
-                className="mt-6 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold !text-white transition hover:bg-[#0b2a55] disabled:opacity-50"
+                className="mt-6 rounded-lg bg-[#061b3d] px-6 py-3 text-sm font-semibold !text-white disabled:opacity-50"
               >
                 {saving
                   ? "Saving..."
@@ -969,31 +1105,60 @@ export default function OtherServicesAdminPage() {
 
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
 
-              <div className="border-b border-slate-200 pb-6">
+              <div className="flex flex-col gap-5 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
 
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#18b8ee]">
-                  05 · Pricing
-                </p>
+                <div>
 
-                <h3 className="mt-2 text-2xl font-bold text-[#071d41]">
-                  Packages & Prices
-                </h3>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#18b8ee]">
+                    05 · Pricing
+                  </p>
 
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                  Manage the packages shown to visitors. Changes
-                  made here will eventually be reflected on the
-                  public service page once the public page is
-                  connected to the CMS.
-                </p>
+                  <h3 className="mt-2 text-2xl font-bold text-[#071d41]">
+                    Packages & Prices
+                  </h3>
+
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    Add, edit, publish or remove packages.
+                    Included services can be edited line by
+                    line.
+                  </p>
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addPackage}
+                  className="shrink-0 rounded-lg bg-[#18b8ee] px-5 py-3 text-sm font-semibold !text-white transition hover:bg-[#087dcc]"
+                >
+                  + Add Package
+                </button>
 
               </div>
 
               <div className="mt-8 space-y-6">
 
+                {packages.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-[#f8fafc] p-8 text-center">
+
+                    <p className="font-semibold text-[#071d41]">
+                      No packages configured.
+                    </p>
+
+                    <p className="mt-2 text-sm text-slate-500">
+                      Click “+ Add Package” to create
+                      the first package.
+                    </p>
+
+                  </div>
+                )}
+
                 {packages.map((pkg, index) => (
 
                   <div
-                    key={pkg.id ?? `new-package-${index}`}
+                    key={
+                      pkg.id ??
+                      `new-package-${index}`
+                    }
                     className="rounded-xl border border-slate-200 bg-[#f8fafc] p-5"
                   >
 
@@ -1004,6 +1169,16 @@ export default function OtherServicesAdminPage() {
                         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#168bc4]">
                           Package {index + 1}
                         </p>
+
+                        {pkg.id ? (
+                          <p className="mt-1 text-xs text-emerald-600">
+                            Saved package
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-xs font-semibold text-amber-600">
+                            New — not yet saved
+                          </p>
+                        )}
 
                       </div>
 
@@ -1022,7 +1197,7 @@ export default function OtherServicesAdminPage() {
                           className="h-4 w-4"
                         />
 
-                        Published
+                        Publish on website
 
                       </label>
 
@@ -1032,7 +1207,8 @@ export default function OtherServicesAdminPage() {
 
                       <Field
                         label={
-                          serviceType === "bookkeeping"
+                          serviceType ===
+                          "bookkeeping"
                             ? "Revenue Range"
                             : "Employee Range"
                         }
@@ -1046,11 +1222,14 @@ export default function OtherServicesAdminPage() {
                         }
                       />
 
-                      {serviceType === "bookkeeping" ? (
+                      {serviceType ===
+                      "bookkeeping" ? (
 
                         <Field
                           label="Monthly Price"
-                          value={pkg.price ?? ""}
+                          value={
+                            pkg.price ?? ""
+                          }
                           onChange={(value) =>
                             updatePackage(
                               index,
@@ -1065,7 +1244,9 @@ export default function OtherServicesAdminPage() {
                         <>
                           <Field
                             label="Fixed Fee"
-                            value={pkg.fixed_fee ?? ""}
+                            value={
+                              pkg.fixed_fee ?? ""
+                            }
                             onChange={(value) =>
                               updatePackage(
                                 index,
@@ -1078,7 +1259,8 @@ export default function OtherServicesAdminPage() {
                           <Field
                             label="Variable Fee"
                             value={
-                              pkg.variable_fee ?? ""
+                              pkg.variable_fee ??
+                              ""
                             }
                             onChange={(value) =>
                               updatePackage(
@@ -1091,7 +1273,9 @@ export default function OtherServicesAdminPage() {
 
                           <Field
                             label="Setup Fee"
-                            value={pkg.setup_fee ?? ""}
+                            value={
+                              pkg.setup_fee ?? ""
+                            }
                             onChange={(value) =>
                               updatePackage(
                                 index,
@@ -1105,6 +1289,7 @@ export default function OtherServicesAdminPage() {
                       )}
 
                       <div>
+
                         <label className="text-sm font-semibold text-[#071d41]">
                           Display Order
                         </label>
@@ -1112,7 +1297,9 @@ export default function OtherServicesAdminPage() {
                         <input
                           type="number"
                           min="1"
-                          value={pkg.display_order}
+                          value={
+                            pkg.display_order
+                          }
                           onChange={(event) =>
                             updatePackage(
                               index,
@@ -1124,6 +1311,7 @@ export default function OtherServicesAdminPage() {
                           }
                           className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#168bc4]"
                         />
+
                       </div>
 
                     </div>
@@ -1137,12 +1325,16 @@ export default function OtherServicesAdminPage() {
                       </label>
 
                       <p className="mt-1 text-xs text-slate-500">
-                        Enter one included service per line.
+                        Enter one service per line.
                       </p>
 
                       <textarea
-                        value={pkg.inclusions.join("\n")}
-                        rows={7}
+                        value={
+                          pkg.inclusions.join(
+                            "\n",
+                          )
+                        }
+                        rows={8}
                         onChange={(event) =>
                           updatePackage(
                             index,
@@ -1157,59 +1349,54 @@ export default function OtherServicesAdminPage() {
                           )
                         }
                         placeholder={
-                          serviceType === "payroll"
-                            ? "Example:\nMonthly payroll processing\nEmployee payslips\nLeave and deduction calculations"
-                            : "Enter one inclusion per line"
+                          serviceType ===
+                          "payroll"
+                            ? "Monthly Payroll Processing\nEmployee Master File Maintenance\nSalary Calculations\nElectronic Payslips"
+                            : "Bookkeeping\nAccounts Receivable\nAccounts Payable\nInventory Accounting"
                         }
                         className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#071d41] outline-none transition focus:border-[#168bc4]"
                       />
 
                     </div>
 
-                    {/* PAYROLL PRICING INFORMATION */}
+                    {/* ACTIONS */}
 
-                    {serviceType === "payroll" && (
-
-                      <div className="mt-5 rounded-lg border border-[#b9e8f7] bg-[#effbff] p-4">
-
-                        <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#087dcc]">
-                          Payroll pricing
-                        </p>
-
-                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                          Fixed fee, variable fee and setup fee
-                          are stored separately and can be edited
-                          independently.
-                        </p>
-
-                      </div>
-
-                    )}
-
-                    <div className="mt-5 flex flex-wrap gap-3">
+                    <div className="mt-6 flex flex-wrap gap-3">
 
                       <button
                         type="button"
-                        onClick={() =>
-                          savePackage(pkg)
+                        disabled={
+                          savingPackageIndex ===
+                          index
                         }
-                        className="rounded-lg bg-[#061b3d] px-5 py-2.5 text-sm font-semibold !text-white transition hover:bg-[#0b2a55]"
+                        onClick={() =>
+                          savePackage(
+                            pkg,
+                            index,
+                          )
+                        }
+                        className="rounded-lg bg-[#061b3d] px-5 py-3 text-sm font-semibold !text-white transition hover:bg-[#0b2a55] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Save Package
+                        {savingPackageIndex ===
+                        index
+                          ? "Publishing..."
+                          : pkg.id
+                            ? "Save Package"
+                            : "Publish Package"}
                       </button>
 
                       {pkg.id && (
-
                         <button
                           type="button"
                           onClick={() =>
-                            deletePackage(pkg.id!)
+                            deletePackage(
+                              pkg.id!,
+                            )
                           }
-                          className="rounded-lg border border-red-200 bg-white px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                          className="rounded-lg border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                         >
                           Delete Package
                         </button>
-
                       )}
 
                     </div>
@@ -1217,74 +1404,6 @@ export default function OtherServicesAdminPage() {
                   </div>
 
                 ))}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPackages([
-                      ...packages,
-                      {
-                        service_id: service.id,
-                        title: "",
-                        price:
-                          serviceType ===
-                          "bookkeeping"
-                            ? ""
-                            : null,
-                        fixed_fee:
-                          serviceType === "payroll"
-                            ? ""
-                            : null,
-                        variable_fee:
-                          serviceType === "payroll"
-                            ? ""
-                            : null,
-                        setup_fee:
-                          serviceType === "payroll"
-                            ? ""
-                            : null,
-                        inclusions: [],
-                        display_order:
-                          packages.length + 1,
-                        published: true,
-                      },
-                    ])
-                  }
-                  className="rounded-lg border border-[#168bc4] bg-white px-5 py-3 text-sm font-semibold text-[#168bc4] transition hover:bg-[#effbff]"
-                >
-                  + Add Package
-                </button>
-
-              </div>
-
-            </section>
-
-            {/* INFO */}
-
-            <section className="rounded-2xl border border-[#b9e8f7] bg-[#effbff] p-6">
-
-              <div className="flex gap-4">
-
-                <div className="mt-0.5 text-xl text-[#087dcc]">
-                  ⓘ
-                </div>
-
-                <div>
-
-                  <h4 className="font-bold text-[#071d41]">
-                    CMS-controlled Other Services
-                  </h4>
-
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    This administration area controls the
-                    Bookkeeping and Payroll service information
-                    stored in Supabase. Once the public pages are
-                    connected to this CMS, changes made here will
-                    appear on the CURA website without editing the
-                    page code.
-                  </p>
-
-                </div>
 
               </div>
 
@@ -1303,7 +1422,8 @@ export default function OtherServicesAdminPage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
 
           <p>
-            © {new Date().getFullYear()} CURA. All rights reserved.
+            © {new Date().getFullYear()} CURA.
+            All rights reserved.
           </p>
 
           <a
@@ -1332,6 +1452,7 @@ function Field({
 }) {
   return (
     <div>
+
       <label className="text-sm font-semibold text-[#071d41]">
         {label}
       </label>
@@ -1343,6 +1464,7 @@ function Field({
         }
         className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#071d41] outline-none transition focus:border-[#168bc4]"
       />
+
     </div>
   )
 }
@@ -1360,6 +1482,7 @@ function TextArea({
 }) {
   return (
     <div>
+
       <label className="text-sm font-semibold text-[#071d41]">
         {label}
       </label>
@@ -1372,6 +1495,7 @@ function TextArea({
         }
         className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#071d41] outline-none transition focus:border-[#168bc4]"
       />
+
     </div>
   )
 }
