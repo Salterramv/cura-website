@@ -288,7 +288,7 @@ export default function OtherServicesAdminPage() {
 
     if (!title) {
       setError(
-        "Please enter the revenue range or employee range before saving the package.",
+        "Please enter the revenue range or employee range before publishing the package.",
       )
       setSavingPackageIndex(null)
       return
@@ -297,6 +297,9 @@ export default function OtherServicesAdminPage() {
     const inclusions = pkg.inclusions
       .map((item) => item.trim())
       .filter(Boolean)
+
+    const displayOrder =
+      Number(pkg.display_order) || index + 1
 
     const payload = {
       service_id: pkg.service_id,
@@ -318,51 +321,57 @@ export default function OtherServicesAdminPage() {
           ? pkg.setup_fee?.trim() || null
           : null,
       inclusions,
-      display_order:
-        Number(pkg.display_order) || index + 1,
+      display_order: displayOrder,
       published: Boolean(pkg.published),
     }
 
     try {
-      let result
-
       if (pkg.id) {
-        result = await supabase
+        const { error } = await supabase
           .from("other_service_packages")
           .update(payload)
           .eq("id", pkg.id)
-          .select()
-          .single()
+
+        if (error) {
+          throw new Error(
+            `Unable to save package: ${error.message}`,
+          )
+        }
+
+        setMessage(
+          payload.published
+            ? "Package published successfully."
+            : "Package saved as draft.",
+        )
       } else {
-        result = await supabase
+        const { error } = await supabase
           .from("other_service_packages")
           .insert(payload)
-          .select()
-          .single()
-      }
 
-      if (result.error) {
-        throw new Error(result.error.message)
-      }
+        if (error) {
+          throw new Error(
+            `Unable to publish new package: ${error.message}`,
+          )
+        }
 
-      if (!result.data) {
-        throw new Error(
-          "Supabase did not return the saved package.",
+        setMessage(
+          payload.published
+            ? "New package published successfully."
+            : "New package saved as draft.",
         )
       }
 
-      setMessage(
-        payload.published
-          ? "Package published successfully."
-          : "Package saved as draft.",
-      )
-
       await loadService()
     } catch (err) {
+      console.error(
+        "Other Services package save error:",
+        err,
+      )
+
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to save the package.",
+          : "Unable to save the package. Please try again.",
       )
     } finally {
       setSavingPackageIndex(null)
