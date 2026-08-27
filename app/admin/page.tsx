@@ -46,6 +46,15 @@ const sections = [
     icon: "↔",
   },
   {
+    title: "Other Services",
+    description:
+      "Manage CURA bookkeeping and payroll services, packages, prices and service content.",
+    href: "/admin/other-services",
+    label: "Manage Other Services",
+    status: "Available",
+    icon: "◆",
+  },
+  {
     title: "Money Exchangers",
     description:
       "Add, edit and manage authorized money exchangers displayed on CURA.",
