@@ -174,7 +174,7 @@ export default function ExchangeRatePage() {
       <CuraHeader />
 
       <main className="min-h-screen bg-[#f4f7fb] text-[#071d41]">
-      <CuraHeader />
+      
 
       {/* HERO */}
       <section className="border-b border-[#164a73] bg-gradient-to-r from-[#061b3a] to-[#0f4f7a] text-white">
@@ -478,90 +478,7 @@ export default function ExchangeRatePage() {
           </>
         )}
       </section>
-      {/* CURA FOOTER */}
-<footer className="bg-[#071B49] text-white">
-  <div className="mx-auto max-w-7xl px-6 py-12 md:px-10 lg:px-12">
 
-    <div className="grid gap-10 md:grid-cols-4">
-
-      {/* BRAND */}
-      <div>
-        <img
-          src="/cura-logo.png"
-          alt="CURA - Audit Tax Advisory"
-          className="h-16 w-auto object-contain brightness-0 invert"
-        />
-
-        <p className="mt-4 max-w-xs text-sm leading-6 text-slate-300">
-          Professional knowledge and information in taxation,
-          accounting, audit, advisory and law.
-        </p>
-      </div>
-
-      {/* KNOWLEDGE */}
-      <div>
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#18b8ee]">
-          Knowledge
-        </h3>
-
-        <div className="space-y-3 text-sm text-slate-300">
-          <a href="/#knowledge" className="block hover:text-white">
-            Knowledge
-          </a>
-
-          <a href="/#legal-cases" className="block hover:text-white">
-            Legal Cases
-          </a>
-
-          <a href="/#updates" className="block hover:text-white">
-            Tax Updates
-          </a>
-        </div>
-      </div>
-
-      {/* EDUCATION */}
-      <div>
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#18b8ee]">
-          Education
-        </h3>
-
-        <div className="space-y-3 text-sm text-slate-300">
-          <a href="/#education" className="block hover:text-white">
-            Education
-          </a>
-
-          <a href="/exchange-rate" className="block hover:text-white">
-            Exchange Rates
-          </a>
-        </div>
-      </div>
-
-      {/* CONTACT */}
-      <div>
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#18b8ee]">
-          Contact
-        </h3>
-
-        <a
-          href="/#contact"
-          className="text-sm text-slate-300 hover:text-white"
-        >
-          Contact CURA
-        </a>
-
-        <p className="mt-3 text-sm text-slate-300">
-          Maldives
-        </p>
-      </div>
-
-    </div>
-
-    <div className="mt-12 border-t border-white/10 pt-6 text-xs text-slate-400">
-      © {new Date().getFullYear()} CURA. All rights reserved.
-    </div>
-
-  </div>
-</footer>
     </main>
 
       <CuraFooter />
