@@ -119,6 +119,8 @@ function isHiddenSourceMetadata(value: string) {
 
 function cleanSourceText(value: string) {
   return value
+    .replace(/\\n/g, "\n")
+    .replace(/\\u00a0/g, " ")
     .replace(/\u00a0/g, " ")
     .split(/\r?\n/)
     .map((line) => line.trimEnd())
@@ -613,12 +615,27 @@ function SourceParagraph({
   const isNumbered =
     paragraph.numbered === true
 
+  const rawAlignment =
+    String(paragraph.alignment || "")
+      .trim()
+      .toLowerCase()
+
+  const isJustified =
+    rawAlignment === "justify" ||
+    rawAlignment === "justified" ||
+    rawAlignment === "both" ||
+    rawAlignment === "full"
+
   const alignment =
-    paragraph.alignment === "center"
+    rawAlignment === "center"
       ? "text-center"
-      : paragraph.alignment === "right"
+      : rawAlignment === "right"
         ? "text-right"
-        : "text-left"
+        : rawAlignment === "left"
+          ? "text-left"
+          : isJustified
+            ? "text-justify"
+            : "text-left"
 
   /*
    * IMPORTANT:
@@ -631,7 +648,7 @@ function SourceParagraph({
   if (isBullet) {
     return (
       <div
-        className={`relative py-1 ${alignment}`}
+        className={`relative py-1 ${alignment} ${isJustified ? "text-justify [text-justify:inter-word]" : ""}`}
         style={{
           paddingLeft: `${indentation + 28}px`,
         }}
@@ -653,7 +670,7 @@ function SourceParagraph({
   if (isNumbered) {
     return (
       <div
-        className={`py-1 ${alignment}`}
+        className={`py-1 ${alignment} ${isJustified ? "text-justify [text-justify:inter-word]" : ""}`}
         style={{
           paddingLeft: `${indentation}px`,
         }}
@@ -667,7 +684,7 @@ function SourceParagraph({
 
   return (
     <div
-      className={`whitespace-pre-wrap break-words py-1 text-base leading-8 text-[#102A5F] ${alignment}`}
+      className={`whitespace-pre-wrap break-words py-1 text-base leading-8 text-[#102A5F] ${alignment} ${isJustified ? "text-justify [text-justify:inter-word]" : ""}`}
       style={{
         paddingLeft: `${indentation}px`,
       }}
@@ -719,8 +736,27 @@ function SourceTable({
 }: {
   table: EducationTable
 }) {
-  const columns = normalizeTableColumns(table.columns)
-  const rows = normalizeTableRows(table.rows)
+  let columns =
+    normalizeTableColumns(
+      table.columns
+    )
+
+  const rows =
+    normalizeTableRows(
+      table.rows
+    )
+
+  /*
+   * Some imported source tables store the first
+   * row as the header and leave columns empty.
+   */
+  if (
+    columns.length === 0 &&
+    rows.length > 0
+  ) {
+    columns = rows[0]
+    rows.shift()
+  }
 
   if (rows.length === 0) {
     return null
@@ -980,10 +1016,11 @@ function SourceTableBlock({
    ============================================================ */
 
 function renderLegacyItems(
-  items: Item[]
+  items: Item[],
+  mode: "bullet" | "numbered" | "plain" = "plain"
 ) {
-  const validItems = items.filter(
-    (item) => {
+  const validItems = items
+    .filter((item) => {
       const text = cleanSourceText(
         item.content || ""
       )
@@ -994,25 +1031,90 @@ function renderLegacyItems(
         !isPictureLabel(text) &&
         !isIllustrationLabel(text)
       )
-    }
-  )
+    })
+    .sort(
+      (a, b) =>
+        a.display_order -
+        b.display_order
+    )
 
   if (validItems.length === 0) {
     return null
   }
 
+  if (mode === "plain") {
+    return (
+      <div className="space-y-2">
+        {validItems.map((item) => (
+          <div
+            key={item.id}
+            className="whitespace-pre-wrap break-words py-1 text-base leading-8 text-[#102A5F]"
+          >
+            {cleanSourceText(
+              item.content
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-2">
-      {validItems.map((item) => (
-        <div
-          key={item.id}
-          className="whitespace-pre-wrap break-words py-1 text-base leading-8 text-[#102A5F]"
-        >
-          {cleanSourceText(
-            item.content
-          )}
-        </div>
-      ))}
+    <div
+      className={
+        mode === "numbered"
+          ? "space-y-2"
+          : "space-y-2"
+      }
+    >
+      {validItems.map(
+        (item, index) => {
+          const isSubitem =
+            item.item_type ===
+            "subitem"
+
+          const indent =
+            isSubitem
+              ? "ml-7"
+              : ""
+
+          if (
+            mode === "numbered"
+          ) {
+            return (
+              <div
+                key={item.id}
+                className={`flex gap-3 py-1 text-base leading-8 text-[#102A5F] ${indent}`}
+              >
+                <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-[#E7F5FB] text-xs font-bold text-[#145D8F]">
+                  {index + 1}
+                </span>
+
+                <div className="min-w-0 whitespace-pre-wrap break-words">
+                  {cleanSourceText(
+                    item.content
+                  )}
+                </div>
+              </div>
+            )
+          }
+
+          return (
+            <div
+              key={item.id}
+              className={`relative py-1 pl-7 text-base leading-8 text-[#102A5F] ${indent}`}
+            >
+              <span className="absolute left-1 top-[15px] h-2 w-2 rounded-full bg-[#24B8ED]" />
+
+              <div className="whitespace-pre-wrap break-words">
+                {cleanSourceText(
+                  item.content
+                )}
+              </div>
+            </div>
+          )
+        }
+      )}
     </div>
   )
 }
@@ -1020,6 +1122,7 @@ function renderLegacyItems(
 /* ============================================================
    BLOCK RENDERER
    ============================================================ */
+
 
 function RenderSourceBlock({
   contentBlock,
@@ -1043,26 +1146,78 @@ function RenderSourceBlock({
    * be treated as ordinary source text.
    */
   /*
-   * Original source illustrations are retained in Supabase
-   * but are NOT displayed on the public CURA accounting page.
+   * SOURCE ILLUSTRATIONS
    *
-   * The section-level CURA illustration is rendered above the
-   * lesson content from section.presentation.cura_visual.
+   * The source asset is already attached to this exact
+   * content block in Supabase.
+   *
+   * Render it inside the CURA visual treatment.
+   *
+   * We do NOT create an illustration merely because a
+   * section has text. The existence of the source asset
+   * is the trigger.
    */
   if (
     blockType === "image" ||
     blockType === "figure" ||
     blockType === "illustration"
   ) {
-    return null
+    return (
+      <SourceFigureBlock
+        block={block}
+        assets={assets}
+      />
+    )
   }
 
-  if (blockType === "table" && tables.length > 0) {
+  if (
+    blockType === "table" &&
+    tables.length > 0
+  ) {
     return (
       <SourceTableBlock
         block={block}
         tables={tables}
       />
+    )
+  }
+
+  /*
+   * Dedicated source list blocks are stored in Supabase
+   * as education_block_items.
+   *
+   * Do not rely on presentation.paragraphs for these.
+   */
+  if (
+    blockType === "bullet_list" ||
+    blockType === "numbered_list"
+  ) {
+    return (
+      <div className="my-4">
+        {block.title &&
+          !isHiddenSourceMetadata(
+            block.title
+          ) &&
+          !isPictureLabel(
+            block.title
+          ) &&
+          !isIllustrationLabel(
+            block.title
+          ) && (
+            <h3 className="mb-3 text-lg font-semibold leading-7 text-[#071B49]">
+              {cleanSourceText(
+                block.title
+              )}
+            </h3>
+          )}
+
+        {renderLegacyItems(
+          items,
+          blockType === "numbered_list"
+            ? "numbered"
+            : "bullet"
+        )}
+      </div>
     )
   }
 
