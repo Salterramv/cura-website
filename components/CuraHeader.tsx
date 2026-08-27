@@ -240,6 +240,20 @@ export default function CuraHeader() {
                     </span>
                   </Link>
 
+                  <Link
+                    href="/other-services"
+                    onClick={() => setServicesOpen(false)}
+                    className="block rounded-lg px-4 py-3 transition hover:bg-[#F1F7FB]"
+                  >
+                    <span className="font-semibold text-[#071B49]">
+                      Other Services
+                    </span>
+
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      Bookkeeping and payroll services
+                    </span>
+                  </Link>
+
                 </div>
               )}
             </div>
