@@ -78,7 +78,7 @@ export default function OtherServicesPage() {
 
             <a
               href="#contact"
-              className="rounded-md border border-white/30 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              className="rounded-md border border-white/40 bg-transparent px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10 hover:text-white" style={{ color: "#FFFFFF" }}
             >
               Discuss your requirements
             </a>
@@ -296,7 +296,7 @@ export default function OtherServicesPage() {
 
                 <Link
                   href="/other-services/bookkeeping#enquiry"
-                  className="flex items-center justify-between rounded-lg bg-[#071B49] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#168BC4]"
+                  className="flex items-center justify-between rounded-lg bg-[#071B49] px-5 py-4 text-sm font-semibold transition hover:bg-[#168BC4] hover:text-white" style={{ color: "#FFFFFF" }}
                 >
                   Bookkeeping enquiry
                   <span>→</span>
