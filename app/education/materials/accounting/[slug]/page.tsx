@@ -289,7 +289,7 @@ function isFirstSlideLecturerName(value: string) {
   }
 
   /*
-   * Lecturer names in the imported cover are normally all caps.
+   * Imported lecturer names are normally all-caps.
    */
   if (text !== text.toUpperCase()) {
     return false
@@ -307,43 +307,51 @@ function isFirstSlideLecturerName(value: string) {
   }
 
   /*
-   * Do not treat obvious educational headings as names.
+   * Do not treat accounting headings as lecturer names.
    */
   const excludedWords = new Set([
-    "scope",
-    "definitions",
-    "objective",
-    "objectives",
-    "recognition",
-    "measurement",
-    "presentation",
-    "accounting",
-    "agriculture",
-    "assets",
-    "liabilities",
-    "equity",
-    "revenue",
-    "expenses",
-    "examples",
-    "example",
-    "illustration",
-    "illustrations",
-    "introduction",
-    "conclusion",
-    "summary",
-    "background",
-    "government",
-    "grants",
-    "biological",
-    "produce",
-    "harvest",
-    "inventory",
-    "inventories",
-    "fair",
-    "value",
+    "SCOPE",
+    "DEFINITIONS",
+    "OBJECTIVE",
+    "OBJECTIVES",
+    "RECOGNITION",
+    "MEASUREMENT",
+    "PRESENTATION",
+    "ACCOUNTING",
+    "AGRICULTURE",
+    "ASSETS",
+    "LIABILITIES",
+    "EQUITY",
+    "REVENUE",
+    "EXPENSES",
+    "EXAMPLES",
+    "EXAMPLE",
+    "ILLUSTRATION",
+    "ILLUSTRATIONS",
+    "INTRODUCTION",
+    "CONCLUSION",
+    "SUMMARY",
+    "BACKGROUND",
+    "GOVERNMENT",
+    "GRANTS",
+    "BIOLOGICAL",
+    "PRODUCE",
+    "HARVEST",
+    "INVENTORY",
+    "INVENTORIES",
+    "FAIR",
+    "VALUE",
+    "CURRENT",
+    "NONCURRENT",
+    "NON-CURRENT",
+    "STATEMENT",
+    "STATEMENTS",
+    "FINANCIAL",
+    "CONSOLIDATED",
+    "CONSOLIDATION",
   ])
 
-  const words = text.toLowerCase().split(/\s+/)
+  const words = text.split(/\s+/)
 
   return !words.some((word) =>
     excludedWords.has(word)
@@ -1950,18 +1958,24 @@ export default function AccountingTopicPage() {
          *
          * The rest of the lesson is left untouched.
          */
-        const firstBlockId =
-          entry.blocks[0]?.block.id
-
         const processedBlocks =
-          entry.blocks.map(
-            (contentBlock) => {
-              const block =
-                contentBlock.block
+  entry.blocks.map(
+    (contentBlock) => {
+      const block = contentBlock.block
 
-              const isFirstCoverBlock =
-                sectionIndex === 0 &&
-                block.id === firstBlockId
+      /*
+       * The first section is the imported source cover.
+       *
+       * Lecturer names, lecturer labels and qualifications
+       * can appear in different blocks/paragraphs depending
+       * on how the source material was imported.
+       *
+       * Therefore we clean the entire first section, not
+       * merely its first block.
+       */
+      const isFirstCoverSection =
+        sectionIndex === 0
+
 
               const presentation =
                 getPresentation(block)
@@ -1994,7 +2008,7 @@ export default function AccountingTopicPage() {
                          * cover block.
                          */
                         if (
-                          isFirstCoverBlock &&
+                          isFirstCoverSection &&
                           isFirstSlideLecturerName(
                             cleanedText
                           )
@@ -2039,7 +2053,7 @@ export default function AccountingTopicPage() {
                   block: {
                     ...block,
                     title:
-                      isFirstCoverBlock &&
+                      isFirstCoverSection &&
                       isFirstSlideLecturerName(
                         block.title || ""
                       )
@@ -2104,7 +2118,7 @@ export default function AccountingTopicPage() {
                       }
 
                       if (
-                        isFirstCoverBlock &&
+                        isFirstCoverSection &&
                         isFirstSlideLecturerName(
                           text
                         )
@@ -2121,14 +2135,14 @@ export default function AccountingTopicPage() {
                 block: {
                   ...block,
                   title:
-                    isFirstCoverBlock &&
+                    isFirstCoverSection &&
                     isFirstSlideLecturerName(
                       cleanedTitle
                     )
                       ? ""
                       : cleanedTitle,
                   content:
-                    isFirstCoverBlock &&
+                    isFirstCoverSection &&
                     isFirstSlideLecturerName(
                       cleanedContent
                     )
