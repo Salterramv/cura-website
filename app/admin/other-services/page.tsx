@@ -1128,40 +1128,45 @@ export default function OtherServicesAdminPage() {
 
                     </div>
 
-                    {serviceType === "bookkeeping" && (
+                    {/* INCLUDED SERVICES */}
 
-                      <div className="mt-5">
+                    <div className="mt-5">
 
-                        <label className="text-sm font-semibold text-[#071d41]">
-                          Included Services
-                        </label>
+                      <label className="text-sm font-semibold text-[#071d41]">
+                        Included Services
+                      </label>
 
-                        <p className="mt-1 text-xs text-slate-500">
-                          Enter one inclusion per line.
-                        </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Enter one included service per line.
+                      </p>
 
-                        <textarea
-                          value={pkg.inclusions.join("\n")}
-                          rows={7}
-                          onChange={(event) =>
-                            updatePackage(
-                              index,
-                              "inclusions",
-                              event.target.value
-                                .split("\n")
-                                .map(
-                                  (item) =>
-                                    item.trim(),
-                                )
-                                .filter(Boolean),
-                            )
-                          }
-                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#168bc4]"
-                        />
+                      <textarea
+                        value={pkg.inclusions.join("\n")}
+                        rows={7}
+                        onChange={(event) =>
+                          updatePackage(
+                            index,
+                            "inclusions",
+                            event.target.value
+                              .split("\n")
+                              .map(
+                                (item) =>
+                                  item.trim(),
+                              )
+                              .filter(Boolean),
+                          )
+                        }
+                        placeholder={
+                          serviceType === "payroll"
+                            ? "Example:\nMonthly payroll processing\nEmployee payslips\nLeave and deduction calculations"
+                            : "Enter one inclusion per line"
+                        }
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-[#071d41] outline-none transition focus:border-[#168bc4]"
+                      />
 
-                      </div>
+                    </div>
 
-                    )}
+                    {/* PAYROLL PRICING INFORMATION */}
 
                     {serviceType === "payroll" && (
 
@@ -1173,8 +1178,8 @@ export default function OtherServicesAdminPage() {
 
                         <p className="mt-2 text-sm leading-6 text-slate-600">
                           Fixed fee, variable fee and setup fee
-                          are stored separately so each can be
-                          edited independently.
+                          are stored separately and can be edited
+                          independently.
                         </p>
 
                       </div>
