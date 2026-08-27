@@ -375,11 +375,1095 @@ const visuals: Array<{
   },
 ]
 
-function pickVisual(topicTitle: string): VisualDefinition {
-  const value = topicTitle.toLowerCase()
+function pickVisual(
+  topicTitle: string,
+  sectionTitle = ""
+): VisualDefinition {
+  const topic = topicTitle.toLowerCase()
+  const section = sectionTitle.toLowerCase()
 
+  /*
+   * ==========================================================
+   * SECTION-SPECIFIC VISUALS
+   * ==========================================================
+   *
+   * These are deliberately checked BEFORE topic-level visuals.
+   * This means, for example, that:
+   *
+   * Agriculture
+   *   → Biological Assets
+   *   → Initial Measurement
+   *   → Subsequent Measurement
+   *   → Agricultural Produce
+   *
+   * can each receive a different visual treatment.
+   */
+
+  const sectionVisuals: Array<{
+    match: string[]
+    visual: VisualDefinition
+  }> = [
+    /* --------------------------------------------------------
+       AGRICULTURE
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "scope of ias 41",
+        "scope of agriculture",
+        "scope",
+      ],
+      visual: {
+        kind: "framework",
+        eyebrow: "Start with scope",
+        title: "Which assets fall within IAS 41?",
+        nodes: [
+          "Biological assets",
+          "Agricultural produce",
+          "Bearer plants",
+          "Excluded assets",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "biological assets: initial measurement",
+        "biological assets initial measurement",
+        "initial measurement",
+      ],
+      visual: {
+        kind: "fair-value",
+        eyebrow: "Measure at recognition",
+        title: "Initial measurement of a biological asset",
+        nodes: [
+          "Recognise",
+          "Fair value",
+          "Costs to sell",
+          "Initial gain/loss",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "biological assets: subsequent measurement",
+        "biological assets subsequent measurement",
+        "subsequent measurement",
+      ],
+      visual: {
+        kind: "agriculture",
+        eyebrow: "Track biological change",
+        title: "How biological assets change after recognition",
+        nodes: [
+          "Opening value",
+          "Growth",
+          "Price movement",
+          "Costs to sell",
+          "Closing value",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "agricultural produce",
+        "produce at harvest",
+        "harvest",
+      ],
+      visual: {
+        kind: "agriculture",
+        eyebrow: "Harvest creates a measurement point",
+        title: "From biological asset to agricultural produce",
+        nodes: [
+          "Biological asset",
+          "Harvest",
+          "Fair value",
+          "Produce",
+          "Inventory",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "bearer plants",
+      ],
+      visual: {
+        kind: "ppe",
+        eyebrow: "Separate the accounting",
+        title: "Bearer plants follow PPE accounting",
+        nodes: [
+          "Bearer plant",
+          "Recognition",
+          "Depreciation",
+          "Impairment",
+          "Produce",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "government grants & biological assets",
+        "government grants",
+      ],
+      visual: {
+        kind: "government-grants",
+        eyebrow: "Connect support with conditions",
+        title: "Government grants related to biological assets",
+        nodes: [
+          "Grant",
+          "Conditions",
+          "Reasonable assurance",
+          "Recognition",
+          "Disclosure",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       LEASES
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "lease definition",
+        "identifying a lease",
+        "identify a lease",
+        "what is a lease",
+      ],
+      visual: {
+        kind: "leases",
+        eyebrow: "Identify the contract",
+        title: "Does the contract contain a lease?",
+        nodes: [
+          "Identified asset",
+          "Right to control",
+          "Economic benefits",
+          "Decision",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "right-of-use asset",
+        "rou asset",
+        "initial measurement of the right",
+      ],
+      visual: {
+        kind: "leases",
+        eyebrow: "Recognise the right",
+        title: "Building the right-of-use asset",
+        nodes: [
+          "Lease liability",
+          "Initial costs",
+          "Prepayments",
+          "Incentives",
+          "ROU asset",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "lease liability",
+        "initial measurement of lease liability",
+      ],
+      visual: {
+        kind: "financial",
+        eyebrow: "Measure the obligation",
+        title: "From future payments to lease liability",
+        nodes: [
+          "Lease payments",
+          "Discount rate",
+          "Present value",
+          "Liability",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "subsequent measurement of lease",
+        "subsequent measurement",
+        "depreciation and interest",
+      ],
+      visual: {
+        kind: "leases",
+        eyebrow: "Account over the lease term",
+        title: "Interest, depreciation and liability reduction",
+        nodes: [
+          "Opening liability",
+          "Interest",
+          "Payment",
+          "Closing liability",
+          "Depreciation",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "lease modification",
+        "modifications",
+      ],
+      visual: {
+        kind: "transition",
+        eyebrow: "The contract changes",
+        title: "How a lease modification changes the accounting",
+        nodes: [
+          "Original lease",
+          "Modification",
+          "Reassess",
+          "Remeasure",
+          "Adjust",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       REVENUE
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "identify the contract",
+        "contract identification",
+        "identify contract",
+      ],
+      visual: {
+        kind: "revenue",
+        eyebrow: "Step 1",
+        title: "Identify the customer contract",
+        nodes: [
+          "Parties",
+          "Rights",
+          "Payment terms",
+          "Commercial substance",
+          "Contract",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "performance obligations",
+        "identify performance",
+      ],
+      visual: {
+        kind: "revenue",
+        eyebrow: "Step 2",
+        title: "Separate the promises in the contract",
+        nodes: [
+          "Promise",
+          "Distinct?",
+          "Performance obligation",
+          "Transfer",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "transaction price",
+        "variable consideration",
+      ],
+      visual: {
+        kind: "measurement",
+        eyebrow: "Step 3",
+        title: "Determine the transaction price",
+        nodes: [
+          "Fixed amount",
+          "Variable amount",
+          "Financing",
+          "Consideration",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "allocate transaction price",
+        "allocation",
+      ],
+      visual: {
+        kind: "revenue",
+        eyebrow: "Step 4",
+        title: "Allocate consideration to performance obligations",
+        nodes: [
+          "Transaction price",
+          "Standalone prices",
+          "Relative allocation",
+          "Obligations",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "recognise revenue",
+        "revenue recognition",
+        "over time",
+        "point in time",
+      ],
+      visual: {
+        kind: "revenue",
+        eyebrow: "Step 5",
+        title: "Recognise revenue when control transfers",
+        nodes: [
+          "Control",
+          "Point in time",
+          "Over time",
+          "Revenue",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       CONSOLIDATION
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "control",
+        "assessment of control",
+      ],
+      visual: {
+        kind: "consolidation",
+        eyebrow: "Start with control",
+        title: "Does the investor control the investee?",
+        nodes: [
+          "Power",
+          "Variable returns",
+          "Linkage",
+          "Control",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "goodwill",
+        "goodwill calculation",
+        "goodwill impairment",
+      ],
+      visual: {
+        kind: "consolidation",
+        eyebrow: "Acquisition analysis",
+        title: "From consideration to goodwill",
+        nodes: [
+          "Consideration",
+          "NCI",
+          "Net assets",
+          "Fair value",
+          "Goodwill",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "non-controlling interest",
+        "nci",
+      ],
+      visual: {
+        kind: "consolidation",
+        eyebrow: "Allocate ownership",
+        title: "Separating parent ownership from NCI",
+        nodes: [
+          "Subsidiary",
+          "Parent",
+          "NCI",
+          "Profit",
+          "Net assets",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "intra-group",
+        "intragroup",
+        "unrealised profit",
+      ],
+      visual: {
+        kind: "consolidation",
+        eyebrow: "Remove internal group effects",
+        title: "Eliminate transactions within the group",
+        nodes: [
+          "Internal sale",
+          "Balance",
+          "Unrealised profit",
+          "Eliminate",
+          "Group",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "consolidated statement of financial position",
+        "group statement of financial position",
+      ],
+      visual: {
+        kind: "consolidated-position",
+        eyebrow: "Combine financial position",
+        title: "Building the consolidated statement of financial position",
+        nodes: [
+          "Parent",
+          "Subsidiary",
+          "Adjust",
+          "Eliminate",
+          "Group",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "consolidated statement of profit or loss",
+        "group profit",
+      ],
+      visual: {
+        kind: "consolidated-profit",
+        eyebrow: "Combine performance",
+        title: "Building consolidated profit or loss",
+        nodes: [
+          "Revenue",
+          "Expenses",
+          "Adjustments",
+          "NCI",
+          "Group profit",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       IMPAIRMENT
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "indicators of impairment",
+        "impairment indicator",
+      ],
+      visual: {
+        kind: "impairment",
+        eyebrow: "Look for warning signs",
+        title: "When should an asset be tested?",
+        nodes: [
+          "External indicator",
+          "Internal indicator",
+          "Test",
+          "Recoverable amount",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "recoverable amount",
+        "value in use",
+        "fair value less costs",
+      ],
+      visual: {
+        kind: "impairment",
+        eyebrow: "Measure recoverable amount",
+        title: "Compare carrying amount with recoverable amount",
+        nodes: [
+          "Carrying amount",
+          "FVLCD",
+          "Value in use",
+          "Higher amount",
+          "Recoverable amount",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "cash-generating unit",
+        "cgu",
+      ],
+      visual: {
+        kind: "impairment",
+        eyebrow: "Test the right unit",
+        title: "Impairment testing at CGU level",
+        nodes: [
+          "Assets",
+          "CGU",
+          "Recoverable amount",
+          "Compare",
+          "Loss",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       FINANCIAL INSTRUMENTS
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "classification",
+        "business model",
+        "contractual cash flows",
+      ],
+      visual: {
+        kind: "financial",
+        eyebrow: "Classify before measuring",
+        title: "How financial assets are classified",
+        nodes: [
+          "Business model",
+          "Cash flows",
+          "SPPI",
+          "Classification",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "amortised cost",
+        "effective interest",
+      ],
+      visual: {
+        kind: "financial",
+        eyebrow: "Measure through time",
+        title: "Amortised cost and effective interest",
+        nodes: [
+          "Initial value",
+          "Effective rate",
+          "Interest",
+          "Cash flows",
+          "Closing value",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "expected credit loss",
+        "impairment of financial assets",
+      ],
+      visual: {
+        kind: "impairment",
+        eyebrow: "Recognise expected losses",
+        title: "Expected credit loss model",
+        nodes: [
+          "Exposure",
+          "Credit risk",
+          "Expected loss",
+          "Allowance",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       INVENTORY
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "cost of inventories",
+        "inventory cost",
+        "cost components",
+      ],
+      visual: {
+        kind: "inventory",
+        eyebrow: "Build the cost",
+        title: "What belongs in inventory cost?",
+        nodes: [
+          "Purchase",
+          "Conversion",
+          "Other costs",
+          "Inventory cost",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "net realisable value",
+        "nrv",
+        "write-down",
+      ],
+      visual: {
+        kind: "inventory",
+        eyebrow: "Apply the lower-of test",
+        title: "Cost versus net realisable value",
+        nodes: [
+          "Cost",
+          "NRV",
+          "Compare",
+          "Write-down",
+          "Closing inventory",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       PPE
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "recognition of property",
+        "initial recognition",
+        "initial cost",
+      ],
+      visual: {
+        kind: "ppe",
+        eyebrow: "Bring the asset into the accounts",
+        title: "What forms part of PPE cost?",
+        nodes: [
+          "Purchase",
+          "Direct costs",
+          "Installation",
+          "Ready for use",
+          "PPE",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "component accounting",
+        "significant parts",
+      ],
+      visual: {
+        kind: "ppe",
+        eyebrow: "Account for significant components",
+        title: "One asset can contain several depreciation components",
+        nodes: [
+          "Whole asset",
+          "Component A",
+          "Component B",
+          "Useful lives",
+          "Depreciation",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "depreciation",
+        "useful life",
+        "residual value",
+      ],
+      visual: {
+        kind: "ppe",
+        eyebrow: "Allocate depreciable amount",
+        title: "Depreciation follows the asset's useful life",
+        nodes: [
+          "Cost",
+          "Residual value",
+          "Useful life",
+          "Depreciation",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       TAXATION
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "current tax",
+        "current taxation",
+        "taxable profit",
+      ],
+      visual: {
+        kind: "taxation",
+        eyebrow: "Start with taxable profit",
+        title: "From accounting profit to current tax",
+        nodes: [
+          "Accounting profit",
+          "Tax adjustments",
+          "Taxable profit",
+          "Current tax",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "temporary differences",
+        "tax base",
+        "deferred tax",
+      ],
+      visual: {
+        kind: "taxation",
+        eyebrow: "Look beyond the current period",
+        title: "From carrying amount to deferred tax",
+        nodes: [
+          "Carrying amount",
+          "Tax base",
+          "Temporary difference",
+          "Deferred tax",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "deferred tax asset",
+        "deferred tax liability",
+      ],
+      visual: {
+        kind: "taxation",
+        eyebrow: "Recognise future tax effects",
+        title: "Deferred tax assets and liabilities",
+        nodes: [
+          "Temporary difference",
+          "Tax consequence",
+          "Asset",
+          "Liability",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       CASH FLOWS
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "operating activities",
+      ],
+      visual: {
+        kind: "cash-flow",
+        eyebrow: "Cash from the business",
+        title: "Operating cash flows",
+        nodes: [
+          "Customers",
+          "Suppliers",
+          "Employees",
+          "Operating cash",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "investing activities",
+      ],
+      visual: {
+        kind: "cash-flow",
+        eyebrow: "Cash invested in resources",
+        title: "Investing cash flows",
+        nodes: [
+          "PPE",
+          "Investments",
+          "Acquisitions",
+          "Investing cash",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "financing activities",
+      ],
+      visual: {
+        kind: "cash-flow",
+        eyebrow: "Cash from capital providers",
+        title: "Financing cash flows",
+        nodes: [
+          "Borrowing",
+          "Equity",
+          "Repayment",
+          "Dividends",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       FAIR VALUE
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "fair value hierarchy",
+        "level 1",
+        "level 2",
+        "level 3",
+      ],
+      visual: {
+        kind: "fair-value",
+        eyebrow: "Assess the inputs",
+        title: "The fair value hierarchy",
+        nodes: [
+          "Level 1",
+          "Level 2",
+          "Level 3",
+          "Disclosure",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "valuation techniques",
+        "market approach",
+        "income approach",
+        "cost approach",
+      ],
+      visual: {
+        kind: "fair-value",
+        eyebrow: "Choose the valuation approach",
+        title: "How fair value is estimated",
+        nodes: [
+          "Market",
+          "Income",
+          "Cost",
+          "Valuation",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       EPS
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "basic eps",
+        "basic earnings per share",
+      ],
+      visual: {
+        kind: "eps",
+        eyebrow: "Start with attributable profit",
+        title: "Calculating basic EPS",
+        nodes: [
+          "Profit",
+          "Ordinary shareholders",
+          "Weighted shares",
+          "Basic EPS",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "diluted eps",
+        "dilution",
+        "convertible",
+      ],
+      visual: {
+        kind: "eps",
+        eyebrow: "Consider potential dilution",
+        title: "From basic EPS to diluted EPS",
+        nodes: [
+          "Basic EPS",
+          "Potential shares",
+          "Dilution",
+          "Diluted EPS",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       INTANGIBLES
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "research",
+        "development",
+      ],
+      visual: {
+        kind: "intangible",
+        eyebrow: "Separate research from development",
+        title: "When internally generated expenditure becomes an asset",
+        nodes: [
+          "Research",
+          "Development",
+          "Criteria",
+          "Recognition",
+          "Amortisation",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "useful life",
+        "amortisation",
+      ],
+      visual: {
+        kind: "intangible",
+        eyebrow: "Allocate the intangible asset",
+        title: "Amortisation over useful life",
+        nodes: [
+          "Cost",
+          "Useful life",
+          "Amortisation",
+          "Carrying amount",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       INVESTMENT PROPERTY
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "classification of investment property",
+        "classification",
+        "owner occupied",
+      ],
+      visual: {
+        kind: "investment-property",
+        eyebrow: "Purpose determines classification",
+        title: "Is the property investment property?",
+        nodes: [
+          "Owner occupied",
+          "Rental",
+          "Capital appreciation",
+          "Classification",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "fair value model",
+        "cost model",
+      ],
+      visual: {
+        kind: "investment-property",
+        eyebrow: "Choose the subsequent model",
+        title: "Investment property measurement",
+        nodes: [
+          "Initial cost",
+          "Cost model",
+          "Fair value model",
+          "Profit or loss",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       GOVERNMENT GRANTS
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "recognition",
+        "reasonable assurance",
+      ],
+      visual: {
+        kind: "government-grants",
+        eyebrow: "Recognition starts with assurance",
+        title: "When can a government grant be recognised?",
+        nodes: [
+          "Grant",
+          "Conditions",
+          "Reasonable assurance",
+          "Recognition",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "capital grants",
+        "asset-related grants",
+      ],
+      visual: {
+        kind: "government-grants",
+        eyebrow: "Relate support to the asset",
+        title: "Accounting for asset-related grants",
+        nodes: [
+          "Asset",
+          "Grant",
+          "Deferred income",
+          "Asset cost",
+          "Income",
+        ],
+      },
+    },
+
+    /* --------------------------------------------------------
+       IAS 37 / IAS 10
+       -------------------------------------------------------- */
+
+    {
+      match: [
+        "provisions",
+        "provision recognition",
+      ],
+      visual: {
+        kind: "ias37",
+        eyebrow: "Assess the obligation",
+        title: "When does an obligation become a provision?",
+        nodes: [
+          "Past event",
+          "Present obligation",
+          "Probable outflow",
+          "Reliable estimate",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "contingent liability",
+        "contingent liabilities",
+      ],
+      visual: {
+        kind: "ias37",
+        eyebrow: "Recognise versus disclose",
+        title: "Contingent liabilities",
+        nodes: [
+          "Possible obligation",
+          "Probability",
+          "Recognition?",
+          "Disclosure",
+        ],
+      },
+    },
+
+    {
+      match: [
+        "adjusting events",
+        "non-adjusting events",
+        "events after reporting period",
+      ],
+      visual: {
+        kind: "ias37",
+        eyebrow: "Look back to the reporting date",
+        title: "Events after the reporting period",
+        nodes: [
+          "Event",
+          "Condition at reporting date?",
+          "Adjust",
+          "Disclose",
+        ],
+      },
+    },
+  ]
+
+  /*
+   * Most specific section matches are checked first.
+   */
+  for (const entry of sectionVisuals) {
+    if (entry.match.some((key) => section.includes(key))) {
+      return entry.visual
+    }
+  }
+
+  /*
+   * If no section-specific visual exists, fall back to the
+   * topic-level CURA visual.
+   */
   for (const entry of visuals) {
-    if (entry.match.some((key) => value.includes(key))) {
+    if (entry.match.some((key) => topic.includes(key))) {
       return entry.visual
     }
   }
@@ -388,7 +1472,13 @@ function pickVisual(topicTitle: string): VisualDefinition {
     kind: "generic",
     eyebrow: "Accounting in context",
     title: "Follow the accounting decision",
-    nodes: ["Identify", "Recognise", "Measure", "Present", "Disclose"],
+    nodes: [
+      "Identify",
+      "Recognise",
+      "Measure",
+      "Present",
+      "Disclose",
+    ],
   }
 }
 
