@@ -284,85 +284,165 @@ export default function OtherServicesAdminPage() {
     setMessage("")
     setSavingPackageIndex(index)
 
-    const title = pkg.title.trim()
+    try {
+      /*
+       * Confirm that the current browser session is still
+       * authenticated as a CURA administrator immediately
+       * before attempting the package write.
+       *
+       * Articles uses this same authentication mechanism.
+       */
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
 
-    if (!title) {
-      setError(
-        "Please enter the revenue range or employee range before saving the package.",
+      if (userError || !user) {
+        throw new Error(
+          "Your admin session has expired. Please log in again.",
+        )
+      }
+
+      const {
+        data: isAdmin,
+        error: adminError,
+      } = await supabase.rpc(
+        "is_current_user_admin",
       )
-      setSavingPackageIndex(null)
-      return
-    }
 
-    const inclusions = pkg.inclusions
-      .map((item) => item.trim())
-      .filter(Boolean)
+      if (adminError) {
+        throw new Error(
+          `Unable to verify administrator access: ${adminError.message}`,
+        )
+      }
 
-    const payload = {
-      service_id: pkg.service_id,
-      title,
-      price:
-        serviceType === "bookkeeping"
-          ? pkg.price?.trim() || null
-          : null,
-      fixed_fee:
-        serviceType === "payroll"
-          ? pkg.fixed_fee?.trim() || null
-          : null,
-      variable_fee:
-        serviceType === "payroll"
-          ? pkg.variable_fee?.trim() || null
-          : null,
-      setup_fee:
-        serviceType === "payroll"
-          ? pkg.setup_fee?.trim() || null
-          : null,
-      inclusions,
-      display_order:
-        Number(pkg.display_order) || index + 1,
-      published: Boolean(pkg.published),
-    }
+      if (!isAdmin) {
+        throw new Error(
+          "You do not have permission to manage Other Services.",
+        )
+      }
 
-    let operationError = null
+      const title = pkg.title.trim()
 
-    if (pkg.id) {
-      const { error } = await supabase
+      if (!title) {
+        throw new Error(
+          serviceType === "payroll"
+            ? "Please enter the employee range before publishing the package."
+            : "Please enter the revenue range before publishing the package.",
+        )
+      }
+
+      const inclusions = pkg.inclusions
+        .map((item) => item.trim())
+        .filter(Boolean)
+
+      const payload = {
+        service_id: pkg.service_id,
+        title,
+        price:
+          serviceType === "bookkeeping"
+            ? pkg.price?.trim() || null
+            : null,
+        fixed_fee:
+          serviceType === "payroll"
+            ? pkg.fixed_fee?.trim() || null
+            : null,
+        variable_fee:
+          serviceType === "payroll"
+            ? pkg.variable_fee?.trim() || null
+            : null,
+        setup_fee:
+          serviceType === "payroll"
+            ? pkg.setup_fee?.trim() || null
+            : null,
+        inclusions,
+        display_order:
+          Number(pkg.display_order) ||
+          index + 1,
+        published: Boolean(pkg.published),
+      }
+
+      let operationError: {
+        message: string
+      } | null = null
+
+      if (pkg.id) {
+        const { error } = await supabase
+          .from("other_service_packages")
+          .update(payload)
+          .eq("id", pkg.id)
+
+        operationError = error
+      } else {
+        const { error } = await supabase
+          .from("other_service_packages")
+          .insert({
+            ...payload,
+          })
+
+        operationError = error
+      }
+
+      if (operationError) {
+        console.error(
+          "CURA Other Services package save failed:",
+          operationError,
+        )
+
+        throw new Error(
+          operationError.message,
+        )
+      }
+
+      /*
+       * Reload the actual records from Supabase.
+       * Do not call loadService() here because it clears
+       * the success message at the beginning.
+       */
+      const {
+        data: refreshedPackages,
+        error: refreshError,
+      } = await supabase
         .from("other_service_packages")
-        .update(payload)
-        .eq("id", pkg.id)
+        .select("*")
+        .eq("service_id", pkg.service_id)
+        .order("display_order", {
+          ascending: true,
+        })
 
-      operationError = error
-    } else {
-      const { error } = await supabase
-        .from("other_service_packages")
-        .insert(payload)
+      if (refreshError) {
+        throw new Error(
+          `Package was saved, but the package list could not be refreshed: ${refreshError.message}`,
+        )
+      }
 
-      operationError = error
-    }
+      setPackages(
+        refreshedPackages ?? [],
+      )
 
-    setSavingPackageIndex(null)
-
-    if (operationError) {
+      setMessage(
+        payload.published
+          ? pkg.id
+            ? "Package published successfully."
+            : "New package published successfully."
+          : pkg.id
+            ? "Package saved as draft."
+            : "New package saved as draft.",
+      )
+    } catch (err) {
       console.error(
-        "Other Service Package error:",
-        operationError,
+        "CURA Other Services package error:",
+        err,
       )
 
-      setError(operationError.message)
-      return
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to save the package. Please try again.",
+      )
+    } finally {
+      setSavingPackageIndex(null)
     }
-
-    setMessage(
-      pkg.id
-        ? payload.published
-          ? "Package published successfully."
-          : "Package saved as draft."
-        : payload.published
-          ? "New package published successfully."
-          : "New package saved as draft.",
-    )
-
-    await loadService()
   }
 
   async function deletePackage(id: string) {
