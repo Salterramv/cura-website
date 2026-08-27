@@ -105,8 +105,6 @@ export default function AccountingMaterialsPage() {
             "id,slug,title,standard,description,category,display_order,visual_theme"
           )
           .eq("category", "Accounting")
-          .eq("is_published", true)
-          .eq("status", "published")
           .order("display_order", { ascending: true }),
 
         supabase
@@ -222,7 +220,7 @@ export default function AccountingMaterialsPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_20%,rgba(53,181,229,0.20),transparent_30%),radial-gradient(circle_at_15%_90%,rgba(22,139,196,0.14),transparent_32%)]" />
 
         <div className="relative mx-auto max-w-7xl px-6 py-16 lg:px-8 lg:py-24">
-          <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="max-w-4xl">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#35B5E5]">
                 CURA Education · Accounting
@@ -234,14 +232,14 @@ export default function AccountingMaterialsPage() {
 
               <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
                 Build your understanding of accounting standards through
-                structured topics, practical explanations and topic-based
-                assessment.
+                clear explanations, CURA visualisations, practical examples
+                and topic-based assessment.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
                 <a
                   href="#topics"
-                  className="rounded-full bg-white px-6 py-3 text-sm font-bold text-[#071B49] transition hover:bg-slate-100"
+                  className="rounded-full bg-[#168BC4] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#35B5E5] hover:text-[#071B49]"
                 >
                   Explore topics →
                 </a>
@@ -252,34 +250,6 @@ export default function AccountingMaterialsPage() {
               </div>
             </div>
 
-            {/* Native CURA accounting visual */}
-            <div className="rounded-[30px] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-              <div className="overflow-hidden rounded-[26px] border border-[#BFE8F6] bg-[#F4FBFE] p-6">
-                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#168BC4]">
-                  CURA learning system
-                </p>
-
-                <div className="mt-5 rounded-2xl border-2 border-[#168BC4] bg-white p-5 shadow-sm">
-                  <div className="h-2 w-20 rounded-full bg-[#35B5E5]" />
-                  <div className="mt-3 h-2 w-28 rounded-full bg-[#D8EEF6]" />
-                  <div className="mt-2 h-2 w-24 rounded-full bg-[#D8EEF6]" />
-                </div>
-
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <div className="h-2 rounded-full bg-[#168BC4]" />
-                  <div className="h-2 rounded-full bg-[#35B5E5]" />
-                  <div className="h-2 rounded-full bg-[#BFE8F6]" />
-                </div>
-
-                <div className="mt-5 flex items-center justify-between text-xs font-semibold text-[#071B49]">
-                  <span>Concept</span>
-                  <span className="text-[#35B5E5]">→</span>
-                  <span>Application</span>
-                  <span className="text-[#35B5E5]">→</span>
-                  <span>Assessment</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -496,9 +466,8 @@ export default function AccountingMaterialsPage() {
             </h2>
 
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
-              Every topic keeps the complete source material while presenting
-              concepts, tables, examples and relationships through the CURA
-              learning experience.
+              Every topic presents accounting concepts, tables, examples and
+              relationships through the CURA learning experience.
             </p>
           </div>
         </div>
