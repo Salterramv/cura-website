@@ -582,9 +582,274 @@ function renderStyleRuns(
   )
 }
 
+
+/* ============================================================
+   FINANCIAL / TRANSACTION PRESENTATION
+   ============================================================ */
+
+function normalizeFinancialLine(value: string) {
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/\r/g, "")
+    .trim()
+}
+
+function isJournalEntryLine(value: string) {
+  const text = normalizeFinancialLine(value)
+
+  return (
+    /^(Dr|Cr)\s+/i.test(text) &&
+    (
+      /\t/.test(value) ||
+      /\s{2,}/.test(text) ||
+      /\d[\d,]*(?:\.\d+)?\s*$/.test(text)
+    )
+  )
+}
+
+function isFinancialColumnLine(value: string) {
+  const text = normalizeFinancialLine(value)
+
+  if (!text) {
+    return false
+  }
+
+  if (/\t/.test(value)) {
+    return true
+  }
+
+  return (
+    /\b(?:X|XX|XXX|X\/\(X\)|\(X\)|\$\s*)$/i.test(text) &&
+    /^(?:Contract|Less:|Overall|Revenue|Cost|Profit|Amount|Contract asset|Contract liability|Receivable)/i.test(text)
+  )
+}
+
+function splitFinancialLine(value: string) {
+  const original = value.replace(/\r/g, "")
+
+  /*
+   * Tabs are the most reliable signal from the imported
+   * source material because they represent the original
+   * accounting columns.
+   */
+  if (original.includes("\t")) {
+    const parts = original
+      .split(/\t+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+
+    if (parts.length >= 2) {
+      return {
+        left: parts.slice(0, -1).join(" "),
+        right: parts[parts.length - 1],
+      }
+    }
+  }
+
+  /*
+   * Fallback for imported whitespace where tabs were lost.
+   */
+  const match = original.match(
+    /^(.*?)(?:\s{2,})(\$|X|XX|XXX|X\/\(X\)|\(X\)|\([\d,]+(?:\.\d+)?\)|[\d,]+(?:\.\d+)?)\s*$/
+  )
+
+  if (match) {
+    return {
+      left: match[1].trim(),
+      right: match[2].trim(),
+    }
+  }
+
+  return null
+}
+
+function splitJournalEntry(value: string) {
+  const text = normalizeFinancialLine(value)
+
+  const match = text.match(
+    /^(Dr|Cr)\s+(.+?)(?:\s{2,}|\t+)(\$?\s*[\d,]+(?:\.\d+)?)\s*$/i
+  )
+
+  if (!match) {
+    return null
+  }
+
+  return {
+    side: match[1].toUpperCase(),
+    account: match[2].trim(),
+    amount: match[3].trim(),
+  }
+}
+
+function FinancialLine({
+  text,
+}: {
+  text: string
+}) {
+  const journal = splitJournalEntry(text)
+
+  if (journal) {
+    return (
+      <div className="grid grid-cols-[48px_minmax(0,1fr)_120px] items-center border-b border-[#168BC4]/10 py-2 text-base leading-7 last:border-b-0">
+        <span className="font-bold text-[#071B49]">
+          {journal.side}
+        </span>
+
+        <span className="min-w-0 text-[#102A5F]">
+          {journal.account}
+        </span>
+
+        <span className="text-right font-semibold tabular-nums text-[#102A5F]">
+          {journal.amount}
+        </span>
+      </div>
+    )
+  }
+
+  const columns = splitFinancialLine(text)
+
+  if (columns) {
+    const isHeader =
+      columns.right === "$"
+
+    const isTotal =
+      /^(Overall profit\/loss|Profit|Contract asset\/liability)/i.test(
+        columns.left
+      )
+
+    return (
+      <div
+        className={`grid grid-cols-[minmax(0,1fr)_140px] items-center py-2 text-base leading-7 ${
+          isTotal
+            ? "font-bold text-[#071B49]"
+            : "text-[#102A5F]"
+        }`}
+      >
+        <span className="min-w-0">
+          {columns.left}
+        </span>
+
+        <span
+          className={`text-right tabular-nums ${
+            isHeader
+              ? "font-bold"
+              : ""
+          }`}
+        >
+          {columns.right}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="py-2 text-base leading-8 text-[#102A5F]">
+      {text}
+    </div>
+  )
+}
+
+function FinancialBlock({
+  paragraphs,
+}: {
+  paragraphs: PresentationParagraph[]
+}) {
+  const visible = paragraphs
+    .map((paragraph) =>
+      cleanSourceText(
+        paragraph.text || ""
+      )
+    )
+    .filter(Boolean)
+
+  if (visible.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="my-6 overflow-hidden rounded-2xl border border-[#168BC4]/15 bg-[#F8FBFD]">
+      <div className="divide-y divide-[#168BC4]/10 px-5 py-3 md:px-7">
+        {visible.map((text, index) => (
+          <FinancialLine
+            key={`${index}-${text}`}
+            text={text}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function containsFinancialLayout(
+  paragraphs: PresentationParagraph[]
+) {
+  const text = paragraphs
+    .map((paragraph) => paragraph.text || "")
+    .join("\n")
+
+  return (
+    /\t/.test(text) &&
+    (
+      /\b(?:Dr|Cr)\b/.test(text) ||
+      /\b(?:Contract price|Overall profit\/loss|Revenue|Cost of sales|Profit|Contract asset\/liability)\b/i.test(text)
+    )
+  )
+}
+
 /* ============================================================
    SOURCE PARAGRAPH
    ============================================================ */
+
+
+function looksLikePointForm(value: string) {
+  const text = value.trim()
+
+  return (
+    /^[•●▪◦]\s+/.test(text) ||
+    /^[-–—]\s+/.test(text) ||
+    /^\d+[.)]\s+/.test(text) ||
+    /^[a-zA-Z][.)]\s+/.test(text)
+  )
+}
+
+function PointFormParagraph({
+  paragraph,
+}: {
+  paragraph: PresentationParagraph
+}) {
+  const text = cleanSourceText(
+    paragraph.text || ""
+  )
+
+  if (!text) {
+    return null
+  }
+
+  const match = text.match(
+    /^([•●▪◦]|[-–—]|\d+[.)]|[a-zA-Z][.)])\s+(.*)$/
+  )
+
+  if (!match) {
+    return null
+  }
+
+  const marker = match[1]
+  const body = match[2]
+
+  const numbered = /^\d/.test(marker)
+
+  return (
+    <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-2 py-1 text-justify text-base leading-8 text-[#102A5F]">
+      <span className="font-semibold text-[#168BC4]">
+        {numbered ? marker : "•"}
+      </span>
+
+      <span className="min-w-0">
+        {body}
+      </span>
+    </div>
+  )
+}
 
 function SourceParagraph({
   paragraph,
@@ -599,6 +864,10 @@ function SourceParagraph({
     isIllustrationLabel(text)
   ) {
     return null
+  }
+
+  if (looksLikePointForm(text)) {
+    return <PointFormParagraph paragraph={paragraph} />
   }
 
   const level =
@@ -926,7 +1195,7 @@ function SourceText({
   children: React.ReactNode
 }) {
   return (
-    <div className="whitespace-pre-wrap text-[15px] leading-8 text-[#173565] md:text-base">
+    <div className="cura-education-source-text whitespace-pre-wrap text-[15px] leading-8 text-[#173565] md:text-base">
       {children}
     </div>
   )
@@ -959,19 +1228,24 @@ function SourceFigureBlock({
           </div>
         )}
 
-      <details className="mx-6 mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white md:mx-8">
-        <summary className="sr-only">
-          Original source illustration
-        </summary>
-        <div className="space-y-6 border-t border-slate-100 p-5 md:p-7">
-          {assets.map((asset) => (
-            <SourceAsset
-              key={asset.id}
-              asset={asset}
-            />
-          ))}
+      {assets.length > 0 && (
+        <div className="mx-6 mb-6 overflow-hidden rounded-2xl border border-[#168BC4]/15 bg-white md:mx-8">
+          <div className="space-y-6 p-5 md:p-7">
+            {assets
+              .slice()
+              .sort(
+                (a, b) =>
+                  a.display_order - b.display_order
+              )
+              .map((asset) => (
+                <SourceAsset
+                  key={asset.id}
+                  asset={asset}
+                />
+              ))}
+          </div>
         </div>
-      </details>
+      )}
     </div>
   )
 }
@@ -1258,6 +1532,21 @@ function RenderSourceBlock({
    */
 
   if (paragraphs.length > 0) {
+
+    /*
+     * Imported accounting examples sometimes arrive as
+     * presentation paragraphs containing the original
+     * tab-separated columns. Render those as accounting
+     * schedules instead of ordinary justified prose.
+     */
+    if (containsFinancialLayout(paragraphs)) {
+      return (
+        <FinancialBlock
+          paragraphs={paragraphs}
+        />
+      )
+    }
+
     const visibleParagraphs =
       paragraphs.filter(
         (paragraph, index) => {

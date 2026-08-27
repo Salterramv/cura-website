@@ -325,3 +325,10 @@ textarea:focus-visible {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--cura-blue);
 }
+
+/* CURA Education source-content justification */
+.cura-education-source-text {
+  text-align: justify;
+  text-justify: inter-word;
+  text-align-last: auto;
+}
