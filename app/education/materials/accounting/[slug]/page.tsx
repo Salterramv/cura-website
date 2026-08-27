@@ -1375,7 +1375,6 @@ export default function AccountingTopicPage() {
         .eq("slug", slug)
         .eq("category", "Accounting")
         .eq("is_published", true)
-        .eq("status", "published")
         .maybeSingle()
 
       if (topicError) {
@@ -1890,8 +1889,35 @@ export default function AccountingTopicPage() {
     )
   }
 
+  /*
+   * ==========================================================
+   * CURA PUBLIC CONTENT
+   * ==========================================================
+   *
+   * The public accounting library is now CURA-authored.
+   *
+   * Old imported lecture/source sections remain in Supabase
+   * for archival/reference purposes but MUST NOT be rendered.
+   *
+   * CURA sections use section_type = "summary".
+   *
+   * Once the full CURA lesson is populated, every public
+   * accounting topic will therefore consist exclusively of
+   * the new CURA content.
+   */
+
+  const curaSections = sections
+    .filter(
+      (section) =>
+        section.section_type === "summary"
+    )
+    .sort(
+      (a, b) =>
+        a.display_order - b.display_order
+    )
+
   const sectionsWithBlocks =
-    sections
+    curaSections
       .map((section) => {
         const sectionBlocks =
           blocks
@@ -2369,14 +2395,14 @@ export default function AccountingTopicPage() {
                 </nav>
               ) : (
                 <p className="mt-4 text-sm leading-6 text-slate-500">
-                  No published material is available.
+                  CURA learning content is currently being prepared for this topic.
                 </p>
               )}
             </div>
           </aside>
 
           {/* ====================================================
-              SOURCE MATERIAL
+              CURA LEARNING CONTENT
               ==================================================== */}
 
           <div className="order-1 min-w-0 lg:order-2">
@@ -2384,7 +2410,7 @@ export default function AccountingTopicPage() {
             0 ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-10">
                 <p className="text-sm leading-6 text-slate-500">
-                  No published source content is currently available for this topic.
+                  No published CURA learning content is currently available for this topic.
                 </p>
               </div>
             ) : (
@@ -2440,7 +2466,7 @@ export default function AccountingTopicPage() {
                           />
                         </div>
 
-                        {/* SOURCE CONTENT */}
+                        {/* CURA CONTENT */}
 
                         <div className="px-7 py-8 md:px-10 md:py-10">
                           <div className="space-y-10">
