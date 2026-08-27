@@ -288,7 +288,7 @@ export default function OtherServicesAdminPage() {
 
     if (!title) {
       setError(
-        "Please enter the revenue range or employee range before publishing the package.",
+        "Please enter the revenue range or employee range before saving the package.",
       )
       setSavingPackageIndex(null)
       return
@@ -297,9 +297,6 @@ export default function OtherServicesAdminPage() {
     const inclusions = pkg.inclusions
       .map((item) => item.trim())
       .filter(Boolean)
-
-    const displayOrder =
-      Number(pkg.display_order) || index + 1
 
     const payload = {
       service_id: pkg.service_id,
@@ -321,61 +318,51 @@ export default function OtherServicesAdminPage() {
           ? pkg.setup_fee?.trim() || null
           : null,
       inclusions,
-      display_order: displayOrder,
+      display_order:
+        Number(pkg.display_order) || index + 1,
       published: Boolean(pkg.published),
     }
 
-    try {
-      if (pkg.id) {
-        const { error } = await supabase
-          .from("other_service_packages")
-          .update(payload)
-          .eq("id", pkg.id)
+    let operationError = null
 
-        if (error) {
-          throw new Error(
-            `Unable to save package: ${error.message}`,
-          )
-        }
+    if (pkg.id) {
+      const { error } = await supabase
+        .from("other_service_packages")
+        .update(payload)
+        .eq("id", pkg.id)
 
-        setMessage(
-          payload.published
-            ? "Package published successfully."
-            : "Package saved as draft.",
-        )
-      } else {
-        const { error } = await supabase
-          .from("other_service_packages")
-          .insert(payload)
+      operationError = error
+    } else {
+      const { error } = await supabase
+        .from("other_service_packages")
+        .insert(payload)
 
-        if (error) {
-          throw new Error(
-            `Unable to publish new package: ${error.message}`,
-          )
-        }
-
-        setMessage(
-          payload.published
-            ? "New package published successfully."
-            : "New package saved as draft.",
-        )
-      }
-
-      await loadService()
-    } catch (err) {
-      console.error(
-        "Other Services package save error:",
-        err,
-      )
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to save the package. Please try again.",
-      )
-    } finally {
-      setSavingPackageIndex(null)
+      operationError = error
     }
+
+    setSavingPackageIndex(null)
+
+    if (operationError) {
+      console.error(
+        "Other Service Package error:",
+        operationError,
+      )
+
+      setError(operationError.message)
+      return
+    }
+
+    setMessage(
+      pkg.id
+        ? payload.published
+          ? "Package published successfully."
+          : "Package saved as draft."
+        : payload.published
+          ? "New package published successfully."
+          : "New package saved as draft.",
+    )
+
+    await loadService()
   }
 
   async function deletePackage(id: string) {
