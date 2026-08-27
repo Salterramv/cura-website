@@ -604,7 +604,7 @@ export default function OtherServicePage({ service }: Props) {
 
             <a
               href="#enquiry"
-              className="ml-3 mt-9 inline-flex rounded-md border border-white/30 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              className="ml-3 mt-9 inline-flex rounded-md border border-white/40 bg-transparent px-7 py-3.5 text-sm font-semibold transition hover:bg-white/10" style={{ color: "#FFFFFF" }}
             >
               Customized enquiry
             </a>
