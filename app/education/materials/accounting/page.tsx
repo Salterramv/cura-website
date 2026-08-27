@@ -136,27 +136,22 @@ export default function AccountingMaterialsPage() {
       let questionCounts: Record<string, number> = {}
 
       if (quizIds.length > 0) {
-        const { data: questions, error: questionError } =
-          await supabase
-            .from("education_questions")
-            .select("quiz_id")
-            .in("quiz_id", quizIds)
+  const { data: questions } = await supabase
+    .from("education_questions")
+    .select("quiz_id")
+    .in("quiz_id", quizIds)
 
-        if (questionError) {
-          setError(questionError.message)
-          setLoading(false)
-          return
-        }
+  if (questions) {
+    questionCounts = questions.reduce<
+      Record<string, number>
+    >((result, question) => {
+      result[question.quiz_id] =
+        (result[question.quiz_id] ?? 0) + 1
 
-        questionCounts = (questions ?? []).reduce<
-          Record<string, number>
-        >((result, question) => {
-          result[question.quiz_id] =
-            (result[question.quiz_id] ?? 0) + 1
-
-          return result
-        }, {})
-      }
+      return result
+    }, {})
+  }
+}
 
       setTopics((topicData ?? []) as Topic[])
 
