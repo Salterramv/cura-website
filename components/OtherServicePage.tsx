@@ -1025,7 +1025,7 @@ export default function OtherServicePage({ service }: Props) {
 
                   <div className="border-t border-slate-200 px-7 pb-7 pt-6">
                     <ul className="space-y-3">
-                      {payrollInclusions.map((item) => (
+                      {(pkg.inclusions ?? []).map((item) => (
                         <li
                           key={item}
                           className="flex gap-3 text-sm leading-6 text-slate-600"
