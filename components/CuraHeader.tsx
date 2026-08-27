@@ -30,7 +30,7 @@ export default function CuraHeader() {
             <img
               src="/cura-logo.png"
               alt="CURA"
-              className="h-16 w-auto object-contain"
+              className="h-20 w-auto object-contain"
             />
           </Link>
 
