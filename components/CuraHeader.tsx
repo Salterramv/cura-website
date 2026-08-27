@@ -134,7 +134,7 @@ export default function CuraHeader() {
                   </Link>
 
                   <Link
-                    href="/insights/exchange-rates"
+                    href="/exchange-rate"
                     onClick={() => setInsightsOpen(false)}
                     className="block rounded-lg px-4 py-3 transition hover:bg-[#F1F7FB]"
                   >
@@ -466,7 +466,7 @@ export default function CuraHeader() {
                     </Link>
 
                     <Link
-                      href="/insights/exchange-rates"
+                      href="/exchange-rate"
                       onClick={closeMobileMenu}
                       className="block py-2.5 text-sm text-slate-600 hover:text-[#168BC4]"
                     >

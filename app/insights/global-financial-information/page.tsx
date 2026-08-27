@@ -1,4 +1,6 @@
 import Link from "next/link"
+import CuraHeader from "@/components/CuraHeader"
+import CuraFooter from "@/components/CuraFooter"
 
 const financialAreas = [
   {
@@ -41,7 +43,10 @@ const financialAreas = [
 
 export default function GlobalFinancialInformationPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <>
+      <CuraHeader />
+
+      <main className="min-h-screen bg-white">
 
       {/* HERO */}
       <section className="relative overflow-hidden border-b border-[#dce5ef] bg-[#F7FAFC]">
@@ -287,5 +292,8 @@ export default function GlobalFinancialInformationPage() {
       </section>
 
     </main>
+
+      <CuraFooter />
+    </>
   )
 }
