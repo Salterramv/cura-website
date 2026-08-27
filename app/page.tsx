@@ -193,13 +193,7 @@ export default function Home() {
                 {service.number}
               </div>
 
-              <h3
-                className={`mt-5 text-lg font-semibold ${
-                  service.title === "Legal"
-                    ? "text-[#D71920]"
-                    : "text-[#071B49]"
-                }`}
-              >
+              <h3 className="mt-5 text-lg font-semibold text-[#071B49]">
                 {service.title}
               </h3>
 
