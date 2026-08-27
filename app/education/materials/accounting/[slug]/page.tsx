@@ -954,7 +954,6 @@ function SourceTableBlock({
    LEGACY FALLBACK
    ============================================================ */
 
-
 function renderLegacyItems(
   items: Item[]
 ) {
