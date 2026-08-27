@@ -13,6 +13,8 @@ const services = {
   tax: "Tax",
   advisory: "Advisory",
   legal: "Legal",
+  bookkeeping: "Bookkeeping",
+  payroll: "Payroll",
 } as const
 
 function clean(value: unknown, max = 10000) {

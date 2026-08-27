@@ -73,10 +73,10 @@ const services = [
   },
   {
     number: "06",
-    title: "Exchange Rates",
-    href: "/exchange-rate",
+    title: "Other Services",
+    href: "/other-services",
     description:
-      "Published MVR / USD exchange rates from authorized money exchangers in the Maldives.",
+      "Bookkeeping and payroll support designed around the practical needs of businesses.",
   },
 ]
 
@@ -197,9 +197,7 @@ export default function Home() {
                 className={`mt-5 text-lg font-semibold ${
                   service.title === "Legal"
                     ? "text-[#D71920]"
-                    : service.title === "Exchange Rates"
-                      ? "text-[#168BC4]"
-                      : "text-[#071B49]"
+                    : "text-[#071B49]"
                 }`}
               >
                 {service.title}

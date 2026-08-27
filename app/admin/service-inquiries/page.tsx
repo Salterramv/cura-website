@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 
 type Inquiry = {
   id: string
-  service: "audit" | "tax" | "advisory" | "legal"
+  service: "audit" | "tax" | "advisory" | "legal" | "bookkeeping" | "payroll"
   full_name: string
   email: string
   phone: string
@@ -28,6 +28,8 @@ const serviceLabels = {
   tax: "Tax",
   advisory: "Advisory",
   legal: "Legal",
+  bookkeeping: "Bookkeeping",
+  payroll: "Payroll",
 }
 
 const statuses = ["New", "Contacted", "In Progress", "Closed"] as const
@@ -167,7 +169,7 @@ export default function ServiceInquiriesAdminPage() {
               Service enquiries
             </h2>
             <p className="mt-3 max-w-3xl text-slate-600">
-              Private enquiries submitted through the Audit, Tax, Advisory and Legal service pages.
+              Private enquiries submitted through the CURA service pages, including Bookkeeping and Payroll.
             </p>
           </div>
 
@@ -181,6 +183,8 @@ export default function ServiceInquiriesAdminPage() {
             <option value="tax">Tax</option>
             <option value="advisory">Advisory</option>
             <option value="legal">Legal</option>
+            <option value="bookkeeping">Bookkeeping</option>
+            <option value="payroll">Payroll</option>
           </select>
         </div>
 
