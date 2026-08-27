@@ -7,6 +7,7 @@ import { useParams } from "next/navigation"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
 import { createClient } from "@/lib/supabase/client"
+import CuraSectionIllustration from "@/components/education/CuraSectionIllustration"
 /* ============================================================
    TYPES
    ============================================================ */
@@ -923,8 +924,8 @@ function SourceFigureBlock({
         )}
 
       <details className="mx-6 mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white md:mx-8">
-        <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-[#071B49]">
-          Source reference — original illustration
+        <summary className="sr-only">
+          Original source illustration
         </summary>
         <div className="space-y-6 border-t border-slate-100 p-5 md:p-7">
           {assets.map((asset) => (
@@ -1041,18 +1042,19 @@ function RenderSourceBlock({
    * presentation-text path. Otherwise an imported figure/table can
    * be treated as ordinary source text.
    */
+  /*
+   * Original source illustrations are retained in Supabase
+   * but are NOT displayed on the public CURA accounting page.
+   *
+   * The section-level CURA illustration is rendered above the
+   * lesson content from section.presentation.cura_visual.
+   */
   if (
-    (blockType === "image" ||
-      blockType === "figure" ||
-      blockType === "illustration") &&
-    assets.length > 0
+    blockType === "image" ||
+    blockType === "figure" ||
+    blockType === "illustration"
   ) {
-    return (
-      <SourceFigureBlock
-        block={block}
-        assets={assets}
-      />
-    )
+    return null
   }
 
   if (blockType === "table" && tables.length > 0) {
@@ -2457,6 +2459,21 @@ export default function AccountingTopicPage() {
                         )}
 
                         <div className="px-7 pt-7 md:px-10 md:pt-8">
+                          <CuraSectionIllustration
+                            visual={
+                              section.presentation
+                                ?.cura_visual as
+                                | {
+                                    type?: string
+                                    eyebrow?: string
+                                    title?: string
+                                    nodes?: string[]
+                                    note?: string
+                                  }
+                                | null
+                                | undefined
+                            }
+                          />
                         </div>
 
                         {/* CURA CONTENT */}

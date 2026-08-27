@@ -1,428 +1,57 @@
 import React from "react"
 
-type CuraVisual = {
+export type CuraSectionVisual = {
   type?: string
   eyebrow?: string
   title?: string
   nodes?: string[]
+  note?: string
 }
 
 type Props = {
-  visual?: CuraVisual | null
+  visual?: CuraSectionVisual | null
 }
 
-/*
- * ============================================================
- * CURA SECTION ILLUSTRATION
- * ============================================================
- *
- * These are educational diagrams rather than decorative images.
- *
- * The visual definition comes from:
- *
- * education_sections.presentation.cura_visual
- *
- * in Supabase.
- *
- * Each visual type changes the structure of the diagram so that
- * the illustration communicates the accounting relationship being
- * explained in that section.
- */
+const navy = "#071B49"
+const blue = "#168BC4"
+const cyan = "#35B5E5"
+
+function Box({
+  children,
+  active = false,
+}: {
+  children: React.ReactNode
+  active?: boolean
+}) {
+  return (
+    <div
+      className={[
+        "rounded-2xl border px-4 py-3 text-center",
+        "shadow-[0_6px_18px_rgba(7,27,73,0.06)]",
+        active
+          ? "border-[#168BC4] bg-[#E8F6FB]"
+          : "border-[#D7E6EE] bg-white",
+      ].join(" ")}
+    >
+      <span className="text-sm font-semibold leading-5 text-[#071B49]">
+        {children}
+      </span>
+    </div>
+  )
+}
 
 function Arrow() {
   return (
     <span
       aria-hidden="true"
-      className="text-[#168BC4] text-lg font-bold"
+      className="shrink-0 text-lg font-bold text-[#168BC4]"
     >
       →
     </span>
   )
 }
 
-function Node({
-  children,
-  index,
-}: {
-  children: React.ReactNode
-  index: number
-}) {
-  return (
-    <div
-      className="
-        min-w-0
-        rounded-2xl
-        border
-        border-[#168BC4]/20
-        bg-white
-        px-4
-        py-3
-        text-center
-        shadow-[0_5px_18px_rgba(7,27,73,0.06)]
-      "
-    >
-      <div className="mx-auto mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#E8F6FB] text-xs font-bold text-[#168BC4]">
-        {index + 1}
-      </div>
-
-      <div className="text-sm font-semibold leading-5 text-[#071B49]">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function MiniIcon({
-  type,
-}: {
-  type: string
-}) {
-  const common =
-    "fill-none stroke-[#168BC4] strokeWidth={2.2} strokeLinecap=\"round\" strokeLinejoin=\"round\""
-
-  if (type === "measurement") {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <path
-          d="M18 58h44"
-          className={common}
-        />
-        <path
-          d="M25 54l15-30 15 30"
-          className={common}
-        />
-        <path
-          d="M31 42h18"
-          className={common}
-        />
-        <circle
-          cx="40"
-          cy="24"
-          r="5"
-          className="fill-[#35B5E5]"
-        />
-      </svg>
-    )
-  }
-
-  if (type === "decision") {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <path
-          d="M40 10 68 40 40 70 12 40Z"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <path
-          d="M29 40h22M40 29v22"
-          className={common}
-        />
-      </svg>
-    )
-  }
-
-  if (type === "comparison" || type === "split") {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <rect
-          x="10"
-          y="18"
-          width="24"
-          height="44"
-          rx="5"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <rect
-          x="46"
-          y="18"
-          width="24"
-          height="44"
-          rx="5"
-          className="fill-[#F5F8FC] stroke-[#071B49]"
-          strokeWidth="2.2"
-        />
-        <path
-          d="M40 22v36"
-          className="stroke-[#35B5E5]"
-          strokeWidth="2"
-          strokeDasharray="4 4"
-        />
-      </svg>
-    )
-  }
-
-  if (type === "transition") {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <rect
-          x="8"
-          y="25"
-          width="22"
-          height="30"
-          rx="5"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <path
-          d="M31 40h18"
-          className={common}
-        />
-        <path
-          d="m44 33 7 7-7 7"
-          className={common}
-        />
-        <rect
-          x="51"
-          y="25"
-          width="22"
-          height="30"
-          rx="5"
-          className="fill-white stroke-[#071B49]"
-          strokeWidth="2.2"
-        />
-      </svg>
-    )
-  }
-
-  if (
-    type === "cycle" ||
-    type === "timeline"
-  ) {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <circle
-          cx="40"
-          cy="40"
-          r="25"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <path
-          d="M40 15a25 25 0 0 1 24 18"
-          className={common}
-        />
-        <path
-          d="m61 27 4 7-8 1"
-          className={common}
-        />
-        <path
-          d="M40 65a25 25 0 0 1-24-18"
-          className={common}
-        />
-        <path
-          d="m19 53-4-7 8-1"
-          className={common}
-        />
-      </svg>
-    )
-  }
-
-  if (
-    type === "formula" ||
-    type === "bridge"
-  ) {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <rect
-          x="12"
-          y="16"
-          width="56"
-          height="48"
-          rx="8"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <path
-          d="M24 32h32M24 48h20"
-          className={common}
-        />
-        <circle
-          cx="56"
-          cy="48"
-          r="5"
-          className="fill-[#35B5E5]"
-        />
-      </svg>
-    )
-  }
-
-  if (type === "hierarchy") {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <path
-          d="M40 12 68 62H12Z"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <path
-          d="M25 51h30M30 40h20M35 29h10"
-          className={common}
-        />
-      </svg>
-    )
-  }
-
-  if (
-    type === "cashflow" ||
-    type === "network"
-  ) {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <circle
-          cx="20"
-          cy="40"
-          r="8"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <circle
-          cx="60"
-          cy="22"
-          r="8"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <circle
-          cx="60"
-          cy="58"
-          r="8"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <path
-          d="M28 37 52 25M28 43l24 12"
-          className={common}
-        />
-      </svg>
-    )
-  }
-
-  if (type === "five-step") {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        {[12, 26, 40, 54].map((x, i) => (
-          <g key={x}>
-            <circle
-              cx={x}
-              cy="40"
-              r="7"
-              className="fill-[#E8F6FB] stroke-[#168BC4]"
-              strokeWidth="2"
-            />
-            {i < 3 && (
-              <path
-                d={`M${x + 8} 40h${6}`}
-                className="stroke-[#35B5E5]"
-                strokeWidth="2"
-              />
-            )}
-          </g>
-        ))}
-        <circle
-          cx="68"
-          cy="40"
-          r="7"
-          className="fill-[#071B49]"
-        />
-      </svg>
-    )
-  }
-
-  if (type === "elimination") {
-    return (
-      <svg
-        viewBox="0 0 80 80"
-        className="h-20 w-20"
-        aria-hidden="true"
-      >
-        <rect
-          x="10"
-          y="24"
-          width="22"
-          height="32"
-          rx="5"
-          className="fill-[#E8F6FB] stroke-[#168BC4]"
-          strokeWidth="2.2"
-        />
-        <rect
-          x="48"
-          y="24"
-          width="22"
-          height="32"
-          rx="5"
-          className="fill-[#F5F8FC] stroke-[#071B49]"
-          strokeWidth="2.2"
-        />
-        <path
-          d="m30 20 20 40M50 20 30 60"
-          className="stroke-[#168BC4]"
-          strokeWidth="2.5"
-        />
-      </svg>
-    )
-  }
-
-  return (
-    <svg
-      viewBox="0 0 80 80"
-      className="h-20 w-20"
-      aria-hidden="true"
-    >
-      <rect
-        x="12"
-        y="16"
-        width="56"
-        height="48"
-        rx="8"
-        className="fill-[#E8F6FB] stroke-[#168BC4]"
-        strokeWidth="2.2"
-      />
-      <path
-        d="M24 40h32M40 28v24"
-        className={common}
-      />
-    </svg>
-  )
-}
-
-function FlowLayout({
+function FlowVisual({
   nodes,
 }: {
   nodes: string[]
@@ -431,11 +60,9 @@ function FlowLayout({
     <div className="flex flex-wrap items-center justify-center gap-2">
       {nodes.map((node, index) => (
         <React.Fragment key={`${node}-${index}`}>
-          <Node
-            index={index}
-          >
+          <Box active={index === 0}>
             {node}
-          </Node>
+          </Box>
 
           {index < nodes.length - 1 && (
             <Arrow />
@@ -446,54 +73,289 @@ function FlowLayout({
   )
 }
 
-function ComparisonLayout({
+function VerticalFlow({
   nodes,
 }: {
   nodes: string[]
 }) {
-  const midpoint = Math.ceil(
-    nodes.length / 2
+  return (
+    <div className="mx-auto flex max-w-xl flex-col items-center">
+      {nodes.map((node, index) => (
+        <React.Fragment key={`${node}-${index}`}>
+          <Box active={index === 0}>
+            {node}
+          </Box>
+
+          {index < nodes.length - 1 && (
+            <div className="flex h-7 items-center">
+              <span className="text-lg font-bold text-[#168BC4]">
+                ↓
+              </span>
+            </div>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
   )
+}
+
+function DecisionVisual({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  const first = nodes[0] || "Question"
+  const rest = nodes.slice(1)
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <div className="rounded-2xl border border-[#168BC4]/20 bg-[#F5FAFC] p-4">
-        <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#168BC4]">
-          Treatment A
-        </p>
+    <div className="mx-auto max-w-2xl">
+      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] border-2 border-[#168BC4] bg-[#E8F6FB]">
+        <div className="h-9 w-9 rotate-45 rounded-lg border-2 border-[#071B49] bg-white" />
+      </div>
 
-        <div className="space-y-2">
-          {nodes
-            .slice(0, midpoint)
-            .map((node, index) => (
-              <Node
-                key={`${node}-${index}`}
-                index={index}
-              >
-                {node}
-              </Node>
-            ))}
+      <p className="mt-3 text-center text-sm font-semibold text-[#071B49]">
+        {first}
+      </p>
+
+      <div className="mx-auto my-5 h-7 w-px bg-[#35B5E5]" />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {rest.map((node, index) => (
+          <div
+            key={`${node}-${index}`}
+            className="rounded-2xl border border-[#D7E6EE] bg-white p-4 text-center shadow-sm"
+          >
+            <div className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#168BC4]">
+              {index === 0 ? "YES / APPLY" : "NO / OTHER"}
+            </div>
+
+            <div className="text-sm font-semibold text-[#071B49]">
+              {node}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MeasurementVisual({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-[1fr_90px_1fr] md:items-center">
+      <Box>
+        {nodes[0] || "Carrying amount"}
+      </Box>
+
+      <div className="flex justify-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#168BC4] bg-[#E8F6FB]">
+          <span className="text-xl font-bold text-[#071B49]">
+            =
+          </span>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#071B49]/10 bg-white p-4">
-        <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#071B49]/60">
-          Treatment B
+      <Box active>
+        {nodes[1] || "Measurement basis"}
+      </Box>
+
+      {nodes.slice(2).map((node, index) => (
+        <div
+          key={`${node}-${index}`}
+          className="rounded-2xl border border-[#D7E6EE] bg-[#F8FBFD] p-4 text-center md:col-span-3"
+        >
+          <span className="text-sm font-semibold text-[#071B49]">
+            {node}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ComparisonVisual({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  const midpoint = Math.ceil(nodes.length / 2)
+
+  return (
+    <div className="grid gap-5 md:grid-cols-2">
+      <div className="rounded-3xl border border-[#168BC4]/20 bg-[#F5FAFC] p-5">
+        <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+          Accounting route A
         </p>
 
-        <div className="space-y-2">
-          {nodes
-            .slice(midpoint)
-            .map((node, index) => (
-              <Node
-                key={`${node}-${index + midpoint}`}
-                index={index + midpoint}
-              >
-                {node}
-              </Node>
-            ))}
+        <div className="space-y-3">
+          {nodes.slice(0, midpoint).map((node, index) => (
+            <Box key={`${node}-${index}`}>
+              {node}
+            </Box>
+          ))}
         </div>
       </div>
+
+      <div className="rounded-3xl border border-[#071B49]/10 bg-white p-5">
+        <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#071B49]/60">
+          Accounting route B
+        </p>
+
+        <div className="space-y-3">
+          {nodes.slice(midpoint).map((node, index) => (
+            <Box key={`${node}-${index}`}>
+              {node}
+            </Box>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LifecycleVisual({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  return (
+    <div className="relative mx-auto max-w-3xl">
+      <div className="absolute left-8 right-8 top-1/2 hidden h-px bg-[#BFE7F4] md:block" />
+
+      <div className="relative grid gap-3 md:grid-cols-5">
+        {nodes.slice(0, 5).map((node, index) => (
+          <div
+            key={`${node}-${index}`}
+            className="relative rounded-2xl border border-[#D7E6EE] bg-white p-4 text-center shadow-sm"
+          >
+            <div className="mx-auto mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-[#E8F6FB] text-xs font-bold text-[#168BC4]">
+              {index + 1}
+            </div>
+
+            <div className="text-sm font-semibold leading-5 text-[#071B49]">
+              {node}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function HierarchyVisual({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className="flex flex-col items-center gap-3">
+        {nodes.slice(0, 4).map((node, index) => (
+          <React.Fragment key={`${node}-${index}`}>
+            <div
+              className="rounded-2xl border-2 px-8 py-3 text-center"
+              style={{
+                borderColor:
+                  index === 0
+                    ? blue
+                    : "#D7E6EE",
+                background:
+                  index === 0
+                    ? "#E8F6FB"
+                    : "white",
+                width: `${Math.max(
+                  45,
+                  100 - index * 15
+                )}%`,
+              }}
+            >
+              <span className="text-sm font-semibold text-[#071B49]">
+                {node}
+              </span>
+            </div>
+
+            {index < Math.min(nodes.length, 4) - 1 && (
+              <span className="text-[#168BC4]">
+                ↓
+              </span>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CashFlowVisual({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      {nodes.slice(0, 3).map((node, index) => (
+        <div
+          key={`${node}-${index}`}
+          className="relative rounded-3xl border border-[#D7E6EE] bg-white p-5 text-center shadow-sm"
+        >
+          <div
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
+            style={{
+              background:
+                index === 0
+                  ? "#E8F6FB"
+                  : "#F5F8FC",
+            }}
+          >
+            <span className="text-2xl font-bold text-[#168BC4]">
+              {index === 0
+                ? "→"
+                : index === 1
+                  ? "↔"
+                  : "←"}
+            </span>
+          </div>
+
+          <div className="text-sm font-semibold text-[#071B49]">
+            {node}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function EliminationVisual({
+  nodes,
+}: {
+  nodes: string[]
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-[1fr_80px_1fr] md:items-center">
+      <Box>
+        {nodes[0] || "Group entity A"}
+      </Box>
+
+      <div className="flex items-center justify-center">
+        <span className="text-3xl font-bold text-[#168BC4]">
+          −
+        </span>
+      </div>
+
+      <Box>
+        {nodes[1] || "Group entity B"}
+      </Box>
+
+      {nodes.slice(2).length > 0 && (
+        <div className="rounded-2xl border border-[#168BC4]/20 bg-[#E8F6FB] p-4 text-center md:col-span-3">
+          <span className="text-sm font-semibold text-[#071B49]">
+            {nodes.slice(2).join(" → ")}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
@@ -508,9 +370,6 @@ export default function CuraSectionIllustration({
     return null
   }
 
-  const type =
-    visual.type || "flow"
-
   const nodes =
     Array.isArray(visual.nodes)
       ? visual.nodes.filter(
@@ -524,31 +383,93 @@ export default function CuraSectionIllustration({
     return null
   }
 
-  const isComparison =
+  const type =
+    (visual.type || "flow").toLowerCase()
+
+  let content: React.ReactNode
+
+  if (
+    type === "decision" ||
+    type === "scope"
+  ) {
+    content = (
+      <DecisionVisual
+        nodes={nodes}
+      />
+    )
+  } else if (
+    type === "measurement" ||
+    type === "fair-value"
+  ) {
+    content = (
+      <MeasurementVisual
+        nodes={nodes}
+      />
+    )
+  } else if (
     type === "comparison" ||
     type === "split"
+  ) {
+    content = (
+      <ComparisonVisual
+        nodes={nodes}
+      />
+    )
+  } else if (
+    type === "lifecycle" ||
+    type === "cycle" ||
+    type === "timeline"
+  ) {
+    content = (
+      <LifecycleVisual
+        nodes={nodes}
+      />
+    )
+  } else if (
+    type === "hierarchy"
+  ) {
+    content = (
+      <HierarchyVisual
+        nodes={nodes}
+      />
+    )
+  } else if (
+    type === "cashflow"
+  ) {
+    content = (
+      <CashFlowVisual
+        nodes={nodes}
+      />
+    )
+  } else if (
+    type === "elimination" ||
+    type === "consolidation"
+  ) {
+    content = (
+      <EliminationVisual
+        nodes={nodes}
+      />
+    )
+  } else if (
+    type === "vertical"
+  ) {
+    content = (
+      <VerticalFlow
+        nodes={nodes}
+      />
+    )
+  } else {
+    content = (
+      <FlowVisual
+        nodes={nodes}
+      />
+    )
+  }
 
   return (
-    <div
-      className="
-        mb-8
-        overflow-hidden
-        rounded-[28px]
-        border
-        border-[#168BC4]/15
-        bg-gradient-to-br
-        from-[#F8FCFE]
-        to-white
-      "
-    >
-      <div className="grid gap-6 p-6 md:grid-cols-[120px_minmax(0,1fr)] md:p-8">
-        <div className="flex items-center justify-center">
-          <div className="flex h-28 w-28 items-center justify-center rounded-[24px] border border-[#168BC4]/15 bg-white shadow-[0_8px_24px_rgba(7,27,73,0.06)]">
-            <MiniIcon type={type} />
-          </div>
-        </div>
-
-        <div className="min-w-0">
+    <div className="mb-8 overflow-hidden rounded-[28px] border border-[#168BC4]/15 bg-gradient-to-br from-[#F7FCFE] to-white">
+      <div className="p-6 md:p-8">
+        <div className="mb-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#168BC4]">
             {visual.eyebrow || "CURA concept visual"}
           </p>
@@ -556,19 +477,15 @@ export default function CuraSectionIllustration({
           <h3 className="mt-2 text-lg font-semibold leading-7 text-[#071B49] md:text-xl">
             {visual.title}
           </h3>
-
-          <div className="mt-5">
-            {isComparison ? (
-              <ComparisonLayout
-                nodes={nodes}
-              />
-            ) : (
-              <FlowLayout
-                nodes={nodes}
-              />
-            )}
-          </div>
         </div>
+
+        {content}
+
+        {visual.note && (
+          <p className="mt-6 rounded-2xl bg-[#F5F8FC] px-5 py-4 text-sm leading-6 text-[#173565]">
+            {visual.note}
+          </p>
+        )}
       </div>
     </div>
   )
