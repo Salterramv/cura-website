@@ -558,6 +558,14 @@ export default function CuraHeader() {
                       Legal
                     </Link>
 
+                    <Link
+                      href="/other-services"
+                      onClick={closeMobileMenu}
+                      className="block py-2.5 text-sm text-slate-600 hover:text-[#168BC4]"
+                    >
+                      Other Services
+                    </Link>
+
                   </div>
                 )}
 
