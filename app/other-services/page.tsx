@@ -1,819 +1,46 @@
-"use client"
-
 import Link from "next/link"
-import { FormEvent, useState } from "react"
 
-type ServiceType = "bookkeeping" | "payroll"
-
-type Props = {
-  service: ServiceType
-}
-
-const bookkeepingPackages = [
+const services = [
   {
-    title: "Less than MVR 10,000",
-    price: "MVR 2,000",
-    inclusions: [
-      "Bookkeeping",
-      "Accounts Receivable",
-      "Accounts Payable",
-      "Inventory Accounting",
-      "GST Compliance",
-      "Year-End Accounting",
-      "Document Management",
+    number: "01",
+    title: "Bookkeeping Service",
+    description:
+      "Professional bookkeeping support designed to keep your financial records organized, timely and useful for running your business.",
+    points: [
+      "Monthly bookkeeping",
+      "Accounts receivable and payable",
+      "Bank and cash reconciliation",
+      "Inventory accounting",
+      "GST and tax compliance support",
+      "Year-end accounting",
+      "Management information and client support",
     ],
+    href: "/other-services/bookkeeping",
   },
   {
-    title: "MVR 10,000 – MVR 25,000",
-    price: "MVR 3,500",
-    inclusions: [
-      "Bookkeeping",
-      "Bank & Cash Reconciliation",
-      "Accounts Receivable",
-      "Accounts Payable",
-      "Inventory Accounting",
-      "Year-End Accounting",
-      "Document Management",
+    number: "02",
+    title: "Payroll Service",
+    description:
+      "Structured payroll support designed to make monthly payroll processing accurate, consistent and easier to manage.",
+    points: [
+      "Monthly payroll processing",
+      "Employee master file maintenance",
+      "Salary and overtime calculations",
+      "Leave adjustments and deductions",
+      "MRPS calculations",
+      "Electronic payslips",
+      "Payroll reporting and analytics",
     ],
-  },
-  {
-    title: "MVR 25,000 – MVR 50,000",
-    price: "MVR 5,000",
-    inclusions: [
-      "Bookkeeping",
-      "Bank & Cash Reconciliation",
-      "Accounts Receivable",
-      "Accounts Payable",
-      "Inventory Accounting",
-      "GST Compliance",
-      "Tax Compliance",
-      "Year-End Accounting",
-      "Client Support",
-      "Document Management",
-    ],
-  },
-  {
-    title: "MVR 50,000 – MVR 75,000",
-    price: "MVR 6,500",
-    inclusions: [
-      "Bookkeeping",
-      "Bank & Cash Reconciliation",
-      "Accounts Receivable",
-      "Accounts Payable",
-      "Inventory Accounting",
-      "GST Compliance",
-      "Tax Compliance",
-      "Year-End Accounting",
-      "Client Support",
-      "Compliance Monitoring",
-      "Management Information",
-      "Document Management",
-    ],
-  },
-  {
-    title: "MVR 75,000 – MVR 100,000",
-    price: "MVR 8,000",
-    inclusions: [
-      "Bookkeeping",
-      "Bank & Cash Reconciliation",
-      "Accounts Receivable",
-      "Accounts Payable",
-      "Inventory Accounting",
-      "GST Compliance",
-      "Tax Compliance",
-      "Year-End Accounting",
-      "Client Support",
-      "Compliance Monitoring",
-      "Management Information",
-      "Document Management",
-    ],
-  },
-  {
-    title: "MVR 100,000 – MVR 150,000",
-    price: "MVR 9,500",
-    inclusions: [
-      "Bookkeeping",
-      "Bank & Cash Reconciliation",
-      "Accounts Receivable",
-      "Accounts Payable",
-      "Inventory Accounting",
-      "GST Compliance",
-      "Tax Compliance",
-      "Year-End Accounting",
-      "Client Support",
-      "Compliance Monitoring",
-      "Management Information",
-      "Document Management",
-    ],
-  },
-  {
-    title: "MVR 150,000 – MVR 200,000",
-    price: "MVR 11,500",
-    inclusions: [
-      "Bookkeeping",
-      "Bank & Cash Reconciliation",
-      "Accounts Receivable",
-      "Accounts Payable",
-      "Inventory Accounting",
-      "GST Compliance",
-      "Tax Compliance",
-      "Year-End Accounting",
-      "Client Support",
-      "Compliance Monitoring",
-      "Management Information",
-      "Document Management",
-    ],
+    href: "/other-services/payroll",
   },
 ]
 
-const payrollPackages = [
-  {
-    title: "1 – 5 Employees",
-    fixed: "MVR 500",
-    variable: "MVR 100",
-    setup: "MVR 1,000",
-  },
-  {
-    title: "6 – 10 Employees",
-    fixed: "MVR 750",
-    variable: "MVR 95",
-    setup: "MVR 1,500",
-  },
-  {
-    title: "11 – 20 Employees",
-    fixed: "MVR 1,000",
-    variable: "MVR 90",
-    setup: "MVR 2,000",
-  },
-  {
-    title: "36 – 50 Employees",
-    fixed: "MVR 1,250",
-    variable: "MVR 85",
-    setup: "MVR 2,500",
-  },
-  {
-    title: "21 – 35 Employees",
-    fixed: "MVR 1,500",
-    variable: "MVR 80",
-    setup: "MVR 3,000",
-  },
-  {
-    title: "51 – 75 Employees",
-    fixed: "MVR 2,000",
-    variable: "MVR 75",
-    setup: "MVR 4,000",
-  },
-  {
-    title: "76 – 100 Employees",
-    fixed: "MVR 2,500",
-    variable: "MVR 70",
-    setup: "MVR 5,000",
-  },
-]
-
-const payrollInclusions = [
-  "Monthly Payroll Processing",
-  "Employee Master File Maintenance",
-  "New Employee Processing",
-  "Employee Termination Processing",
-  "Salary Calculations",
-  "Overtime Calculations",
-  "Leave Adjustments",
-  "Deductions",
-  "MRPS Calculations",
-  "Payroll Validation",
-  "Electronic Payslips",
-  "Payroll Register",
-  "Payroll Journal",
-  "Bank Transfer Schedule",
-  "Payroll Reports",
-  "Payroll Analytics",
-  "Client Support",
-  "Compliance Monitoring",
-]
-
-const bookkeepingReasons = [
-  {
-    title: "Reduce administrative burden",
-    text:
-      "Outsourcing routine bookkeeping allows business owners and management to spend more time on customers, operations and growth.",
-  },
-  {
-    title: "Improve financial records",
-    text:
-      "Consistent bookkeeping helps maintain organized and timely financial information for decision-making and compliance.",
-  },
-  {
-    title: "Access professional support",
-    text:
-      "Businesses can access accounting knowledge without maintaining a full in-house bookkeeping function.",
-  },
-  {
-    title: "Create better visibility",
-    text:
-      "Reliable records make it easier to understand cash flows, receivables, payables and the financial position of the business.",
-  },
-]
-
-const payrollReasons = [
-  {
-    title: "Reduce administrative work",
-    text:
-      "Payroll can consume significant management time. Outsourcing allows businesses to focus on their core operations.",
-  },
-  {
-    title: "Improve payroll accuracy",
-    text:
-      "A structured payroll process reduces the risk of calculation, processing and record-keeping errors.",
-  },
-  {
-    title: "Protect employee information",
-    text:
-      "Payroll involves sensitive employee information. A controlled process helps manage payroll information appropriately.",
-  },
-  {
-    title: "Maintain consistent processes",
-    text:
-      "A dedicated payroll process provides consistency for monthly processing, employee changes, deductions and reporting.",
-  },
-]
-
-const whyCura = [
-  "Practical understanding of the Maldives business environment",
-  "Professional accounting and financial knowledge",
-  "Structured and consistent processes",
-  "Clear communication with management",
-  "Flexible support designed around the client's requirements",
-  "Ability to combine bookkeeping or payroll support with wider accounting, tax and advisory services",
-]
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
+export default function OtherServicesPage() {
   return (
-    <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#168BC4]">
-      {children}
-    </p>
-  )
-}
-
-function BookkeepingCard({
-  pkg,
-  index,
-}: {
-  pkg: (typeof bookkeepingPackages)[number]
-  index: number
-}) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div
-      className={`group overflow-hidden rounded-2xl border bg-white transition-all duration-300 ${
-        open
-          ? "border-[#168BC4] shadow-xl"
-          : "border-slate-200 shadow-sm hover:-translate-y-1 hover:border-[#18B8EE]/50 hover:shadow-xl"
-      }`}
-    >
-      <div className="relative overflow-hidden bg-[#071B49] px-7 pb-7 pt-6 text-white">
-        <div className="absolute right-0 top-0 h-32 w-32 translate-x-12 -translate-y-12 rounded-full border-[18px] border-[#18B8EE]/10" />
-
-        <div className="relative">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-[0.22em] text-[#35B5E5]">
-              Package {String(index + 1).padStart(2, "0")}
-            </span>
-
-            <span className="text-xs font-medium text-slate-400">
-              Bookkeeping
-            </span>
-          </div>
-
-          <h3 className="mt-6 min-h-[52px] text-xl font-semibold leading-7">
-            {pkg.title}
-          </h3>
-
-          <div className="mt-7">
-            <p className="text-3xl font-semibold tracking-tight">
-              {pkg.price}
-            </p>
-
-            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8EB3D7]">
-              Per month
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-6">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          className={`flex w-full items-center justify-between rounded-xl px-5 py-4 text-sm font-bold uppercase tracking-[0.12em] transition ${
-            open
-              ? "bg-[#071B49] text-white"
-              : "bg-[#EAF8FD] text-[#071B49] hover:bg-[#18B8EE] hover:text-white"
-          }`}
-        >
-          <span>{open ? "Hide inclusions" : "View inclusions"}</span>
-
-          <span
-            className={`flex h-7 w-7 items-center justify-center rounded-full border transition-transform ${
-              open ? "rotate-45 border-white/40" : "border-[#168BC4]/30"
-            }`}
-          >
-            +
-          </span>
-        </button>
-
-        <div
-          className={`grid transition-all duration-300 ${
-            open
-              ? "mt-6 grid-rows-[1fr] opacity-100"
-              : "grid-rows-[0fr] opacity-0"
-          }`}
-        >
-          <div className="overflow-hidden">
-            <div className="border-t border-slate-200 pt-5">
-              <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-                Includes
-              </p>
-
-              <ul className="space-y-3">
-                {pkg.inclusions.map((item) => (
-                  <li
-                    key={item}
-                    className="flex gap-3 text-sm leading-6 text-slate-600"
-                  >
-                    <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E7F7FC] text-[10px] font-bold text-[#168BC4]">
-                      ✓
-                    </span>
-
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PayrollCard({
-  pkg,
-  index,
-}: {
-  pkg: (typeof payrollPackages)[number]
-  index: number
-}) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div
-      className={`group overflow-hidden rounded-2xl border bg-white transition-all duration-300 ${
-        open
-          ? "border-[#168BC4] shadow-xl"
-          : "border-slate-200 shadow-sm hover:-translate-y-1 hover:border-[#18B8EE]/50 hover:shadow-xl"
-      }`}
-    >
-      <div className="relative overflow-hidden bg-[#071B49] px-7 pb-7 pt-6 text-white">
-        <div className="absolute right-0 top-0 h-32 w-32 translate-x-12 -translate-y-12 rounded-full border-[18px] border-[#18B8EE]/10" />
-
-        <div className="relative">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-[0.22em] text-[#35B5E5]">
-              Package {String(index + 1).padStart(2, "0")}
-            </span>
-
-            <span className="text-xs font-medium text-slate-400">
-              Payroll
-            </span>
-          </div>
-
-          <h3 className="mt-6 min-h-[52px] text-xl font-semibold leading-7">
-            {pkg.title}
-          </h3>
-        </div>
-      </div>
-
-      <div className="space-y-5 p-7">
-
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            Fixed fee
-          </p>
-
-          <p className="mt-1 text-2xl font-semibold text-[#071B49]">
-            {pkg.fixed}
-          </p>
-
-          <p className="text-xs text-slate-400">
-            Per month
-          </p>
-        </div>
-
-        <div className="border-t border-slate-100 pt-5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            Variable fee
-          </p>
-
-          <p className="mt-1 text-2xl font-semibold text-[#071B49]">
-            {pkg.variable}
-          </p>
-
-          <p className="text-xs text-slate-400">
-            Per employee per month
-          </p>
-        </div>
-
-        <div className="border-t border-slate-100 pt-5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            Setup fee
-          </p>
-
-          <p className="mt-1 text-2xl font-semibold text-[#071B49]">
-            {pkg.setup}
-          </p>
-
-          <p className="text-xs text-slate-400">
-            One time fixed fee
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          className={`flex w-full items-center justify-between rounded-xl px-5 py-4 text-sm font-bold uppercase tracking-[0.12em] transition ${
-            open
-              ? "bg-[#071B49] text-white"
-              : "bg-[#EAF8FD] text-[#071B49] hover:bg-[#18B8EE] hover:text-white"
-          }`}
-        >
-          <span>{open ? "Hide inclusions" : "View inclusions"}</span>
-
-          <span
-            className={`flex h-7 w-7 items-center justify-center rounded-full border transition-transform ${
-              open ? "rotate-45 border-white/40" : "border-[#168BC4]/30"
-            }`}
-          >
-            +
-          </span>
-        </button>
-
-        <div
-          className={`grid transition-all duration-300 ${
-            open
-              ? "grid-rows-[1fr] opacity-100"
-              : "grid-rows-[0fr] opacity-0"
-          }`}
-        >
-          <div className="overflow-hidden">
-            <div className="border-t border-slate-200 pt-5">
-              <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
-                Includes
-              </p>
-
-              <ul className="space-y-3">
-                {payrollInclusions.map((item) => (
-                  <li
-                    key={item}
-                    className="flex gap-3 text-sm leading-6 text-slate-600"
-                  >
-                    <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E7F7FC] text-[10px] font-bold text-[#168BC4]">
-                      ✓
-                    </span>
-
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  )
-}
-
-function InquiryForm({ service }: { service: ServiceType }) {
-  const serviceName =
-    service === "bookkeeping"
-      ? "Bookkeeping Service"
-      : "Payroll Service"
-
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [error, setError] = useState("")
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    setSubmitting(true)
-    setSuccess(false)
-    setError("")
-
-    const form = event.currentTarget
-    const formData = new FormData(form)
-
-    const payload = {
-      service,
-      full_name: formData.get("full_name"),
-      email: formData.get("email"),
-      phone: formData.get("phone"),
-      business_name: formData.get("business_name"),
-      business_type: formData.get("business_type"),
-      business_location: formData.get("business_location"),
-      website: formData.get("website"),
-      current_circumstance: formData.get("current_circumstance"),
-      assistance_required: formData.get("assistance_required"),
-      urgency: formData.get("urgency"),
-      preferred_contact_method: formData.get("preferred_contact_method"),
-    }
-
-    try {
-      const response = await fetch("/api/service-inquiries", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok || !result.ok) {
-        throw new Error(
-          result?.error || "Unable to submit your enquiry.",
-        )
-      }
-
-      form.reset()
-      setSuccess(true)
-
-      window.setTimeout(() => {
-        setSuccess(false)
-      }, 5000)
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to submit your enquiry. Please try again.",
-      )
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <section
-      id="enquiry"
-      className="bg-[#071B49] px-6 py-20 text-white md:py-24"
-    >
-      <div className="mx-auto max-w-6xl">
-
-        <SectionLabel>Customized requirements</SectionLabel>
-
-        <h2 className="mt-5 max-w-3xl text-3xl font-semibold md:text-4xl">
-          Need a package tailored to your business?
-        </h2>
-
-        <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">
-          Tell CURA about your business, current processes and requirements.
-          We can review your needs and discuss an appropriate scope of
-          support.
-        </p>
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-12 rounded-2xl bg-white p-6 text-[#071B49] shadow-2xl md:p-10"
-        >
-          <div className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-              Service enquiry
-            </p>
-
-            <p className="mt-2 text-lg font-semibold">
-              {serviceName}
-            </p>
-          </div>
-
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
-
-            <div>
-              <label className="text-sm font-semibold">
-                Full name *
-              </label>
-
-              <input
-                required
-                name="full_name"
-                type="text"
-                placeholder="Your full name"
-                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-[#168BC4]"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold">
-                Business / Company *
-              </label>
-
-              <input
-                required
-                name="business_name"
-                type="text"
-                placeholder="Company name"
-                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-[#168BC4]"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold">
-                Email *
-              </label>
-
-              <input
-                required
-                name="email"
-                type="email"
-                placeholder="you@company.com"
-                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-[#168BC4]"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold">
-                Phone / WhatsApp *
-              </label>
-
-              <input
-                required
-                name="phone"
-                type="tel"
-                placeholder="+960 ..."
-                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-[#168BC4]"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold">
-                Business type / Industry *
-              </label>
-
-              <input
-                required
-                name="business_type"
-                type="text"
-                placeholder="e.g. Retail, Tourism, Construction"
-                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-[#168BC4]"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold">
-                Business location
-              </label>
-
-              <input
-                name="business_location"
-                type="text"
-                placeholder="Island / Location"
-                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-[#168BC4]"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold">
-                Website
-              </label>
-
-              <input
-                name="website"
-                type="text"
-                placeholder="www.example.com"
-                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-[#168BC4]"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold">
-                Preferred contact method
-              </label>
-
-              <select
-                name="preferred_contact_method"
-                defaultValue="Email"
-                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none focus:border-[#168BC4]"
-              >
-                <option>Email</option>
-                <option>Phone</option>
-                <option>WhatsApp</option>
-              </select>
-            </div>
-
-          </div>
-
-          <div className="mt-6">
-            <label className="text-sm font-semibold">
-              Tell us about your current circumstances *
-            </label>
-
-            <textarea
-              required
-              minLength={20}
-              name="current_circumstance"
-              rows={5}
-              placeholder="Tell us about your current bookkeeping/payroll process, team size, systems used, challenges or other relevant circumstances."
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-[#168BC4]"
-            />
-          </div>
-
-          <div className="mt-6">
-            <label className="text-sm font-semibold">
-              What would you like CURA to help with? *
-            </label>
-
-            <textarea
-              required
-              minLength={10}
-              name="assistance_required"
-              rows={5}
-              placeholder="Describe the support you are looking for or any customized requirements."
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-[#168BC4]"
-            />
-          </div>
-
-          <div className="mt-6">
-            <label className="text-sm font-semibold">
-              Urgency
-            </label>
-
-            <select
-              name="urgency"
-              defaultValue="Not urgent"
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none focus:border-[#168BC4]"
-            >
-              <option>Not urgent</option>
-              <option>Within 1 month</option>
-              <option>Within 2 weeks</option>
-              <option>Urgent</option>
-            </select>
-          </div>
-
-          {error && (
-            <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm font-semibold text-green-700">
-              ✓ Your enquiry has been submitted successfully. CURA will
-              review your requirements and get in touch with you.
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="mt-8 inline-flex items-center justify-center rounded-md bg-[#071B49] px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-[#0B2A69] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {submitting ? "Submitting..." : "Submit enquiry →"}
-          </button>
-
-          <p className="mt-4 text-xs leading-5 text-slate-500">
-            Your enquiry will be reviewed by CURA. We will use the contact
-            information provided to respond to your enquiry.
-          </p>
-        </form>
-      </div>
-    </section>
-  )
-}
-
-export default function OtherServicePage({ service }: Props) {
-  const isBookkeeping = service === "bookkeeping"
-
-  const title = isBookkeeping
-    ? "Bookkeeping Service"
-    : "Payroll Service"
-
-  const description = isBookkeeping
-    ? "Reliable bookkeeping support designed to keep your financial records organized, timely and useful for running your business."
-    : "Structured payroll support designed to make monthly payroll processing accurate, consistent and easier to manage."
-
-  const reasons = isBookkeeping
-    ? bookkeepingReasons
-    : payrollReasons
-
-  return (
-    <div className="min-h-screen bg-white text-[#071B49]">
+    <main className="min-h-screen bg-white text-[#071B49]">
 
       {/* HERO */}
       <section className="relative overflow-hidden bg-[#061936]">
-
         <div className="absolute inset-0">
           <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-[#0D4F85] via-[#0A315F] to-transparent opacity-80" />
 
@@ -822,133 +49,163 @@ export default function OtherServicePage({ service }: Props) {
           <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-[#0C73A8] opacity-20 blur-3xl" />
         </div>
 
-        <div className="relative mx-auto max-w-7xl px-6 py-20 md:py-28 lg:px-8 lg:py-32">
+        <div className="relative mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+          <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#35B5E5]">
+            Other Services
+          </p>
 
-          <Link
-            href="/other-services"
-            className="text-sm font-semibold text-[#8EB3D7] transition hover:text-white"
-          >
-            ← Back to Other Services
-          </Link>
+          <h1 className="mt-6 max-w-4xl text-5xl font-semibold leading-[1.05] tracking-tight text-white md:text-7xl">
+            Practical support for the
+            <br />
+            <span className="text-[#8EB3D7]">
+              processes behind your business.
+            </span>
+          </h1>
 
-          <div className="mt-12 max-w-4xl">
+          <p className="mt-8 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
+            CURA provides bookkeeping and payroll support designed to reduce
+            administrative burden, improve consistency and give businesses
+            access to professional financial support.
+          </p>
 
-            <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#35B5E5]">
-              Other Services
-            </p>
+          <div className="mt-10 flex flex-wrap gap-4">
+            <a
+              href="#services"
+              className="rounded-md bg-white px-7 py-3.5 text-sm font-semibold text-[#071B49] transition hover:bg-slate-100"
+            >
+              Explore services →
+            </a>
 
-            <h1 className="mt-5 text-5xl font-semibold leading-[1.05] tracking-tight text-white md:text-7xl">
-              {title}
-            </h1>
-
-            <p className="mt-7 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl">
-              {description}
-            </p>
-
-            <div className="mt-9 flex flex-wrap gap-3">
-
-              <a
-                href="#packages"
-                className="inline-flex rounded-md bg-white px-7 py-3.5 text-sm font-semibold text-[#071B49] transition hover:bg-slate-100"
-              >
-                View packages →
-              </a>
-
-              <a
-                href="#enquiry"
-                className="inline-flex rounded-md border border-white/30 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
-                Customized enquiry
-              </a>
-
-            </div>
-
+            <a
+              href="#contact"
+              className="rounded-md border border-white/30 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              Discuss your requirements
+            </a>
           </div>
         </div>
       </section>
 
       {/* INTRO */}
-      <section>
+      <section className="bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-24">
 
-          <div className="grid gap-14 lg:grid-cols-[1.4fr_0.8fr]">
+          <div className="grid gap-14 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
 
             <div>
-              <SectionLabel>Why outsource?</SectionLabel>
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#168BC4]">
+                Business support
+              </p>
 
-              <h2 className="mt-5 text-4xl font-semibold tracking-tight md:text-5xl">
-                Focus on running your business. Let CURA handle the process.
+              <h2 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
+                Let your team focus on the business. Let CURA support the
+                process.
               </h2>
 
-              <p className="mt-7 text-lg leading-9 text-slate-600">
-                {isBookkeeping
-                  ? "Bookkeeping is a recurring operational requirement, but it does not necessarily need to be managed entirely in-house. Outsourcing can give businesses access to structured accounting support while reducing the administrative burden on owners and management."
-                  : "Payroll is a critical recurring process involving employee records, calculations, deductions, reporting and payment information. Outsourcing can reduce administrative pressure while giving businesses access to a structured payroll process."
-                }
+              <p className="mt-7 max-w-3xl text-lg leading-9 text-slate-600">
+                Bookkeeping and payroll are essential recurring business
+                processes. Outsourcing these functions can reduce
+                administrative pressure while providing access to structured
+                professional support.
               </p>
             </div>
 
             <div className="rounded-2xl bg-[#F5F8FC] p-8">
-
-              <SectionLabel>At a glance</SectionLabel>
-
-              <h3 className="mt-4 text-2xl font-semibold">
-                {isBookkeeping
-                  ? "Bookkeeping support"
-                  : "Payroll support"
-                }
-              </h3>
-
-              <p className="mt-4 leading-7 text-slate-600">
-                Practical support designed around the size, needs and
-                circumstances of your business.
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#168BC4]">
+                CURA approach
               </p>
 
-              <a
-                href="#enquiry"
-                className="mt-7 inline-flex font-semibold text-[#168BC4] hover:text-[#071B49]"
-              >
-                Discuss your requirements →
-              </a>
+              <p className="mt-5 text-2xl font-semibold leading-9 text-[#071B49]">
+                Professional knowledge. Practical support. Clear processes.
+              </p>
 
+              <p className="mt-5 leading-7 text-slate-600">
+                Our services are designed around the practical requirements of
+                businesses operating in the Maldives.
+              </p>
             </div>
 
           </div>
         </div>
       </section>
 
-      {/* WHY OUTSOURCE */}
-      <section className="bg-[#F5F8FC]">
+      {/* SERVICES */}
+      <section
+        id="services"
+        className="bg-[#F5F8FC]"
+      >
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-24">
 
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#168BC4]">
+            Our services
+          </p>
 
-          <SectionLabel>
-            Benefits of outsourcing
-          </SectionLabel>
-
-          <h2 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
-            Why businesses outsource {isBookkeeping ? "bookkeeping" : "payroll"}.
+          <h2 className="mt-5 text-4xl font-semibold tracking-tight md:text-5xl">
+            Choose the support your business needs.
           </h2>
 
-          <div className="mt-12 grid gap-5 md:grid-cols-2">
+          <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-600">
+            Explore our bookkeeping and payroll services, including packages,
+            benefits and the option to discuss customized requirements.
+          </p>
 
-            {reasons.map((reason, index) => (
-              <div
-                key={reason.title}
-                className="group rounded-2xl border border-slate-200 bg-white p-7 transition duration-300 hover:-translate-y-1 hover:border-[#18B8EE]/40 hover:shadow-lg"
+          <div className="mt-12 grid gap-7 lg:grid-cols-2">
+
+            {services.map((service) => (
+              <Link
+                key={service.title}
+                href={service.href}
+                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#18B8EE]/50 hover:shadow-xl md:p-10"
               >
-                <span className="text-sm font-bold tracking-[0.15em] text-[#18B8EE]">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
+                <div className="absolute right-0 top-0 h-48 w-48 translate-x-20 -translate-y-20 rounded-full border-[24px] border-[#18B8EE]/5 transition duration-500 group-hover:scale-125" />
 
-                <h3 className="mt-7 text-xl font-semibold">
-                  {reason.title}
-                </h3>
+                <div className="relative">
 
-                <p className="mt-3 leading-7 text-slate-600">
-                  {reason.text}
-                </p>
-              </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold tracking-[0.25em] text-[#18B8EE]">
+                      {service.number}
+                    </span>
+
+                    <span className="text-2xl text-[#168BC4] transition-transform duration-300 group-hover:translate-x-1">
+                      →
+                    </span>
+                  </div>
+
+                  <h3 className="mt-8 text-3xl font-semibold tracking-tight text-[#071B49]">
+                    {service.title}
+                  </h3>
+
+                  <p className="mt-5 text-base leading-8 text-slate-600">
+                    {service.description}
+                  </p>
+
+                  <div className="mt-8 border-t border-slate-200 pt-7">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+                      What we support
+                    </p>
+
+                    <ul className="mt-5 space-y-3">
+                      {service.points.map((point) => (
+                        <li
+                          key={point}
+                          className="flex gap-3 text-sm leading-6 text-slate-600"
+                        >
+                          <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E7F7FC] text-[10px] font-bold text-[#168BC4]">
+                            ✓
+                          </span>
+
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="mt-9 text-sm font-semibold text-[#071B49] transition group-hover:text-[#168BC4]">
+                    Explore {service.title} →
+                  </div>
+
+                </div>
+              </Link>
             ))}
 
           </div>
@@ -956,169 +213,40 @@ export default function OtherServicePage({ service }: Props) {
       </section>
 
       {/* WHY CURA */}
-      <section>
-
+      <section className="bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-24">
-
-          <div className="max-w-3xl">
-
-            <SectionLabel>Why CURA</SectionLabel>
-
-            <h2 className="mt-5 text-4xl font-semibold tracking-tight md:text-5xl">
-              Professional support with a practical perspective.
-            </h2>
-
-            <p className="mt-6 text-lg leading-8 text-slate-600">
-              CURA combines professional financial knowledge with practical
-              support designed around the day-to-day realities of businesses.
-            </p>
-
-          </div>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-
-            {whyCura.map((item) => (
-              <div
-                key={item}
-                className="rounded-2xl border border-slate-200 p-7 transition hover:-translate-y-1 hover:border-[#18B8EE]/40 hover:shadow-lg"
-              >
-                <span className="text-2xl font-semibold text-[#18B8EE]">
-                  +
-                </span>
-
-                <p className="mt-5 leading-7 text-slate-600">
-                  {item}
-                </p>
-              </div>
-            ))}
-
-          </div>
-        </div>
-      </section>
-
-      {/* PACKAGES */}
-      <section
-        id="packages"
-        className="bg-[#F5F8FC]"
-      >
-
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-24">
-
-          <SectionLabel>Packages</SectionLabel>
-
-          <h2 className="mt-5 text-4xl font-semibold tracking-tight md:text-5xl">
-            {isBookkeeping
-              ? "Bookkeeping packages"
-              : "Payroll packages"
-            }
-          </h2>
-
-          <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-600">
-            {isBookkeeping
-              ? "Choose a package based on monthly revenue. Each package includes the services listed below."
-              : "Choose a package based on the number of employees. Payroll pricing includes a monthly fixed fee, variable fee per employee and a one-time setup fee."
-            }
-          </p>
-
-          {isBookkeeping ? (
-
-            <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-
-              {bookkeepingPackages.map((pkg, index) => (
-                <BookkeepingCard
-                  key={pkg.title}
-                  pkg={pkg}
-                  index={index}
-                />
-              ))}
-
-            </div>
-
-          ) : (
-
-            <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-
-              {payrollPackages.map((pkg, index) => (
-                <PayrollCard
-                  key={pkg.title}
-                  pkg={pkg}
-                  index={index}
-                />
-              ))}
-
-            </div>
-
-          )}
-
-          <div className="mt-10 rounded-2xl border border-[#18B8EE]/20 bg-white p-7 shadow-sm">
-
-            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-
-              <div>
-                <p className="text-sm font-semibold text-[#071B49]">
-                  Need something different?
-                </p>
-
-                <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                  The packages provide a starting point. If your business has
-                  requirements outside the packages above, use the customized
-                  enquiry form and tell CURA what you need.
-                </p>
-              </div>
-
-              <a
-                href="#enquiry"
-                className="inline-flex shrink-0 rounded-md bg-[#071B49] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#168BC4]"
-              >
-                Customized enquiry →
-              </a>
-
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* SERVICE SCOPE */}
-      <section>
-
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
 
           <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
 
             <div>
-              <SectionLabel>
-                Practical support
-              </SectionLabel>
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#168BC4]">
+                Why CURA
+              </p>
 
-              <h2 className="mt-5 text-4xl font-semibold tracking-tight">
-                Designed around your business.
+              <h2 className="mt-5 text-4xl font-semibold tracking-tight md:text-5xl">
+                Support that fits the way your business operates.
               </h2>
             </div>
 
-            <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
 
-              {(isBookkeeping
-                ? [
-                    "Packages can be selected according to monthly revenue.",
-                    "Businesses can discuss requirements that fall outside the standard package.",
-                    "Support can be structured around the client's existing accounting processes.",
-                    "CURA can discuss broader accounting and compliance requirements where relevant.",
-                  ]
-                : [
-                    "Packages can be selected according to employee numbers.",
-                    "The package includes monthly processing and the listed payroll activities.",
-                    "Businesses can discuss requirements that fall outside the standard package.",
-                    "CURA can discuss broader accounting and compliance requirements where relevant.",
-                  ]
-              ).map((item) => (
+              {[
+                "Professional financial knowledge",
+                "Practical understanding of the Maldives business environment",
+                "Structured and consistent processes",
+                "Flexible support around client requirements",
+                "Clear communication with management",
+                "Access to wider accounting, tax and advisory knowledge",
+              ].map((item, index) => (
                 <div
                   key={item}
-                  className="rounded-xl border border-slate-200 bg-[#F5F8FC] px-6 py-5"
+                  className="rounded-xl border border-slate-200 bg-[#F5F8FC] p-6"
                 >
-                  <p className="flex gap-3 leading-7 text-slate-600">
-                    <span className="text-[#168BC4]">✓</span>
+                  <span className="text-xs font-bold tracking-[0.2em] text-[#18B8EE]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+
+                  <p className="mt-4 leading-7 text-slate-600">
                     {item}
                   </p>
                 </div>
@@ -1130,9 +258,65 @@ export default function OtherServicePage({ service }: Props) {
         </div>
       </section>
 
-      {/* ENQUIRY */}
-      <InquiryForm service={service} />
+      {/* CUSTOMIZED REQUIREMENTS */}
+      <section
+        id="contact"
+        className="bg-[#071B49]"
+      >
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-24">
 
-    </div>
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#35B5E5]">
+            Customized requirements
+          </p>
+
+          <div className="mt-6 grid gap-10 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
+
+            <div>
+              <h2 className="max-w-4xl text-4xl font-semibold tracking-tight text-white md:text-5xl">
+                Don't see exactly what your business needs?
+              </h2>
+
+              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
+                Tell us about your requirements. You can explore the standard
+                packages first, or contact CURA to discuss a customized
+                arrangement.
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-white p-7">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+                Get started
+              </p>
+
+              <p className="mt-4 text-lg font-semibold text-[#071B49]">
+                Choose a service and tell us what you need.
+              </p>
+
+              <div className="mt-6 space-y-3">
+
+                <Link
+                  href="/other-services/bookkeeping#enquiry"
+                  className="flex items-center justify-between rounded-lg bg-[#071B49] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#168BC4]"
+                >
+                  Bookkeeping enquiry
+                  <span>→</span>
+                </Link>
+
+                <Link
+                  href="/other-services/payroll#enquiry"
+                  className="flex items-center justify-between rounded-lg border border-slate-200 px-5 py-4 text-sm font-semibold text-[#071B49] transition hover:border-[#168BC4] hover:text-[#168BC4]"
+                >
+                  Payroll enquiry
+                  <span>→</span>
+                </Link>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </main>
   )
 }
