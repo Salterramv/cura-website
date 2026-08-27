@@ -269,6 +269,113 @@ function stripLecturerText(
   return result.join("\n").trim()
 }
 
+/*
+ * PowerPoint imports can store a lecturer name as a separate
+ * paragraph from the lecturer's qualification. The old cleanup
+ * therefore missed names such as "ABDULLA AFHAAM".
+ *
+ * We only use this broader name test while cleaning the FIRST
+ * CONTENT BLOCK of the FIRST SECTION, which corresponds to the
+ * source cover/lecturer area. This prevents legitimate author
+ * names or person names inside the actual lesson from being
+ * removed.
+ */
+function isFirstSlideLecturerName(value: string) {
+  const text = value.trim()
+
+  if (!text || /\d/.test(text)) {
+    return false
+  }
+
+  /*
+   * Lecturer names in the imported cover are normally all caps.
+   */
+  if (text !== text.toUpperCase()) {
+    return false
+  }
+
+  /*
+   * Require a normal two-to-five-word name.
+   */
+  if (
+    !/^[A-Z][A-Z.'-]*(?:\s+[A-Z][A-Z.'-]*){1,4}$/.test(
+      text
+    )
+  ) {
+    return false
+  }
+
+  /*
+   * Do not treat obvious educational headings as names.
+   */
+  const excludedWords = new Set([
+    "scope",
+    "definitions",
+    "objective",
+    "objectives",
+    "recognition",
+    "measurement",
+    "presentation",
+    "accounting",
+    "agriculture",
+    "assets",
+    "liabilities",
+    "equity",
+    "revenue",
+    "expenses",
+    "examples",
+    "example",
+    "illustration",
+    "illustrations",
+    "introduction",
+    "conclusion",
+    "summary",
+    "background",
+    "government",
+    "grants",
+    "biological",
+    "produce",
+    "harvest",
+    "inventory",
+    "inventories",
+    "fair",
+    "value",
+  ])
+
+  const words = text.toLowerCase().split(/\s+/)
+
+  return !words.some((word) =>
+    excludedWords.has(word)
+  )
+}
+
+/*
+ * Source image labels such as "Picture 3" are importer
+ * artefacts. The image itself is still rendered.
+ */
+function isPictureLabel(value: string | null | undefined) {
+  if (!value) {
+    return false
+  }
+
+  return /^picture\s+\d+$/i.test(value.trim())
+}
+
+function isIllustrationLabel(
+  value: string | null | undefined
+) {
+  if (!value) {
+    return false
+  }
+
+  const text = value.trim()
+
+  return (
+    /^picture\s+\d+$/i.test(text) ||
+    /^illustration\s+\d+$/i.test(text)
+  )
+}
+
 /* ============================================================
    PRESENTATION TYPES
    ============================================================ */
@@ -334,7 +441,9 @@ function getPresentationParagraphs(
       paragraph &&
       typeof paragraph === "object" &&
       typeof paragraph.text === "string" &&
-      paragraph.text.trim().length > 0
+      paragraph.text.trim().length > 0 &&
+      !isPictureLabel(paragraph.text) &&
+      !isIllustrationLabel(paragraph.text)
   )
 }
 
@@ -474,7 +583,11 @@ function SourceParagraph({
 }) {
   const text = paragraph.text || ""
 
-  if (!text.trim()) {
+  if (
+    !text.trim() ||
+    isPictureLabel(text) ||
+    isIllustrationLabel(text)
+  ) {
     return null
   }
 
@@ -598,54 +711,47 @@ function SourceTable({
 }: {
   table: EducationTable
 }) {
-  const columns = normalizeTableColumns(
-    table.columns
-  )
-
-  const rows = normalizeTableRows(
-    table.rows
-  )
+  const columns = normalizeTableColumns(table.columns)
+  const rows = normalizeTableRows(table.rows)
 
   if (rows.length === 0) {
     return null
   }
 
   return (
-    <div className="my-8 overflow-x-auto">
-      <table className="w-full border-collapse text-base">
-        {columns.length > 0 && (
-          <thead>
-            <tr>
-              {columns.map(
-                (column, index) => (
+    <div className="my-8 overflow-hidden rounded-3xl border border-[#D7E0EA] bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-base">
+          {columns.length > 0 && (
+            <thead>
+              <tr>
+                {columns.map((column, index) => (
                   <th
                     key={index}
                     className="
-                      border
-                      border-[#D7E0EA]
+                      border-r
+                      border-white/10
                       bg-[#071B49]
                       px-4
                       py-3
                       text-left
                       font-semibold
                       text-white
+                      last:border-r-0
+                      md:px-5
                     "
                   >
-                    <span className="whitespace-pre-wrap">
-                      {String(
-                        column ?? ""
-                      )}
+                    <span className="whitespace-pre-wrap break-words">
+                      {String(column ?? "")}
                     </span>
                   </th>
-                )
-              )}
-            </tr>
-          </thead>
-        )}
+                ))}
+              </tr>
+            </thead>
+          )}
 
-        <tbody>
-          {rows.map(
-            (row, rowIndex) => (
+          <tbody>
+            {rows.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
                 className={
@@ -654,41 +760,40 @@ function SourceTable({
                     : "bg-[#F7FAFC]"
                 }
               >
-                {row.map(
-                  (
-                    cell,
-                    cellIndex
-                  ) => (
-                    <td
-                      key={cellIndex}
-                      className="
-                        border
-                        border-[#D7E0EA]
-                        px-4
-                        py-3
-                        align-top
-                        text-[#102A5F]
-                      "
-                    >
-                      <span className="whitespace-pre-wrap break-words">
-                        {String(
-                          cell ?? ""
-                        )}
-                      </span>
-                    </td>
-                  )
-                )}
+                {row.map((cell, cellIndex) => (
+                  <td
+                    key={cellIndex}
+                    className="
+                      border-b
+                      border-r
+                      border-[#D7E0EA]
+                      px-4
+                      py-3
+                      align-top
+                      leading-7
+                      text-[#102A5F]
+                      last:border-r-0
+                      md:px-5
+                    "
+                  >
+                    <span className="whitespace-pre-wrap break-words">
+                      {String(cell ?? "")}
+                    </span>
+                  </td>
+                ))}
               </tr>
-            )
-          )}
-        </tbody>
-      </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      {table.caption && (
-        <p className="mt-3 text-center text-sm italic text-slate-500">
-          {table.caption}
-        </p>
-      )}
+      {table.caption &&
+        !isPictureLabel(table.caption) &&
+        !isIllustrationLabel(table.caption) && (
+          <p className="border-t border-slate-100 bg-[#F8FBFD] px-5 py-3 text-center text-sm leading-6 italic text-slate-500 md:px-6">
+            {table.caption}
+          </p>
+        )}
     </div>
   )
 }
@@ -707,8 +812,8 @@ function SourceAsset({
   }
 
   return (
-    <figure className="my-8">
-      <div className="overflow-hidden rounded-2xl border border-[#D7E0EA] bg-white">
+    <figure className="my-8 w-full">
+      <div className="flex w-full justify-center overflow-hidden rounded-3xl border border-[#D7E0EA] bg-white p-3 md:p-5">
         <img
           src={asset.url}
           alt={
@@ -716,9 +821,10 @@ function SourceAsset({
             "Accounting illustration"
           }
           className="
-            mx-auto
             block
             h-auto
+            max-h-[900px]
+            w-auto
             max-w-full
             object-contain
           "
@@ -726,18 +832,128 @@ function SourceAsset({
         />
       </div>
 
-      {asset.caption && (
-        <figcaption className="mt-3 text-center text-sm text-slate-500">
-          {asset.caption}
-        </figcaption>
-      )}
+      {asset.caption &&
+        !isPictureLabel(asset.caption) &&
+        !isIllustrationLabel(asset.caption) && (
+          <figcaption className="mt-3 text-center text-sm leading-6 text-slate-500">
+            {asset.caption}
+          </figcaption>
+        )}
     </figure>
+  )
+}
+
+/* ============================================================
+   VISUAL BLOCK HEADER
+   ============================================================ */
+
+function VisualBlockHeader({
+  label,
+  title,
+}: {
+  label: "Illustration" | "Table"
+  title: string | null
+}) {
+  if (
+    !title ||
+    isHiddenSourceMetadata(title) ||
+    isPictureLabel(title) ||
+    isIllustrationLabel(title)
+  ) {
+    return null
+  }
+
+  return (
+    <div className="border-b border-[#168BC4]/10 px-6 py-5 md:px-8">
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#168BC4]">
+        {label}
+      </p>
+
+      <h3 className="mt-2 text-xl font-semibold leading-7 text-[#071B49]">
+        {cleanSourceText(title)}
+      </h3>
+    </div>
+  )
+}
+
+/* ============================================================
+   VISUAL BLOCK RENDERERS
+   ============================================================ */
+
+function SourceFigureBlock({
+  block,
+  assets,
+}: {
+  block: Block
+  assets: EducationAsset[]
+}) {
+  return (
+    <div className="my-8 overflow-hidden rounded-3xl border border-[#168BC4]/15 bg-[#F8FBFD]">
+      <VisualBlockHeader
+        label="Illustration"
+        title={block.title}
+      />
+
+      {block.content &&
+        cleanSourceText(block.content).length > 0 && (
+          <div className="px-6 pt-6 md:px-8">
+            <SourceText>
+              {cleanSourceText(block.content)}
+            </SourceText>
+          </div>
+        )}
+
+      <div className="space-y-6 p-6 md:p-8">
+        {assets.map((asset) => (
+          <SourceAsset
+            key={asset.id}
+            asset={asset}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SourceTableBlock({
+  block,
+  tables,
+}: {
+  block: Block
+  tables: EducationTable[]
+}) {
+  return (
+    <div className="my-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <VisualBlockHeader
+        label="Table"
+        title={block.title}
+      />
+
+      {block.content &&
+        cleanSourceText(block.content).length > 0 && (
+          <div className="px-6 pt-6 md:px-8">
+            <SourceText>
+              {cleanSourceText(block.content)}
+            </SourceText>
+          </div>
+        )}
+
+      <div className="p-5 md:p-8">
+        {tables.map((table) => (
+          <SourceTable
+            key={table.id}
+            table={table}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 
 /* ============================================================
    LEGACY FALLBACK
    ============================================================ */
+
 
 function renderLegacyItems(
   items: Item[]
@@ -750,7 +966,9 @@ function renderLegacyItems(
 
       return (
         text.length > 0 &&
-        !isHiddenSourceMetadata(text)
+        !isHiddenSourceMetadata(text) &&
+        !isPictureLabel(text) &&
+        !isIllustrationLabel(text)
       )
     }
   )
@@ -775,6 +993,22 @@ function renderLegacyItems(
   )
 }
 
+function SourceText({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={`whitespace-pre-wrap break-words text-base leading-8 text-[#102A5F] ${className}`}
+    >
+      {children}
+    </div>
+  )
+}
+
 /* ============================================================
    BLOCK RENDERER
    ============================================================ */
@@ -792,6 +1026,36 @@ function RenderSourceBlock({
 }) {
   const { block, items } =
     contentBlock
+
+  const blockType = (block.block_type || "").toLowerCase()
+
+  /*
+   * Visual blocks are authoritative and must be rendered before the
+   * presentation-text path. Otherwise an imported figure/table can
+   * be treated as ordinary source text.
+   */
+  if (
+    (blockType === "image" ||
+      blockType === "figure" ||
+      blockType === "illustration") &&
+    assets.length > 0
+  ) {
+    return (
+      <SourceFigureBlock
+        block={block}
+        assets={assets}
+      />
+    )
+  }
+
+  if (blockType === "table" && tables.length > 0) {
+    return (
+      <SourceTableBlock
+        block={block}
+        tables={tables}
+      />
+    )
+  }
 
   const paragraphs =
     getPresentationParagraphs(block)
@@ -848,7 +1112,9 @@ function RenderSourceBlock({
           if (
             isHiddenSourceMetadata(
               text
-            )
+            ) ||
+            isPictureLabel(text) ||
+            isIllustrationLabel(text)
           ) {
             return false
           }
@@ -895,6 +1161,8 @@ function RenderSourceBlock({
           !isHiddenSourceMetadata(
             block.title
           ) &&
+          !isPictureLabel(block.title) &&
+          !isIllustrationLabel(block.title) &&
           visibleParagraphs.length ===
             0 && (
             <h3 className="mb-4 text-xl font-semibold leading-8 text-[#071B49]">
@@ -953,7 +1221,9 @@ function RenderSourceBlock({
         !blockTitleIsDuplicate &&
         !isHiddenSourceMetadata(
           block.title
-        ) && (
+        ) &&
+        !isPictureLabel(block.title) &&
+        !isIllustrationLabel(block.title) && (
           <h3 className="text-xl font-semibold leading-8 text-[#071B49]">
             {cleanSourceText(
               block.title
@@ -1673,11 +1943,14 @@ export default function AccountingTopicPage() {
   const processedSections =
     sectionsWithBlocks.map(
       (entry, sectionIndex) => {
-        if (
-          sectionIndex !== 0
-        ) {
-          return entry
-        }
+        /*
+         * Only the first content block of the first section is
+         * treated as the source cover/lecturer area.
+         *
+         * The rest of the lesson is left untouched.
+         */
+        const firstBlockId =
+          entry.blocks[0]?.block.id
 
         const processedBlocks =
           entry.blocks.map(
@@ -1685,14 +1958,15 @@ export default function AccountingTopicPage() {
               const block =
                 contentBlock.block
 
+              const isFirstCoverBlock =
+                sectionIndex === 0 &&
+                block.id === firstBlockId
+
               const presentation =
-                getPresentation(
-                  block
-                )
+                getPresentation(block)
 
               /*
-               * First preference:
-               * clean presentation paragraphs.
+               * Presentation data is authoritative.
                */
               if (
                 presentation &&
@@ -1705,31 +1979,71 @@ export default function AccountingTopicPage() {
                     .map(
                       (
                         paragraph
-                      ) => ({
-                        ...paragraph,
-                        text:
+                      ) => {
+                        const cleanedText =
                           stripLecturerText(
                             paragraph.text ||
                               ""
-                          ),
-                      })
+                          )
+
+                        /*
+                         * The imported lecturer name can be
+                         * a standalone all-caps paragraph.
+                         * Remove it only from the first
+                         * cover block.
+                         */
+                        if (
+                          isFirstCoverBlock &&
+                          isFirstSlideLecturerName(
+                            cleanedText
+                          )
+                        ) {
+                          return {
+                            ...paragraph,
+                            text: "",
+                          }
+                        }
+
+                        return {
+                          ...paragraph,
+                          text: cleanedText,
+                        }
+                      }
                     )
                     .filter(
                       (
                         paragraph
-                      ) =>
-                        paragraph.text &&
-                        paragraph.text.trim()
-                          .length > 0 &&
-                        !isHiddenSourceMetadata(
-                          paragraph.text
+                      ) => {
+                        const text =
+                          paragraph.text?.trim() ||
+                          ""
+
+                        return (
+                          text.length > 0 &&
+                          !isHiddenSourceMetadata(
+                            text
+                          ) &&
+                          !isPictureLabel(
+                            text
+                          ) &&
+                          !isIllustrationLabel(
+                            text
+                          )
                         )
+                      }
                     )
 
                 return {
                   ...contentBlock,
                   block: {
                     ...block,
+                    title:
+                      isFirstCoverBlock &&
+                      isFirstSlideLecturerName(
+                        block.title || ""
+                      )
+                        ? ""
+                        : block.title,
                     presentation: {
                       ...presentation,
                       paragraphs,
@@ -1741,38 +2055,87 @@ export default function AccountingTopicPage() {
               /*
                * Legacy fallback.
                */
+              const cleanedTitle =
+                stripLecturerText(
+                  block.title || ""
+                )
+
+              const cleanedContent =
+                stripLecturerText(
+                  block.content || ""
+                )
+
+              const cleanedItems =
+                contentBlock.items
+                  .map(
+                    (item) => {
+                      const cleaned =
+                        stripLecturerText(
+                          item.content ||
+                            ""
+                        )
+
+                      return {
+                        ...item,
+                        content:
+                          cleaned,
+                      }
+                    }
+                  )
+                  .filter(
+                    (item) => {
+                      const text =
+                        item.content.trim()
+
+                      if (
+                        !text ||
+                        isHiddenSourceMetadata(
+                          text
+                        ) ||
+                        isPictureLabel(
+                          text
+                        ) ||
+                        isIllustrationLabel(
+                          text
+                        )
+                      ) {
+                        return false
+                      }
+
+                      if (
+                        isFirstCoverBlock &&
+                        isFirstSlideLecturerName(
+                          text
+                        )
+                      ) {
+                        return false
+                      }
+
+                      return true
+                    }
+                  )
+
               return {
                 ...contentBlock,
                 block: {
                   ...block,
                   title:
-                    stripLecturerText(
-                      block.title ||
-                        ""
-                    ),
+                    isFirstCoverBlock &&
+                    isFirstSlideLecturerName(
+                      cleanedTitle
+                    )
+                      ? ""
+                      : cleanedTitle,
                   content:
-                    stripLecturerText(
-                      block.content ||
-                        ""
-                    ),
+                    isFirstCoverBlock &&
+                    isFirstSlideLecturerName(
+                      cleanedContent
+                    )
+                      ? ""
+                      : cleanedContent,
                 },
                 items:
-                  contentBlock.items
-                    .map(
-                      (item) => ({
-                        ...item,
-                        content:
-                          stripLecturerText(
-                            item.content ||
-                              ""
-                          ),
-                      })
-                    )
-                    .filter(
-                      (item) =>
-                        item.content.trim()
-                          .length > 0
-                    ),
+                  cleanedItems,
               }
             }
           )
