@@ -1416,12 +1416,7 @@ export default function OtherServicesAdminPage() {
                             index,
                             "inclusions",
                             event.target.value
-                              .split("\n")
-                              .map(
-                                (item) =>
-                                  item.trim(),
-                              )
-                              .filter(Boolean),
+                              .split("\n"),
                           )
                         }
                         placeholder={
