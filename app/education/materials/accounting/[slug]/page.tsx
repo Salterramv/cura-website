@@ -7,6 +7,7 @@ import { useParams } from "next/navigation"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
 import { createClient } from "@/lib/supabase/client"
+import CuraAccountingVisual from "@/components/education/CuraAccountingVisual"
 
 /* ============================================================
    TYPES
@@ -876,6 +877,18 @@ function VisualBlockHeader({
   )
 }
 
+function SourceText({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="whitespace-pre-wrap text-[15px] leading-8 text-[#173565] md:text-base">
+      {children}
+    </div>
+  )
+}
+
 /* ============================================================
    VISUAL BLOCK RENDERERS
    ============================================================ */
@@ -903,14 +916,19 @@ function SourceFigureBlock({
           </div>
         )}
 
-      <div className="space-y-6 p-6 md:p-8">
-        {assets.map((asset) => (
-          <SourceAsset
-            key={asset.id}
-            asset={asset}
-          />
-        ))}
-      </div>
+      <details className="mx-6 mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white md:mx-8">
+        <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-[#071B49]">
+          Source reference — original illustration
+        </summary>
+        <div className="space-y-6 border-t border-slate-100 p-5 md:p-7">
+          {assets.map((asset) => (
+            <SourceAsset
+              key={asset.id}
+              asset={asset}
+            />
+          ))}
+        </div>
+      </details>
     </div>
   )
 }
@@ -988,22 +1006,6 @@ function renderLegacyItems(
           )}
         </div>
       ))}
-    </div>
-  )
-}
-
-function SourceText({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <div
-      className={`whitespace-pre-wrap break-words text-base leading-8 text-[#102A5F] ${className}`}
-    >
-      {children}
     </div>
   )
 }
@@ -2219,35 +2221,35 @@ export default function AccountingTopicPage() {
             ← Accounting
           </Link>
 
-          <div className="mt-8 max-w-5xl">
-            {topic.standard && (
-              <span
-                className="
-                  inline-flex
-                  rounded-full
-                  bg-white/10
-                  px-4
-                  py-2
-                  text-xs
-                  font-bold
-                  uppercase
-                  tracking-[0.2em]
-                  text-[#35B5E5]
-                "
-              >
-                {topic.standard}
-              </span>
-            )}
+          <div className="mt-8 grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div>
+              <div className="flex flex-wrap gap-3">
+                <span className="inline-flex rounded-full bg-[#168BC4] px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-white">
+                  CURA Education
+                </span>
+                {topic.standard && (
+                  <span className="inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-[#A9E4F6]">
+                    {topic.standard}
+                  </span>
+                )}
+              </div>
 
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-6xl">
-              {topic.title}
-            </h1>
+              <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white md:text-6xl">
+                {topic.title}
+              </h1>
 
-            {topic.description && (
-              <p className="mt-6 max-w-3xl text-base leading-8 text-white/75 md:text-lg">
-                {topic.description}
-              </p>
-            )}
+              {topic.description && (
+                <p className="mt-6 max-w-3xl text-base leading-8 text-white/75 md:text-lg">
+                  {topic.description}
+                </p>
+              )}
+            </div>
+
+            <CuraAccountingVisual
+              topicTitle={topic.title}
+              standard={topic.standard || ""}
+              mode="hero"
+            />
           </div>
         </div>
       </section>
@@ -2407,11 +2409,22 @@ export default function AccountingTopicPage() {
 
                         {sectionTitle && (
                           <div className="border-b border-slate-100 bg-[#FBFCFE] px-7 py-6 md:px-10">
-                            <h2 className="text-2xl font-semibold leading-8 text-[#071B49] md:text-3xl">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#168BC4]">
+                              Section {processedSections.findIndex((entry) => entry.section.id === section.id) + 1}
+                            </p>
+                            <h2 className="mt-2 text-2xl font-semibold leading-8 text-[#071B49] md:text-3xl">
                               {sectionTitle}
                             </h2>
                           </div>
                         )}
+
+                        <div className="px-7 pt-7 md:px-10 md:pt-8">
+                          <CuraAccountingVisual
+                            topicTitle={topic.title}
+                            sectionTitle={sectionTitle}
+                            mode="section"
+                          />
+                        </div>
 
                         {/* SOURCE CONTENT */}
 
