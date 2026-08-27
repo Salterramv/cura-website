@@ -576,7 +576,7 @@ export default function OtherServicePage({ service }: Props) {
 
           <Link
             href="/other-services"
-            className="text-sm font-semibold text-[#8EB3D7] transition hover:text-white"
+            className="inline-flex items-center rounded-md border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-[#18B8EE] hover:bg-[#168BC4] hover:text-white" style={{ color: "#FFFFFF" }}
           >
             ← Back to Other Services
           </Link>
