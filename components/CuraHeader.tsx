@@ -82,7 +82,7 @@ export default function CuraHeader() {
                 >
                   <path
                     fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 010-1.414z"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L4.17 8.29a.75.75 0 01.02-1.08z"
                     clipRule="evenodd"
                   />
                 </svg>
@@ -175,7 +175,7 @@ export default function CuraHeader() {
                 >
                   <path
                     fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 010-1.414z"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L4.17 8.29a.75.75 0 01.02-1.08z"
                     clipRule="evenodd"
                   />
                 </svg>
@@ -269,7 +269,7 @@ export default function CuraHeader() {
                 >
                   <path
                     fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 010-1.414z"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L4.17 8.29a.75.75 0 01.02-1.08z"
                     clipRule="evenodd"
                   />
                 </svg>
@@ -423,19 +423,19 @@ export default function CuraHeader() {
                   <span>Cura Insights</span>
 
                   <svg
-                    className={`h-3.5 w-3.5 transition-transform ${
+                  className={`h-3.5 w-3.5 transition-transform ${
                       insightsOpen ? "rotate-180" : ""
                     }`}
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25-4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01-1.08 1.04l-4.25-4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L4.17 8.29a.75.75 0 01.02-1.08z"
+                    clipRule="evenodd"
+                  />
+                </svg>
                 </button>
 
                 {insightsOpen && (
@@ -494,19 +494,19 @@ export default function CuraHeader() {
                   <span>Services</span>
 
                   <svg
-                    className={`h-3.5 w-3.5 transition-transform ${
+                  className={`h-3.5 w-3.5 transition-transform ${
                       servicesOpen ? "rotate-180" : ""
                     }`}
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25-4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L4.17 8.29a.75.75 0 01.02-1.08z"
+                    clipRule="evenodd"
+                  />
+                </svg>
                 </button>
 
                 {servicesOpen && (
@@ -565,19 +565,19 @@ export default function CuraHeader() {
                   <span>Education</span>
 
                   <svg
-                    className={`h-3.5 w-3.5 transition-transform ${
+                  className={`h-3.5 w-3.5 transition-transform ${
                       educationOpen ? "rotate-180" : ""
                     }`}
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25-4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01-.02-1.06z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L4.17 8.29a.75.75 0 01.02-1.08z"
+                    clipRule="evenodd"
+                  />
+                </svg>
                 </button>
 
                 {educationOpen && (
