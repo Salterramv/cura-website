@@ -1538,6 +1538,27 @@ function RenderSourceBlock({
   const paragraphs =
     getPresentationParagraphs(block)
 
+  /*
+   * CURA CMS CONTENT
+   *
+   * A block edited/created through the Education CMS stores its
+   * authoritative editable body in block.content.
+   *
+   * Imported source material can still use presentation.paragraphs.
+   *
+   * Therefore:
+   *   - real presentation paragraphs continue through the
+   *     existing source-material renderer;
+   *   - CMS content is rendered from block.content when no
+   *     presentation paragraphs exist.
+   */
+
+  const hasCmsContent =
+    Boolean(
+      block.content &&
+      block.content.trim().length > 0
+    )
+
   const normalizedSection =
     normalizeForComparison(
       sectionTitle
@@ -1559,17 +1580,59 @@ function RenderSourceBlock({
    *
    * This is the important part.
    *
-   * If presentation.paragraphs exists, it is authoritative.
+   * Imported presentation paragraphs remain authoritative
+   * when a block is source-material content.
    *
-   * We do NOT additionally render:
-   *
-   *   block.content
-   *   block.title
-   *   block_items
-   *
-   * because those are duplicate representations of the same
-   * source material.
+   * CURA CMS blocks with editable block.content are handled
+   * immediately above this branch.
    */
+
+  if (hasCmsContent) {
+    return (
+      <div
+        className="
+          space-y-4
+          break-words
+          text-base
+          leading-8
+          text-[#102A5F]
+          [&_p]:mb-4
+          [&_strong]:font-bold
+          [&_b]:font-bold
+          [&_em]:italic
+          [&_i]:italic
+          [&_u]:underline
+          [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6
+          [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6
+          [&_li]:mb-1
+          [&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:text-2xl
+          [&_h2]:font-bold [&_h2]:text-[#071B49]
+          [&_h3]:mb-3 [&_h3]:mt-5 [&_h3]:text-xl
+          [&_h3]:font-semibold [&_h3]:text-[#071B49]
+          [&_a]:font-semibold [&_a]:text-[#168BC4]
+          [&_a]:underline
+        "
+      >
+        {block.title &&
+          !blockTitleIsDuplicate &&
+          !isHiddenSourceMetadata(block.title) &&
+          !isPictureLabel(block.title) &&
+          !isIllustrationLabel(block.title) && (
+            <h3 className="text-xl font-semibold leading-8 text-[#071B49]">
+              {cleanSourceText(block.title)}
+            </h3>
+          )}
+
+        <div
+          dangerouslySetInnerHTML={{
+            __html: sanitizeRichText(
+              block.content
+            ),
+          }}
+        />
+      </div>
+    )
+  }
 
   if (paragraphs.length > 0) {
 
@@ -1724,16 +1787,36 @@ function RenderSourceBlock({
           </h3>
         )}
 
-      {block.content &&
-        cleanSourceText(
-          block.content
-        ) && (
-          <div className="whitespace-pre-wrap break-words text-base leading-8 text-[#102A5F]">
-            {cleanSourceText(
+      {hasCmsContent && (
+        <div
+          className="
+            break-words
+            text-base
+            leading-8
+            text-[#102A5F]
+            [&_p]:mb-4
+            [&_strong]:font-bold
+            [&_b]:font-bold
+            [&_em]:italic
+            [&_i]:italic
+            [&_u]:underline
+            [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6
+            [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6
+            [&_li]:mb-1
+            [&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:text-2xl
+            [&_h2]:font-bold [&_h2]:text-[#071B49]
+            [&_h3]:mb-3 [&_h3]:mt-5 [&_h3]:text-xl
+            [&_h3]:font-semibold [&_h3]:text-[#071B49]
+            [&_a]:font-semibold [&_a]:text-[#168BC4]
+            [&_a]:underline
+          "
+          dangerouslySetInnerHTML={{
+            __html: sanitizeRichText(
               block.content
-            )}
-          </div>
-        )}
+            ),
+          }}
+        />
+      )}
 
       {renderLegacyItems(items)}
 
