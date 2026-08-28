@@ -536,7 +536,7 @@ export default function EducationMaterialsClient() {
   if (!selectedCategory) {
     return (
       <main className="min-h-screen bg-[#F4F7FA]">
-        <header className="bg-[#071B49] text-white">
+        <header className="bg-[#071B49] !text-white text-white">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
             <div className="flex items-center gap-5">
               <Link
@@ -713,7 +713,7 @@ export default function EducationMaterialsClient() {
                                   onClick={
                                     saveArea
                                   }
-                                  className="rounded-xl bg-[#071B49] px-4 py-3 text-xs font-bold text-white"
+                                  className="rounded-xl bg-[#071B49] !text-white px-4 py-3 text-xs font-bold text-white"
                                 >
                                   Save
                                 </button>
@@ -762,7 +762,7 @@ export default function EducationMaterialsClient() {
                                 {area.is_active && (
                                   <Link
                                     href={`/admin/education?category=${encodeURIComponent(area.name)}`}
-                                    className="rounded-lg bg-[#071B49] px-4 py-2 text-xs font-bold text-white"
+                                    className="rounded-lg bg-[#071B49] !text-white px-4 py-2 text-xs font-bold text-white"
                                   >
                                     Manage Topics
                                   </Link>
@@ -859,7 +859,7 @@ export default function EducationMaterialsClient() {
   return (
     <main className="min-h-screen bg-[#F4F7FA]">
 
-      <header className="bg-[#071B49] text-white">
+      <header className="bg-[#071B49] !text-white text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
 
           <div className="flex items-center gap-5">
@@ -1060,7 +1060,7 @@ export default function EducationMaterialsClient() {
                       <div className="flex flex-wrap gap-2">
                         <Link
                           href={`/admin/education/${topic.id}`}
-                          className="rounded-lg bg-[#071B49] px-4 py-2 text-xs font-bold text-white"
+                          className="rounded-lg bg-[#071B49] !text-white px-4 py-2 text-xs font-bold text-white"
                         >
                           Manage Content
                         </Link>
