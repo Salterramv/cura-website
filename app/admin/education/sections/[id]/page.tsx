@@ -68,6 +68,8 @@ export default function SectionEditor({
     useState<Section | null>(null)
   const [blocks, setBlocks] =
     useState<Block[]>([])
+  const [dirtyBlockIds, setDirtyBlockIds] =
+    useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -107,6 +109,8 @@ export default function SectionEditor({
           ? data.blocks
           : []
       )
+
+      setDirtyBlockIds(new Set())
     } catch (err) {
       setError(
         err instanceof Error
@@ -239,7 +243,12 @@ export default function SectionEditor({
               title: block.title || "",
               content: block.content || "",
               presentation:
-                block.presentation || {},
+                dirtyBlockIds.has(block.id)
+                  ? {
+                      ...(block.presentation || {}),
+                      cura_content_edited: true,
+                    }
+                  : block.presentation || {},
               is_published: true,
             }),
           }
@@ -491,6 +500,98 @@ export default function SectionEditor({
                 "Section"}
           </h1>
 
+          {!loading && section && (
+            <div className="mt-5 max-w-3xl">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[#159B78]">
+                Section heading
+              </label>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="cura-section-title"
+                  type="text"
+                  defaultValue={section.title}
+                  className="flex-1 rounded-xl border border-[#D6E3DE] bg-white px-4 py-3 text-sm font-semibold text-[#071B49] outline-none focus:border-[#159B78] focus:ring-2 focus:ring-[#159B78]/10"
+                />
+
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={async () => {
+                    const input =
+                      document.getElementById(
+                        "cura-section-title"
+                      ) as HTMLInputElement | null
+
+                    const title =
+                      input?.value.trim() || ""
+
+                    if (!title) {
+                      setError(
+                        "Section heading cannot be empty."
+                      )
+                      return
+                    }
+
+                    try {
+                      setSaving(true)
+                      setError("")
+                      setMessage("")
+
+                      const response = await fetch(
+                        `/api/admin/education/sections/${sectionId}`,
+                        {
+                          method: "PATCH",
+                          headers: {
+                            "Content-Type":
+                              "application/json",
+                          },
+                          body: JSON.stringify({
+                            title,
+                          }),
+                        }
+                      )
+
+                      const data =
+                        await response.json()
+
+                      if (!response.ok) {
+                        throw new Error(
+                          data.error ||
+                            "Unable to update section heading."
+                        )
+                      }
+
+                      setSection((current) =>
+                        current
+                          ? {
+                              ...current,
+                              title,
+                            }
+                          : current
+                      )
+
+                      setMessage(
+                        "Section heading saved."
+                      )
+                    } catch (err) {
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : "Unable to update section heading."
+                      )
+                    } finally {
+                      setSaving(false)
+                    }
+                  }}
+                  className="rounded-xl bg-[#071B49] px-5 py-3 text-sm font-bold !text-white transition hover:bg-[#0B285E] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Save Heading
+                </button>
+              </div>
+            </div>
+          )}
+
           {section?.topic && (
             <p className="mt-2 text-sm text-[#71827C]">
               {section.topic.title}
@@ -665,6 +766,19 @@ export default function SectionEditor({
                       <button
                         type="button"
                         disabled={saving}
+                        onClick={async () => {
+                          await addBlock(
+                            "paragraph"
+                          )
+                        }}
+                        className="rounded-lg border border-[#D6E3DE] px-3 py-1.5 text-xs font-semibold text-[#355B50] hover:bg-[#F1FAF6] disabled:opacity-40"
+                      >
+                        + Insert Below
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={saving}
                         onClick={() =>
                           deleteBlock(
                             block
@@ -682,59 +796,41 @@ export default function SectionEditor({
                       "illustration" &&
                       block.block_type !==
                         "table" && (
-                        <textarea
-                          value={
-                            block.content ||
-                            ""
-                          }
-                          onChange={(
-                            event
-                          ) => {
-                            setBlocks(
-                              (current) =>
-                                current.map(
-                                  (item) =>
-                                    item.id ===
-                                    block.id
-                                      ? {
-                                          ...item,
-                                          content:
-                                            event
-                                              .target
-                                              .value,
-                                        }
-                                      : item
-                                )
+                        <CuraRichTextEditor
+                        value={block.content || ""}
+                        onChange={(value) => {
+                          setBlocks((current) =>
+                            current.map((item) =>
+                              item.id === block.id
+                                ? {
+                                    ...item,
+                                    content: value,
+                                  }
+                                : item
                             )
-                          }}
-                          onBlur={(event) =>
-                            updateBlock(
-                              block,
-                              {
-                                content:
-                                  event.target.value,
-                              }
-                            )
-                          }
-                          rows={
-                            block.block_type ===
-                              "formula"
-                              ? 3
-                              : 6
-                          }
-                          placeholder={
-                            block.block_type ===
-                            "heading"
-                              ? "Heading"
-                              : "Enter content…"
-                          }
-                          className={`w-full resize-y rounded-2xl border border-[#D6E3DE] bg-[#FBFDFC] px-4 py-3 text-sm leading-7 text-[#071B49] outline-none focus:border-[#159B78] ${
-                            block.block_type ===
-                            "formula"
-                              ? "font-mono"
-                              : ""
-                          }`}
-                        />
+                          )
+
+                          setDirtyBlockIds((current) => {
+                            const next = new Set(current)
+                            next.add(block.id)
+                            return next
+                          })
+                        }}
+                        placeholder={
+                          block.block_type === "heading"
+                            ? "Enter heading..."
+                            : block.block_type === "formula"
+                              ? "Enter formula..."
+                              : "Enter section content..."
+                        }
+                        minHeight={
+                          block.block_type === "heading"
+                            ? "100px"
+                            : block.block_type === "formula"
+                              ? "120px"
+                              : "240px"
+                        }
+                      />
                       )}
 
                     {block.block_type ===
