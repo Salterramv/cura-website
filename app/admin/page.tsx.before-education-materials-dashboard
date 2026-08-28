@@ -10,13 +10,6 @@ type AdminUser = {
 
 const sections = [
   {
-    title: "Education Materials",
-    description:
-      "Manage educational topics, sections and learning content",
-    href: "/admin/education",
-    label: "Manage Education Materials",
-  },
-  {
     title: "Knowledge",
     description:
       "Create, edit and manage CURA articles, tax guides and professional knowledge content.",

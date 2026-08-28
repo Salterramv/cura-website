@@ -1,0 +1,92 @@
+import { NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+
+function db() {
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      "Supabase environment variables are missing."
+    )
+  }
+
+  return createClient(url, key)
+}
+
+export async function POST(
+  request: Request,
+  context: {
+    params: Promise<{ id: string }>
+  }
+) {
+  try {
+    const { id } = await context.params
+    const body = await request.json()
+    const supabase = db()
+
+    if (
+      typeof body.url !==
+      "string" ||
+      !body.url.trim()
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Illustration URL is required.",
+        },
+        { status: 400 }
+      )
+    }
+
+    /*
+     * Remove any existing illustration asset
+     * for this block. This does NOT remove files
+     * from storage.
+     */
+    await supabase
+      .from("education_assets")
+      .delete()
+      .eq("block_id", id)
+
+    const { error } =
+      await supabase
+        .from("education_assets")
+        .insert({
+          block_id: id,
+          asset_type: "illustration",
+          url: body.url.trim(),
+          caption:
+            typeof body.caption ===
+            "string"
+              ? body.caption.trim()
+              : null,
+          alt_text:
+            typeof body.alt_text ===
+            "string"
+              ? body.alt_text.trim()
+              : null,
+          display_order: 0,
+        })
+
+    if (error) throw error
+
+    return NextResponse.json({
+      success: true,
+    })
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to save illustration.",
+      },
+      { status: 500 }
+    )
+  }
+}

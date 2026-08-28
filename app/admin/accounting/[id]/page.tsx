@@ -1,0 +1,312 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import Link from "next/link"
+
+type Section = {
+  id: string
+  title: string
+  display_order: number
+  published?: boolean
+}
+
+type Topic = {
+  id: string
+  title: string
+  slug: string
+}
+
+export default function AccountingTopicAdmin({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const [topicId, setTopicId] = useState("")
+  const [topic, setTopic] = useState<Topic | null>(null)
+  const [sections, setSections] = useState<Section[]>([])
+  const [newSection, setNewSection] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    params.then(({ id }) => {
+      setTopicId(id)
+      load(id)
+    })
+  }, [params])
+
+  async function load(id: string) {
+    try {
+      setLoading(true)
+
+      const response = await fetch(
+        `/api/admin/accounting/topics/${id}/sections`,
+        { cache: "no-store" }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to load topic."
+        )
+      }
+
+      setTopic(data.topic)
+      setSections(
+        Array.isArray(data.sections)
+          ? data.sections
+          : []
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load topic."
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function addSection() {
+    const title = newSection.trim()
+
+    if (!title || !topicId) return
+
+    try {
+      setSaving(true)
+      setError("")
+
+      const response = await fetch(
+        `/api/admin/accounting/topics/${topicId}/sections`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title,
+          }),
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to create section."
+        )
+      }
+
+      setNewSection("")
+      await load(topicId)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to create section."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function removeSection(
+    section: Section
+  ) {
+    const confirmed =
+      window.confirm(
+        `Remove "${section.title}"?\n\nThe section will be unpublished rather than permanently deleted.`
+      )
+
+    if (!confirmed) return
+
+    try {
+      setSaving(true)
+
+      const response = await fetch(
+        `/api/admin/accounting/sections/${section.id}`,
+        {
+          method: "DELETE",
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to remove section."
+        )
+      }
+
+      await load(topicId)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to remove section."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-[#F6FAF8] px-6 py-10">
+      <div className="mx-auto max-w-7xl">
+
+        <div className="mb-8">
+          <Link
+            href="/admin/accounting"
+            className="text-sm font-semibold text-[#159B78]"
+          >
+            ← Accounting Topics
+          </Link>
+
+          <div className="mt-5">
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#159B78]">
+              CURA Education
+            </div>
+
+            <h1 className="mt-2 text-3xl font-bold text-[#071B49]">
+              {loading
+                ? "Loading…"
+                : topic?.title ||
+                  "Accounting Topic"}
+            </h1>
+
+            {topic && (
+              <p className="mt-2 text-sm text-[#71827C]">
+                /{topic.slug}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <section className="mb-8 rounded-3xl border border-[#DCE9E4] bg-white p-6 shadow-[0_10px_35px_rgba(20,70,55,0.05)]">
+          <h2 className="text-lg font-bold text-[#071B49]">
+            Add Section
+          </h2>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input
+              value={newSection}
+              onChange={(event) =>
+                setNewSection(
+                  event.target.value
+                )
+              }
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter"
+                ) {
+                  addSection()
+                }
+              }}
+              placeholder="Section name"
+              className="min-h-11 flex-1 rounded-xl border border-[#D6E3DE] px-4 text-sm text-[#071B49] outline-none focus:border-[#159B78]"
+            />
+
+            <button
+              type="button"
+              disabled={
+                saving ||
+                !newSection.trim()
+              }
+              onClick={addSection}
+              className="rounded-xl bg-[#159B78] px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              + Add Section
+            </button>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-[#DCE9E4] bg-white shadow-[0_10px_35px_rgba(20,70,55,0.05)]">
+          <div className="border-b border-[#E7EFEC] px-6 py-5">
+            <h2 className="text-lg font-bold text-[#071B49]">
+              Sections
+            </h2>
+          </div>
+
+          {loading ? (
+            <div className="px-6 py-12 text-center text-sm text-[#71827C]">
+              Loading sections…
+            </div>
+          ) : sections.length === 0 ? (
+            <div className="px-6 py-12 text-center text-sm text-[#71827C]">
+              No sections.
+            </div>
+          ) : (
+            <div className="divide-y divide-[#E7EFEC]">
+              {sections.map(
+                (section, index) => (
+                  <div
+                    key={section.id}
+                    className="flex flex-col gap-4 px-6 py-5 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E9F6F1] text-xs font-bold text-[#159B78]">
+                        {index + 1}
+                      </div>
+
+                      <div>
+                        <div className="font-semibold text-[#071B49]">
+                          {section.title}
+                        </div>
+
+                        <div className="mt-1 text-xs text-[#7A8984]">
+                          Section {index + 1}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/admin/accounting/sections/${section.id}`}
+                        className="rounded-lg bg-[#071B49] px-4 py-2 text-xs font-bold text-white"
+                      >
+                        Edit Content
+                      </Link>
+
+                      <Link
+                        href={`/education/materials/accounting/${topic?.slug}`}
+                        target="_blank"
+                        className="rounded-lg border border-[#D6E3DE] px-4 py-2 text-xs font-semibold text-[#355B50]"
+                      >
+                        Preview
+                      </Link>
+
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          removeSection(
+                            section
+                          )
+                        }
+                        className="rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  )
+}
