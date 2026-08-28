@@ -15,6 +15,7 @@ const sections = [
       "Manage educational topics, sections and learning content",
     href: "/admin/education",
     label: "Manage Education Materials",
+    status: "Available",
   },
   {
     title: "Knowledge",
