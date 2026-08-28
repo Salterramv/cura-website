@@ -1,6 +1,10 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 
 type Props = {
   value: string
@@ -13,54 +17,18 @@ const buttonClass =
   "rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
 
 const COLORS = [
-  {
-    name: "CURA Navy",
-    value: "#071B49",
-  },
-  {
-    name: "CURA Blue",
-    value: "#168BC4",
-  },
-  {
-    name: "CURA Cyan",
-    value: "#18B8EE",
-  },
-  {
-    name: "CURA Green",
-    value: "#159B78",
-  },
-  {
-    name: "Black",
-    value: "#000000",
-  },
-  {
-    name: "Dark Grey",
-    value: "#475569",
-  },
-  {
-    name: "Grey",
-    value: "#64748B",
-  },
-  {
-    name: "Red",
-    value: "#DC2626",
-  },
-  {
-    name: "Orange",
-    value: "#EA580C",
-  },
-  {
-    name: "Yellow",
-    value: "#CA8A04",
-  },
-  {
-    name: "Purple",
-    value: "#7C3AED",
-  },
-  {
-    name: "Pink",
-    value: "#DB2777",
-  },
+  { name: "CURA Navy", value: "#071B49" },
+  { name: "CURA Blue", value: "#168BC4" },
+  { name: "CURA Cyan", value: "#18B8EE" },
+  { name: "CURA Green", value: "#159B78" },
+  { name: "Black", value: "#000000" },
+  { name: "Dark Grey", value: "#475569" },
+  { name: "Grey", value: "#64748B" },
+  { name: "Red", value: "#DC2626" },
+  { name: "Orange", value: "#EA580C" },
+  { name: "Yellow", value: "#CA8A04" },
+  { name: "Purple", value: "#7C3AED" },
+  { name: "Pink", value: "#DB2777" },
 ]
 
 export default function CuraRichTextEditor({
@@ -70,27 +38,109 @@ export default function CuraRichTextEditor({
   minHeight = "220px",
 }: Props) {
   const editorRef = useRef<HTMLDivElement>(null)
-  const [showPalette, setShowPalette] = useState(false)
+  const savedRangeRef = useRef<Range | null>(null)
+
+  const [showPalette, setShowPalette] =
+    useState(false)
+
+  /*
+   * --------------------------------------------------------
+   * KEEP THE CURRENT TEXT SELECTION
+   * --------------------------------------------------------
+   */
+
+  function saveSelection() {
+    const editor = editorRef.current
+    const selection = window.getSelection()
+
+    if (
+      !editor ||
+      !selection ||
+      selection.rangeCount === 0
+    ) {
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+
+    if (
+      editor.contains(
+        range.commonAncestorContainer,
+      )
+    ) {
+      savedRangeRef.current =
+        range.cloneRange()
+    }
+  }
+
+  function restoreSelection() {
+    const selection = window.getSelection()
+    const range = savedRangeRef.current
+
+    if (!selection || !range) {
+      return
+    }
+
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+
+  function handleToolbarMouseDown(
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault()
+    saveSelection()
+  }
+
+  /*
+   * --------------------------------------------------------
+   * LOAD CONTENT
+   * --------------------------------------------------------
+   */
 
   useEffect(() => {
-    if (!editorRef.current) return
+    if (!editorRef.current) {
+      return
+    }
 
-    if (editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || ""
+    if (
+      editorRef.current.innerHTML !== value
+    ) {
+      editorRef.current.innerHTML =
+        value || ""
     }
   }, [value])
 
-  function update() {
-    if (!editorRef.current) return
+  /*
+   * --------------------------------------------------------
+   * UPDATE VALUE
+   * --------------------------------------------------------
+   */
 
-    onChange(editorRef.current.innerHTML)
+  function update() {
+    if (!editorRef.current) {
+      return
+    }
+
+    onChange(
+      editorRef.current.innerHTML,
+    )
+
+    saveSelection()
   }
+
+  /*
+   * --------------------------------------------------------
+   * EXECUTE FORMATTING COMMAND
+   * --------------------------------------------------------
+   */
 
   function exec(
     command: string,
     commandValue?: string,
   ) {
     editorRef.current?.focus()
+    restoreSelection()
 
     document.execCommand(
       command,
@@ -101,8 +151,15 @@ export default function CuraRichTextEditor({
     update()
   }
 
+  /*
+   * --------------------------------------------------------
+   * TEXT COLOUR
+   * --------------------------------------------------------
+   */
+
   function applyColor(color: string) {
     editorRef.current?.focus()
+    restoreSelection()
 
     document.execCommand(
       "foreColor",
@@ -114,8 +171,15 @@ export default function CuraRichTextEditor({
     setShowPalette(false)
   }
 
+  /*
+   * --------------------------------------------------------
+   * FONT SIZE
+   * --------------------------------------------------------
+   */
+
   function applyFontSize(px: number) {
     editorRef.current?.focus()
+    restoreSelection()
 
     document.execCommand(
       "fontSize",
@@ -144,25 +208,15 @@ export default function CuraRichTextEditor({
     update()
   }
 
-  function insertLink() {
-    const url = window.prompt(
-      "Enter URL:",
-    )
-
-    if (!url) return
-
-    exec(
-      "createLink",
-      url,
-    )
-  }
-
-  function clearFormatting() {
-    exec("removeFormat")
-  }
+  /*
+   * --------------------------------------------------------
+   * BULLET LIST
+   * --------------------------------------------------------
+   */
 
   function applyUnorderedList() {
     editorRef.current?.focus()
+    restoreSelection()
 
     document.execCommand(
       "insertUnorderedList",
@@ -172,8 +226,15 @@ export default function CuraRichTextEditor({
     update()
   }
 
+  /*
+   * --------------------------------------------------------
+   * NUMBERED LIST
+   * --------------------------------------------------------
+   */
+
   function applyOrderedList() {
     editorRef.current?.focus()
+    restoreSelection()
 
     document.execCommand(
       "insertOrderedList",
@@ -183,12 +244,49 @@ export default function CuraRichTextEditor({
     update()
   }
 
+  /*
+   * --------------------------------------------------------
+   * LINK
+   * --------------------------------------------------------
+   */
+
+  function insertLink() {
+    const url = window.prompt(
+      "Enter URL:",
+    )
+
+    if (!url) {
+      return
+    }
+
+    exec(
+      "createLink",
+      url,
+    )
+  }
+
+  /*
+   * --------------------------------------------------------
+   * CLEAR FORMATTING
+   * --------------------------------------------------------
+   */
+
+  function clearFormatting() {
+    exec("removeFormat")
+  }
+
+  /*
+   * --------------------------------------------------------
+   * RENDER
+   * --------------------------------------------------------
+   */
+
   return (
     <div className="overflow-visible rounded-xl border border-slate-300 bg-white">
 
-      {/* =====================================================
+      {/* ==================================================
           TOOLBAR
-          ===================================================== */}
+          ================================================== */}
 
       <div className="relative flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-3">
 
@@ -197,12 +295,8 @@ export default function CuraRichTextEditor({
         <button
           type="button"
           className={`${buttonClass} font-bold`}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
-          onClick={() =>
-            exec("bold")
-          }
+          onMouseDown={handleToolbarMouseDown}
+          onClick={() => exec("bold")}
           title="Bold"
         >
           B
@@ -213,12 +307,8 @@ export default function CuraRichTextEditor({
         <button
           type="button"
           className={`${buttonClass} italic`}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
-          onClick={() =>
-            exec("italic")
-          }
+          onMouseDown={handleToolbarMouseDown}
+          onClick={() => exec("italic")}
           title="Italic"
         >
           I
@@ -229,9 +319,7 @@ export default function CuraRichTextEditor({
         <button
           type="button"
           className={`${buttonClass} underline`}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
+          onMouseDown={handleToolbarMouseDown}
           onClick={() =>
             exec("underline")
           }
@@ -246,46 +334,60 @@ export default function CuraRichTextEditor({
           defaultValue=""
           aria-label="Font size"
           className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700"
-          onMouseDown={(e) =>
-            e.stopPropagation()
-          }
-          onChange={(e) => {
-            if (!e.target.value) return
+          onMouseDown={() => {
+            saveSelection()
+          }}
+          onChange={(event) => {
+            const value =
+              event.target.value
+
+            if (!value) {
+              return
+            }
 
             applyFontSize(
-              Number(e.target.value),
+              Number(value),
             )
 
-            e.target.value = ""
+            event.target.value = ""
           }}
         >
           <option value="">
             Font size
           </option>
+
           <option value="12">
             12px
           </option>
+
           <option value="14">
             14px
           </option>
+
           <option value="16">
             16px
           </option>
+
           <option value="18">
             18px
           </option>
+
           <option value="20">
             20px
           </option>
+
           <option value="24">
             24px
           </option>
+
           <option value="28">
             28px
           </option>
+
           <option value="32">
             32px
           </option>
+
           <option value="36">
             36px
           </option>
@@ -300,9 +402,10 @@ export default function CuraRichTextEditor({
           <button
             type="button"
             className={buttonClass}
-            onMouseDown={(e) =>
-              e.preventDefault()
-            }
+            onMouseDown={(event) => {
+              event.preventDefault()
+              saveSelection()
+            }}
             onClick={() =>
               setShowPalette(
                 (current) =>
@@ -321,23 +424,10 @@ export default function CuraRichTextEditor({
 
           {showPalette && (
             <div
-              className="
-                absolute
-                left-0
-                top-full
-                z-50
-                mt-2
-                w-64
-                rounded-xl
-                border
-                border-slate-200
-                bg-white
-                p-3
-                shadow-xl
-              "
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
+              className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+              onMouseDown={(event) => {
+                event.preventDefault()
+              }}
             >
 
               <div className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
@@ -359,27 +449,17 @@ export default function CuraRichTextEditor({
                       title={
                         color.name
                       }
-                      className="
-                        h-8
-                        w-8
-                        rounded-full
-                        border
-                        border-slate-300
-                        shadow-sm
-                        transition
-                        hover:scale-110
-                        hover:ring-2
-                        hover:ring-[#18B8EE]/40
-                      "
+                      className="h-8 w-8 rounded-full border border-slate-300 shadow-sm transition hover:scale-110 hover:ring-2 hover:ring-[#18B8EE]/40"
                       style={{
                         backgroundColor:
                           color.value,
                       }}
                       onMouseDown={(
-                        e,
-                      ) =>
-                        e.preventDefault()
-                      }
+                        event,
+                      ) => {
+                        event.preventDefault()
+                        saveSelection()
+                      }}
                       onClick={() =>
                         applyColor(
                           color.value,
@@ -402,22 +482,19 @@ export default function CuraRichTextEditor({
                   <input
                     type="color"
                     defaultValue="#071B49"
-                    className="
-                      h-8
-                      w-10
-                      cursor-pointer
-                      rounded
-                      border
-                      border-slate-300
-                      bg-white
-                      p-0.5
-                    "
-                    onMouseDown={(e) =>
-                      e.preventDefault()
-                    }
-                    onChange={(e) =>
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-300 bg-white p-0.5"
+                    onMouseDown={(
+                      event,
+                    ) => {
+                      event.preventDefault()
+                      saveSelection()
+                    }}
+                    onChange={(
+                      event,
+                    ) =>
                       applyColor(
-                        e.target.value,
+                        event.target
+                          .value,
                       )
                     }
                   />
@@ -436,9 +513,7 @@ export default function CuraRichTextEditor({
         <button
           type="button"
           className={buttonClass}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
+          onMouseDown={handleToolbarMouseDown}
           onClick={() =>
             exec(
               "formatBlock",
@@ -455,9 +530,7 @@ export default function CuraRichTextEditor({
         <button
           type="button"
           className={buttonClass}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
+          onMouseDown={handleToolbarMouseDown}
           onClick={() =>
             exec(
               "formatBlock",
@@ -469,14 +542,12 @@ export default function CuraRichTextEditor({
           H3
         </button>
 
-        {/* BULLET LIST */}
+        {/* BULLETS */}
 
         <button
           type="button"
           className={buttonClass}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
+          onMouseDown={handleToolbarMouseDown}
           onClick={
             applyUnorderedList
           }
@@ -485,14 +556,12 @@ export default function CuraRichTextEditor({
           • List
         </button>
 
-        {/* NUMBERED LIST */}
+        {/* NUMBERING */}
 
         <button
           type="button"
           className={buttonClass}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
+          onMouseDown={handleToolbarMouseDown}
           onClick={
             applyOrderedList
           }
@@ -506,9 +575,7 @@ export default function CuraRichTextEditor({
         <button
           type="button"
           className={buttonClass}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
+          onMouseDown={handleToolbarMouseDown}
           onClick={insertLink}
           title="Insert link"
         >
@@ -520,9 +587,7 @@ export default function CuraRichTextEditor({
         <button
           type="button"
           className={buttonClass}
-          onMouseDown={(e) =>
-            e.preventDefault()
-          }
+          onMouseDown={handleToolbarMouseDown}
           onClick={
             clearFormatting
           }
@@ -533,9 +598,9 @@ export default function CuraRichTextEditor({
 
       </div>
 
-      {/* =====================================================
+      {/* ==================================================
           EDITOR
-          ===================================================== */}
+          ================================================== */}
 
       <div
         ref={editorRef}
@@ -545,6 +610,8 @@ export default function CuraRichTextEditor({
           placeholder
         }
         onInput={update}
+        onKeyUp={saveSelection}
+        onMouseUp={saveSelection}
         className="
           min-h-[220px]
           max-w-none
@@ -554,66 +621,20 @@ export default function CuraRichTextEditor({
           leading-7
           text-[#102A5F]
           outline-none
-
-          [&_p]:mb-4
-
-          [&_strong]:font-bold
-          [&_b]:font-bold
-
-          [&_u]:underline
-
-          [&_h2]:
-            mb-4
-          [&_h2]:
-            mt-6
-          [&_h2]:
-            text-2xl
-          [&_h2]:
-            font-bold
-          [&_h2]:
-            text-[#071B49]
-
-          [&_h3]:
-            mb-3
-          [&_h3]:
-            mt-5
-          [&_h3]:
-            text-xl
-          [&_h3]:
-            font-semibold
-          [&_h3]:
-            text-[#071B49]
-
-          [&_ul]:
-            mb-4
-          [&_ul]:
-            ml-6
-          [&_ul]:
-            list-disc
-          [&_ul]:
-            pl-6
-
-          [&_ol]:
-            mb-4
-          [&_ol]:
-            ml-6
-          [&_ol]:
-            list-decimal
-          [&_ol]:
-            pl-6
-
-          [&_li]:
-            mb-1
-
-          [&_a]:
-            text-[#168BC4]
-          [&_a]:
-            underline
         "
         style={{
           minHeight,
         }}
       />
+
+      {/* ==================================================
+          EDITOR LIST / FORMAT CSS
+          ================================================== */}
+
+      <div className="hidden">
+        <ul className="list-disc" />
+        <ol className="list-decimal" />
+      </div>
 
     </div>
   )
