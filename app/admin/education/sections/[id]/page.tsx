@@ -707,13 +707,12 @@ export default function SectionEditor({
                                 )
                             )
                           }}
-                          onBlur={() =>
+                          onBlur={(event) =>
                             updateBlock(
                               block,
                               {
                                 content:
-                                  block.content ||
-                                  "",
+                                  event.target.value,
                               }
                             )
                           }
