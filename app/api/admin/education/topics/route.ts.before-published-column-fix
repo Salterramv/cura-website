@@ -62,7 +62,7 @@ export async function GET(
         await supabase
           .from("education_topics")
           .select(
-            "id,slug,title,category,display_order,is_published"
+            "id,slug,title,category,display_order,published"
           )
           .in(
             "category",
@@ -102,7 +102,7 @@ export async function GET(
       await supabase
         .from("education_topics")
         .select(
-          "id,slug,title,category,display_order,is_published"
+          "id,slug,title,category,display_order,published"
         )
         .eq(
           "category",
@@ -186,7 +186,7 @@ export async function POST(
       await supabase
         .from("education_topics")
         .select("id")
-        .ilike("category", category)
+        .eq("category", category)
         .eq("slug", slug)
         .maybeSingle()
 
@@ -204,7 +204,7 @@ export async function POST(
       await supabase
         .from("education_topics")
         .select("display_order")
-        .ilike("category", category)
+        .eq("category", category)
         .order("display_order", {
           ascending: false,
         })
@@ -225,7 +225,7 @@ export async function POST(
           category,
           display_order:
             nextOrder,
-          is_published: false,
+          published: false,
         })
         .select()
         .single()

@@ -186,7 +186,7 @@ export async function POST(
       await supabase
         .from("education_topics")
         .select("id")
-        .ilike("category", category)
+        .eq("category", category)
         .eq("slug", slug)
         .maybeSingle()
 
@@ -204,7 +204,7 @@ export async function POST(
       await supabase
         .from("education_topics")
         .select("display_order")
-        .ilike("category", category)
+        .eq("category", category)
         .order("display_order", {
           ascending: false,
         })
