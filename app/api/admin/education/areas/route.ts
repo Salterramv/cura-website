@@ -1,37 +1,11 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY
-
-  if (!url || !key) {
-    throw new Error(
-      "Supabase environment variables are missing."
-    )
-  }
-
-  return createClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
+import { createClient } from "@/lib/supabase/server"
 
 async function requireAdmin() {
-  const supabase = getSupabaseAdmin()
+  const supabase = await createClient()
 
-  /*
-   * Keep authentication consistent with the existing
-   * Education administration APIs.
-   */
   const {
-    data: {
-      user,
-    },
+    data: { user },
     error: userError,
   } = await supabase.auth.getUser()
 
@@ -45,15 +19,17 @@ async function requireAdmin() {
     }
   }
 
-  const { data: isAdmin, error } =
-    await supabase.rpc(
-      "is_current_user_admin",
-      {
-        user_id: user.id,
-      }
-    )
+  const {
+    data: isAdmin,
+    error: adminError,
+  } = await supabase.rpc(
+    "is_current_user_admin",
+    {
+      user_id: user.id,
+    }
+  )
 
-  if (error || !isAdmin) {
+  if (adminError || !isAdmin) {
     return {
       supabase,
       response: NextResponse.json(
@@ -69,10 +45,14 @@ async function requireAdmin() {
   }
 }
 
-/*
- * GET
- * Load all education areas.
- */
+function makeAreaKey(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
 export async function GET() {
   try {
     const {
@@ -95,22 +75,17 @@ export async function GET() {
       })
 
     if (error) {
-      console.error(
-        "Education areas GET error:",
-        error
-      )
-
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      )
+      throw error
     }
 
     return NextResponse.json({
       areas: data ?? [],
     })
   } catch (error) {
-    console.error(error)
+    console.error(
+      "Education areas GET error:",
+      error
+    )
 
     return NextResponse.json(
       {
@@ -124,10 +99,6 @@ export async function GET() {
   }
 }
 
-/*
- * POST
- * Create a new education area.
- */
 export async function POST(
   request: Request
 ) {
@@ -161,17 +132,38 @@ export async function POST(
       )
     }
 
-    const suppliedKey =
-      typeof body?.area_key === "string"
-        ? body.area_key.trim()
-        : ""
-
     const areaKey =
-      suppliedKey ||
-      name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "")
+      makeAreaKey(name)
+
+    if (!areaKey) {
+      return NextResponse.json(
+        {
+          error:
+            "Unable to create a valid area key.",
+        },
+        { status: 400 }
+      )
+    }
+
+    const {
+      data: existing,
+    } = await supabase
+      .from("education_areas")
+      .select("area_key")
+      .or(
+        `area_key.eq.${areaKey},name.ilike.${name}`
+      )
+      .maybeSingle()
+
+    if (existing) {
+      return NextResponse.json(
+        {
+          error:
+            "An education area with this name already exists.",
+        },
+        { status: 409 }
+      )
+    }
 
     const {
       data: lastArea,
@@ -207,20 +199,7 @@ export async function POST(
       .single()
 
     if (error) {
-      console.error(
-        "Education area POST error:",
-        error
-      )
-
-      return NextResponse.json(
-        {
-          error:
-            error.code === "23505"
-              ? "An education area with this key already exists."
-              : error.message,
-        },
-        { status: 400 }
-      )
+      throw error
     }
 
     return NextResponse.json(
@@ -228,7 +207,10 @@ export async function POST(
       { status: 201 }
     )
   } catch (error) {
-    console.error(error)
+    console.error(
+      "Education area POST error:",
+      error
+    )
 
     return NextResponse.json(
       {
@@ -242,11 +224,6 @@ export async function POST(
   }
 }
 
-/*
- * PATCH
- * Rename, reorder, activate/deactivate,
- * or change description.
- */
 export async function PATCH(
   request: Request
 ) {
@@ -275,18 +252,43 @@ export async function PATCH(
       )
     }
 
+    const {
+      data: currentArea,
+      error: currentError,
+    } = await supabase
+      .from("education_areas")
+      .select(
+        "area_key,name,description,display_order,is_active"
+      )
+      .eq("area_key", areaKey)
+      .single()
+
+    if (currentError || !currentArea) {
+      return NextResponse.json(
+        {
+          error:
+            "Education area not found.",
+        },
+        { status: 404 }
+      )
+    }
+
     const updates: Record<
       string,
       unknown
     > = {}
 
+    let newName:
+      | string
+      | null = null
+
     if (
       typeof body?.name === "string"
     ) {
-      const name =
+      newName =
         body.name.trim()
 
-      if (!name) {
+      if (!newName) {
         return NextResponse.json(
           {
             error:
@@ -296,7 +298,7 @@ export async function PATCH(
         )
       }
 
-      updates.name = name
+      updates.name = newName
     }
 
     if (
@@ -324,15 +326,6 @@ export async function PATCH(
     }
 
     if (
-      typeof body?.new_area_key ===
-        "string" &&
-      body.new_area_key.trim()
-    ) {
-      updates.area_key =
-        body.new_area_key.trim()
-    }
-
-    if (
       Object.keys(updates).length === 0
     ) {
       return NextResponse.json(
@@ -342,6 +335,53 @@ export async function PATCH(
         },
         { status: 400 }
       )
+    }
+
+    /*
+     * The education_topics table currently stores
+     * the education area name in `category`.
+     *
+     * When an area is renamed, keep existing topics
+     * attached to the renamed area.
+     */
+    if (
+      newName &&
+      newName !== currentArea.name
+    ) {
+      const {
+        data: duplicate,
+      } = await supabase
+        .from("education_areas")
+        .select("area_key")
+        .ilike("name", newName)
+        .neq("area_key", areaKey)
+        .maybeSingle()
+
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            error:
+              "Another education area already uses this name.",
+          },
+          { status: 409 }
+        )
+      }
+
+      const {
+        error: topicUpdateError,
+      } = await supabase
+        .from("education_topics")
+        .update({
+          category: newName,
+        })
+        .eq(
+          "category",
+          currentArea.name
+        )
+
+      if (topicUpdateError) {
+        throw topicUpdateError
+      }
     }
 
     const {
@@ -357,22 +397,17 @@ export async function PATCH(
       .single()
 
     if (error) {
-      console.error(
-        "Education area PATCH error:",
-        error
-      )
-
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      throw error
     }
 
     return NextResponse.json({
       area: data,
     })
   } catch (error) {
-    console.error(error)
+    console.error(
+      "Education area PATCH error:",
+      error
+    )
 
     return NextResponse.json(
       {
@@ -386,12 +421,6 @@ export async function PATCH(
   }
 }
 
-/*
- * DELETE
- *
- * "Delete" means deactivate.
- * Nothing underneath the area is deleted.
- */
 export async function DELETE(
   request: Request
 ) {
@@ -435,22 +464,17 @@ export async function DELETE(
       .single()
 
     if (error) {
-      console.error(
-        "Education area DELETE error:",
-        error
-      )
-
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      throw error
     }
 
     return NextResponse.json({
       area: data,
     })
   } catch (error) {
-    console.error(error)
+    console.error(
+      "Education area DELETE error:",
+      error
+    )
 
     return NextResponse.json(
       {

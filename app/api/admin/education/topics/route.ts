@@ -1,28 +1,31 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 
-const VALID_CATEGORIES = [
-  "Accounting",
-  "Tax",
-  "Audit",
-  "Law",
-]
+async function db() {
+  return await createClient()
+}
 
-function supabaseAdmin() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL
+async function getActiveAreaNames(
+  supabase: Awaited<ReturnType<typeof createClient>>
+) {
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("education_areas")
+    .select("name")
+    .eq("is_active", true)
+    .order("display_order", {
+      ascending: true,
+    })
 
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY
-
-  if (!url || !key) {
-    throw new Error(
-      "Supabase environment variables are missing."
-    )
+  if (error) {
+    throw error
   }
 
-  return createClient(url, key)
+  return (data ?? []).map(
+    (row) => row.name
+  )
 }
 
 function makeSlug(value: string) {
@@ -33,91 +36,52 @@ function makeSlug(value: string) {
     .replace(/^-+|-+$/g, "")
 }
 
-function validCategory(
-  value: unknown
-): value is string {
-  return (
-    typeof value === "string" &&
-    VALID_CATEGORIES.includes(value)
-  )
-}
-
 export async function GET(
   request: Request
 ) {
   try {
-    const supabase = supabaseAdmin()
+    const supabase = await db()
 
-    const url = new URL(request.url)
+    const url =
+      new URL(request.url)
 
     const requestedCategory =
-      url.searchParams.get("category")
-
-    /*
-     * If no category is supplied, return all four
-     * education areas. This keeps the API general.
-     */
-    if (!requestedCategory) {
-      const { data, error } =
-        await supabase
-          .from("education_topics")
-          .select(
-            "id,slug,title,category,display_order,is_published"
-          )
-          .in(
-            "category",
-            VALID_CATEGORIES
-          )
-          .order("category", {
-            ascending: true,
-          })
-          .order("display_order", {
-            ascending: true,
-          })
-
-      if (error) {
-        throw error
-      }
-
-      return NextResponse.json({
-        topics: data || [],
-      })
-    }
-
-    if (
-      !validCategory(
-        requestedCategory
+      url.searchParams.get(
+        "category"
       )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid education category.",
-        },
-        { status: 400 }
-      )
-    }
 
-    const { data, error } =
-      await supabase
+    let query =
+      supabase
         .from("education_topics")
         .select(
-          "id,slug,title,category,display_order,is_published"
+          "id,slug,title,category,display_order,is_published,status"
         )
-        .eq(
+
+    if (requestedCategory) {
+      query =
+        query.eq(
           "category",
           requestedCategory
         )
-        .order("display_order", {
-          ascending: true,
-        })
+    }
+
+    const {
+      data,
+      error,
+    } = await query
+      .order("category", {
+        ascending: true,
+      })
+      .order("display_order", {
+        ascending: true,
+      })
 
     if (error) {
       throw error
     }
 
     return NextResponse.json({
-      topics: data || [],
+      topics: data ?? [],
     })
   } catch (error) {
     console.error(
@@ -141,16 +105,18 @@ export async function POST(
   request: Request
 ) {
   try {
+    const supabase = await db()
+
     const body =
       await request.json()
 
     const title =
-      typeof body.title === "string"
+      typeof body?.title === "string"
         ? body.title.trim()
         : ""
 
     const category =
-      typeof body.category === "string"
+      typeof body?.category === "string"
         ? body.category.trim()
         : ""
 
@@ -164,31 +130,72 @@ export async function POST(
       )
     }
 
-    if (
-      !validCategory(category)
-    ) {
+    if (!category) {
       return NextResponse.json(
         {
           error:
-            "A valid education category is required.",
+            "Education area is required.",
         },
         { status: 400 }
       )
     }
 
-    const supabase =
-      supabaseAdmin()
+    const {
+      data: area,
+      error: areaError,
+    } = await supabase
+      .from("education_areas")
+      .select(
+        "name,is_active"
+      )
+      .eq("name", category)
+      .maybeSingle()
+
+    if (areaError) {
+      throw areaError
+    }
+
+    if (!area) {
+      return NextResponse.json(
+        {
+          error:
+            "Education area not found.",
+        },
+        { status: 404 }
+      )
+    }
+
+    if (!area.is_active) {
+      return NextResponse.json(
+        {
+          error:
+            "This education area is inactive.",
+        },
+        { status: 400 }
+      )
+    }
 
     const slug =
       makeSlug(title)
 
-    const { data: existing } =
-      await supabase
-        .from("education_topics")
-        .select("id")
-        .ilike("category", category)
-        .eq("slug", slug)
-        .maybeSingle()
+    if (!slug) {
+      return NextResponse.json(
+        {
+          error:
+            "Unable to create a valid topic slug.",
+        },
+        { status: 400 }
+      )
+    }
+
+    const {
+      data: existing,
+    } = await supabase
+      .from("education_topics")
+      .select("id")
+      .eq("category", category)
+      .eq("slug", slug)
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json(
@@ -200,43 +207,50 @@ export async function POST(
       )
     }
 
-    const { data: maxRow } =
-      await supabase
-        .from("education_topics")
-        .select("display_order")
-        .ilike("category", category)
-        .order("display_order", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle()
+    const {
+      data: maxRow,
+    } = await supabase
+      .from("education_topics")
+      .select("display_order")
+      .eq("category", category)
+      .order("display_order", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle()
 
     const nextOrder =
       Number(
         maxRow?.display_order ?? 0
       ) + 1
 
-    const { data, error } =
-      await supabase
-        .from("education_topics")
-        .insert({
-          title,
-          slug,
-          category,
-          display_order:
-            nextOrder,
-          is_published: false,
-        })
-        .select()
-        .single()
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("education_topics")
+      .insert({
+        title,
+        slug,
+        category,
+        display_order:
+          nextOrder,
+        is_published: false,
+        status: "draft",
+      })
+      .select()
+      .single()
 
     if (error) {
       throw error
     }
 
-    return NextResponse.json({
-      topic: data,
-    })
+    return NextResponse.json(
+      {
+        topic: data,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error(
       "Education topics POST error:",

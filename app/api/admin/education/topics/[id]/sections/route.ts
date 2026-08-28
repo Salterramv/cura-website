@@ -1,54 +1,48 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-function db() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL
-
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY
-
-  if (!url || !key) {
-    throw new Error(
-      "Supabase environment variables are missing."
-    )
-  }
-
-  return createClient(url, key)
-}
+import { createClient } from "@/lib/supabase/server"
 
 export async function GET(
   _request: Request,
   context: {
-    params: Promise<{ id: string }>
+    params: Promise<{
+      id: string
+    }>
   }
 ) {
   try {
-    const { id } = await context.params
-    const supabase = db()
+    const { id } =
+      await context.params
 
-    const { data: topic, error: topicError } =
-      await supabase
-        .from("education_topics")
-        .select("id,title,slug,category")
-        .eq("id", id)
-        .single()
+    const supabase =
+      await createClient()
+
+    const {
+      data: topic,
+      error: topicError,
+    } = await supabase
+      .from("education_topics")
+      .select(
+        "id,title,slug,category"
+      )
+      .eq("id", id)
+      .single()
 
     if (topicError) {
       throw topicError
     }
 
-    const { data: sections, error } =
-      await supabase
-        .from("education_sections")
-        .select(
-          "id,title,display_order,is_published"
-        )
-        .eq("topic_id", id)
-        .order("display_order", {
-          ascending: true,
-        })
+    const {
+      data: sections,
+      error,
+    } = await supabase
+      .from("education_sections")
+      .select(
+        "id,title,display_order,is_published"
+      )
+      .eq("topic_id", id)
+      .order("display_order", {
+        ascending: true,
+      })
 
     if (error) {
       throw error
@@ -56,9 +50,15 @@ export async function GET(
 
     return NextResponse.json({
       topic,
-      sections: sections || [],
+      sections:
+        sections ?? [],
     })
   } catch (error) {
+    console.error(
+      "Education sections GET error:",
+      error
+    )
+
     return NextResponse.json(
       {
         error:
@@ -74,15 +74,20 @@ export async function GET(
 export async function POST(
   request: Request,
   context: {
-    params: Promise<{ id: string }>
+    params: Promise<{
+      id: string
+    }>
   }
 ) {
   try {
-    const { id } = await context.params
-    const body = await request.json()
+    const { id } =
+      await context.params
+
+    const body =
+      await request.json()
 
     const title =
-      typeof body.title === "string"
+      typeof body?.title === "string"
         ? body.title.trim()
         : ""
 
@@ -96,35 +101,40 @@ export async function POST(
       )
     }
 
-    const supabase = db()
+    const supabase =
+      await createClient()
 
-    const { data: maxRow } =
-      await supabase
-        .from("education_sections")
-        .select("display_order")
-        .eq("topic_id", id)
-        .order("display_order", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle()
+    const {
+      data: maxRow,
+    } = await supabase
+      .from("education_sections")
+      .select("display_order")
+      .eq("topic_id", id)
+      .order("display_order", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle()
 
     const nextOrder =
       Number(
         maxRow?.display_order ?? 0
       ) + 1
 
-    const { data, error } =
-      await supabase
-        .from("education_sections")
-        .insert({
-          topic_id: id,
-          title,
-          display_order: nextOrder,
-          is_published: false,
-        })
-        .select()
-        .single()
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("education_sections")
+      .insert({
+        topic_id: id,
+        title,
+        display_order:
+          nextOrder,
+        is_published: false,
+      })
+      .select()
+      .single()
 
     if (error) {
       throw error
@@ -134,6 +144,11 @@ export async function POST(
       section: data,
     })
   } catch (error) {
+    console.error(
+      "Education sections POST error:",
+      error
+    )
+
     return NextResponse.json(
       {
         error:

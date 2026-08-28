@@ -1,22 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-function supabaseAdmin() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL
-
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY
-
-  if (!url || !key) {
-    throw new Error(
-      "Supabase environment variables are missing."
-    )
-  }
-
-  return createClient(url, key)
-}
+import { createClient } from "@/lib/supabase/server"
 
 export async function DELETE(
   _request: Request,
@@ -27,7 +10,8 @@ export async function DELETE(
   }
 ) {
   try {
-    const { id } = await context.params
+    const { id } =
+      await context.params
 
     if (!id) {
       return NextResponse.json(
@@ -39,32 +23,43 @@ export async function DELETE(
       )
     }
 
-    const supabase = supabaseAdmin()
+    const supabase =
+      await createClient()
 
-    const { data: topic, error: findError } =
-      await supabase
-        .from("education_topics")
-        .select("id,category")
-        .eq("id", id)
-        .single()
+    const {
+      data: topic,
+      error: findError,
+    } = await supabase
+      .from("education_topics")
+      .select(
+        "id,category"
+      )
+      .eq("id", id)
+      .single()
 
     if (findError) {
       throw findError
     }
 
-    /*
-     * Existing content must not be silently destroyed.
-     *
-     * Therefore deletion is implemented as an archive/
-     * unpublish operation at this stage.
-     */
-    const { error } =
-      await supabase
-        .from("education_topics")
-        .update({
-          is_published: false,
-        })
-        .eq("id", id)
+    if (!topic) {
+      return NextResponse.json(
+        {
+          error:
+            "Topic not found.",
+        },
+        { status: 404 }
+      )
+    }
+
+    const {
+      error,
+    } = await supabase
+      .from("education_topics")
+      .update({
+        is_published: false,
+        status: "archived",
+      })
+      .eq("id", id)
 
     if (error) {
       throw error
@@ -74,6 +69,11 @@ export async function DELETE(
       success: true,
     })
   } catch (error) {
+    console.error(
+      "Education topic DELETE error:",
+      error
+    )
+
     return NextResponse.json(
       {
         error:
