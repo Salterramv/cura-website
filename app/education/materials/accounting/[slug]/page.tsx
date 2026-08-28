@@ -1455,6 +1455,41 @@ function RenderSourceBlock({
   const blockType = (block.block_type || "").toLowerCase()
 
   /*
+   * CURA EDITOR CONTENT AUTHORITY
+   *
+   * Imported/source blocks may contain presentation.paragraphs,
+   * which remains authoritative until an administrator explicitly
+   * edits the block in the CURA editor.
+   *
+   * Once the editor marks the block with cura_content_edited,
+   * block.content becomes the public content source.
+   */
+  const curaContentEdited =
+    Boolean(
+      block.presentation &&
+        typeof block.presentation === "object" &&
+        (block.presentation as Record<string, unknown>)
+          .cura_content_edited === true
+    )
+
+  if (
+    curaContentEdited &&
+    blockType !== "illustration" &&
+    blockType !== "image" &&
+    blockType !== "figure" &&
+    blockType !== "table"
+  ) {
+    const editedContent =
+      block.content || ""
+
+    if (editedContent.trim()) {
+      return (
+        <RichText value={editedContent} />
+      )
+    }
+  }
+
+  /*
    * Visual blocks are authoritative and must be rendered before the
    * presentation-text path. Otherwise an imported figure/table can
    * be treated as ordinary source text.
