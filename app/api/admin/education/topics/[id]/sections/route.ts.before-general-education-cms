@@ -31,7 +31,7 @@ export async function GET(
     const { data: topic, error: topicError } =
       await supabase
         .from("education_topics")
-        .select("id,title,slug,category")
+        .select("id,title,slug")
         .eq("id", id)
         .single()
 

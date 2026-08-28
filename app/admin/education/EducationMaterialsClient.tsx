@@ -1,0 +1,519 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+
+type Topic = {
+  id: string
+  slug: string
+  title: string
+  category: string
+  display_order: number
+  published?: boolean
+}
+
+const AREAS = [
+  {
+    key: "Accounting",
+    title: "Accounting",
+    description:
+      "Financial reporting, accounting standards and accounting practice.",
+  },
+  {
+    key: "Tax",
+    title: "Tax",
+    description:
+      "Tax principles, legislation, interpretation and practical application.",
+  },
+  {
+    key: "Audit",
+    title: "Audit",
+    description:
+      "Auditing standards, audit methodology, evidence and professional practice.",
+  },
+  {
+    key: "Law",
+    title: "Law",
+    description:
+      "Legal principles, legislation, cases and professional legal knowledge.",
+  },
+] as const
+
+export default function EducationMaterialsClient() {
+  const searchParams = useSearchParams()
+
+  const selectedCategory =
+    searchParams.get("category")
+
+  const [topics, setTopics] =
+    useState<Topic[]>([])
+
+  const [loading, setLoading] =
+    useState(false)
+
+  const [saving, setSaving] =
+    useState(false)
+
+  const [newTopic, setNewTopic] =
+    useState("")
+
+  const [error, setError] =
+    useState("")
+
+  async function loadTopics(
+    category: string
+  ) {
+    try {
+      setLoading(true)
+      setError("")
+
+      const response =
+        await fetch(
+          `/api/admin/education/topics?category=${encodeURIComponent(category)}`,
+          {
+            cache: "no-store",
+          }
+        )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            `Unable to load ${category} topics.`
+        )
+      }
+
+      setTopics(
+        Array.isArray(data.topics)
+          ? data.topics
+          : []
+      )
+    } catch (err) {
+      setTopics([])
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load topics."
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedCategory) {
+      loadTopics(
+        selectedCategory
+      )
+    } else {
+      setTopics([])
+      setError("")
+    }
+  }, [selectedCategory])
+
+  async function addTopic() {
+    if (!selectedCategory) {
+      return
+    }
+
+    const title =
+      newTopic.trim()
+
+    if (!title) {
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError("")
+
+      const response =
+        await fetch(
+          "/api/admin/education/topics",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              title,
+              category:
+                selectedCategory,
+            }),
+          }
+        )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to create topic."
+        )
+      }
+
+      setNewTopic("")
+
+      await loadTopics(
+        selectedCategory
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to create topic."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteTopic(
+    topic: Topic
+  ) {
+    const confirmed =
+      window.confirm(
+        `Remove "${topic.title}"?\n\nThe topic will be unpublished rather than permanently deleted.`
+      )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError("")
+
+      const response =
+        await fetch(
+          `/api/admin/education/topics/${topic.id}`,
+          {
+            method: "DELETE",
+          }
+        )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to remove topic."
+        )
+      }
+
+      if (selectedCategory) {
+        await loadTopics(
+          selectedCategory
+        )
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to remove topic."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /*
+   * MASTER EDUCATION SCREEN
+   */
+
+  if (!selectedCategory) {
+    return (
+      <main className="min-h-screen bg-[#F6FAF8] px-6 py-10">
+        <div className="mx-auto max-w-7xl">
+
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#159B78]">
+                CURA Education
+              </div>
+
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#071B49]">
+                Education Materials
+              </h1>
+
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5D7180]">
+                Manage CURA educational materials across
+                Accounting, Tax, Audit and Law.
+              </p>
+            </div>
+
+            <Link
+              href="/admin"
+              className="inline-flex w-fit rounded-xl border border-[#D8E5E0] bg-white px-4 py-2 text-sm font-semibold text-[#245448] shadow-sm"
+            >
+              ← Admin Dashboard
+            </Link>
+          </div>
+
+          <section className="grid gap-5 md:grid-cols-2">
+
+            {AREAS.map(
+              (area) => (
+                <Link
+                  key={area.key}
+                  href={`/admin/education?category=${encodeURIComponent(area.key)}`}
+                  className="group rounded-3xl border border-[#DCE9E4] bg-white p-7 shadow-[0_10px_35px_rgba(20,70,55,0.05)] transition hover:-translate-y-0.5 hover:border-[#159B78]"
+                >
+                  <div className="flex items-start justify-between gap-5">
+
+                    <div>
+                      <div className="mb-3 inline-flex rounded-full bg-[#E9F6F1] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-[#159B78]">
+                        Education
+                      </div>
+
+                      <h2 className="text-2xl font-bold text-[#071B49]">
+                        {area.title}
+                      </h2>
+
+                      <p className="mt-3 max-w-xl text-sm leading-6 text-[#5D7180]">
+                        {area.description}
+                      </p>
+                    </div>
+
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#071B49] text-lg font-bold text-white transition group-hover:bg-[#159B78]">
+                      →
+                    </div>
+
+                  </div>
+
+                  <div className="mt-6 border-t border-[#E7EFEC] pt-4 text-sm font-bold text-[#071B49]">
+                    Manage {area.title} Materials →
+                  </div>
+                </Link>
+              )
+            )}
+
+          </section>
+
+          <section className="mt-8 rounded-3xl border border-[#DCE9E4] bg-white p-6">
+            <h2 className="text-lg font-bold text-[#071B49]">
+              Common Education Controls
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-[#5D7180]">
+              Each education area uses the same content-management
+              controls for topics, sections, ordered content,
+              illustrations and tables.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                "Topics",
+                "Sections",
+                "Content",
+                "Illustrations & Tables",
+              ].map(
+                (item) => (
+                  <div
+                    key={item}
+                    className="rounded-xl bg-[#F6FAF8] px-4 py-3 text-sm font-semibold text-[#245448]"
+                  >
+                    ✓ {item}
+                  </div>
+                )
+              )}
+            </div>
+          </section>
+
+        </div>
+      </main>
+    )
+  }
+
+  /*
+   * AREA TOPIC MANAGER
+   */
+
+  const area =
+    AREAS.find(
+      (item) =>
+        item.key ===
+        selectedCategory
+    ) || AREAS[0]
+
+  return (
+    <main className="min-h-screen bg-[#F6FAF8] px-6 py-10">
+      <div className="mx-auto max-w-7xl">
+
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+
+          <div>
+            <Link
+              href="/admin/education"
+              className="text-sm font-semibold text-[#159B78]"
+            >
+              ← Education Materials
+            </Link>
+
+            <div className="mt-5">
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#159B78]">
+                CURA Education
+              </div>
+
+              <h1 className="mt-2 text-3xl font-bold text-[#071B49]">
+                {area.title}
+              </h1>
+
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5D7180]">
+                Manage {area.title.toLowerCase()}
+                topics, sections and educational content.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/admin"
+            className="inline-flex w-fit rounded-xl border border-[#D8E5E0] bg-white px-4 py-2 text-sm font-semibold text-[#245448] shadow-sm"
+          >
+            ← Admin Dashboard
+          </Link>
+
+        </div>
+
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <section className="mb-8 rounded-3xl border border-[#DCE9E4] bg-white p-6 shadow-[0_10px_35px_rgba(20,70,55,0.05)]">
+
+          <h2 className="text-lg font-bold text-[#071B49]">
+            Add {area.title} Topic
+          </h2>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input
+              value={newTopic}
+              onChange={(event) =>
+                setNewTopic(
+                  event.target.value
+                )
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  addTopic()
+                }
+              }}
+              placeholder={`${area.title} topic name`}
+              className="min-h-11 flex-1 rounded-xl border border-[#D6E3DE] bg-white px-4 text-sm text-[#071B49] outline-none focus:border-[#159B78]"
+            />
+
+            <button
+              type="button"
+              disabled={
+                saving ||
+                !newTopic.trim()
+              }
+              onClick={addTopic}
+              className="rounded-xl bg-[#159B78] px-6 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              + Add Topic
+            </button>
+          </div>
+
+        </section>
+
+        <section className="rounded-3xl border border-[#DCE9E4] bg-white shadow-[0_10px_35px_rgba(20,70,55,0.05)]">
+
+          <div className="border-b border-[#E7EFEC] px-6 py-5">
+            <h2 className="text-lg font-bold text-[#071B49]">
+              {area.title} Topics
+            </h2>
+
+            <p className="mt-1 text-xs text-[#6A7E76]">
+              {topics.length} topics
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="px-6 py-12 text-center text-sm text-[#71827C]">
+              Loading {area.title.toLowerCase()} topics…
+            </div>
+          ) : topics.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+
+              <div className="text-sm text-[#71827C]">
+                No {area.title.toLowerCase()} topics found.
+              </div>
+
+              <p className="mt-2 text-xs text-[#8A9993]">
+                Use “Add Topic” above to create the first one.
+              </p>
+
+            </div>
+          ) : (
+            <div className="divide-y divide-[#E7EFEC]">
+
+              {topics.map(
+                (topic, index) => (
+                  <div
+                    key={topic.id}
+                    className="flex flex-col gap-4 px-6 py-5 md:flex-row md:items-center md:justify-between"
+                  >
+
+                    <div className="flex min-w-0 items-center gap-4">
+
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E9F6F1] text-xs font-bold text-[#159B78]">
+                        {index + 1}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="font-semibold text-[#071B49]">
+                          {topic.title}
+                        </div>
+
+                        <div className="mt-1 text-xs text-[#7A8984]">
+                          /{topic.slug}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+
+                      <Link
+                        href={`/admin/education/${topic.id}`}
+                        className="rounded-lg bg-[#071B49] px-4 py-2 text-xs font-bold text-white"
+                      >
+                        Manage
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          deleteTopic(
+                            topic
+                          )
+                        }
+                        disabled={saving}
+                        className="rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+
+                    </div>
+                  </div>
+                )
+              )}
+
+            </div>
+          )}
+
+        </section>
+      </div>
+    </main>
+  )
+}

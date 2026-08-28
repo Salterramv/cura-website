@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const VALID_CATEGORIES = [
-  "Accounting",
-  "Tax",
-  "Audit",
-  "Law",
-]
-
 function supabaseAdmin() {
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -33,81 +26,17 @@ function makeSlug(value: string) {
     .replace(/^-+|-+$/g, "")
 }
 
-function validCategory(
-  value: unknown
-): value is string {
-  return (
-    typeof value === "string" &&
-    VALID_CATEGORIES.includes(value)
-  )
-}
-
-export async function GET(
-  request: Request
-) {
+export async function GET() {
   try {
     const supabase = supabaseAdmin()
-
-    const url = new URL(request.url)
-
-    const requestedCategory =
-      url.searchParams.get("category")
-
-    /*
-     * If no category is supplied, return all four
-     * education areas. This keeps the API general.
-     */
-    if (!requestedCategory) {
-      const { data, error } =
-        await supabase
-          .from("education_topics")
-          .select(
-            "id,slug,title,category,display_order,published"
-          )
-          .in(
-            "category",
-            VALID_CATEGORIES
-          )
-          .order("category", {
-            ascending: true,
-          })
-          .order("display_order", {
-            ascending: true,
-          })
-
-      if (error) {
-        throw error
-      }
-
-      return NextResponse.json({
-        topics: data || [],
-      })
-    }
-
-    if (
-      !validCategory(
-        requestedCategory
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid education category.",
-        },
-        { status: 400 }
-      )
-    }
 
     const { data, error } =
       await supabase
         .from("education_topics")
         .select(
-          "id,slug,title,category,display_order,published"
+          "id,slug,title,display_order,published"
         )
-        .eq(
-          "category",
-          requestedCategory
-        )
+        .eq("category", "Education")
         .order("display_order", {
           ascending: true,
         })
@@ -120,11 +49,6 @@ export async function GET(
       topics: data || [],
     })
   } catch (error) {
-    console.error(
-      "Education topics GET error:",
-      error
-    )
-
     return NextResponse.json(
       {
         error:
@@ -141,17 +65,11 @@ export async function POST(
   request: Request
 ) {
   try {
-    const body =
-      await request.json()
+    const body = await request.json()
 
     const title =
       typeof body.title === "string"
         ? body.title.trim()
-        : ""
-
-    const category =
-      typeof body.category === "string"
-        ? body.category.trim()
         : ""
 
     if (!title) {
@@ -164,29 +82,14 @@ export async function POST(
       )
     }
 
-    if (
-      !validCategory(category)
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "A valid education category is required.",
-        },
-        { status: 400 }
-      )
-    }
+    const supabase = supabaseAdmin()
 
-    const supabase =
-      supabaseAdmin()
-
-    const slug =
-      makeSlug(title)
+    const slug = makeSlug(title)
 
     const { data: existing } =
       await supabase
         .from("education_topics")
         .select("id")
-        .eq("category", category)
         .eq("slug", slug)
         .maybeSingle()
 
@@ -194,7 +97,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "A topic with this name already exists in this education area.",
+            "A topic with this name already exists.",
         },
         { status: 409 }
       )
@@ -204,7 +107,7 @@ export async function POST(
       await supabase
         .from("education_topics")
         .select("display_order")
-        .eq("category", category)
+        .eq("category", "Education")
         .order("display_order", {
           ascending: false,
         })
@@ -222,9 +125,8 @@ export async function POST(
         .insert({
           title,
           slug,
-          category,
-          display_order:
-            nextOrder,
+          category: "Education",
+          display_order: nextOrder,
           published: false,
         })
         .select()
@@ -238,11 +140,6 @@ export async function POST(
       topic: data,
     })
   } catch (error) {
-    console.error(
-      "Education topics POST error:",
-      error
-    )
-
     return NextResponse.json(
       {
         error:
