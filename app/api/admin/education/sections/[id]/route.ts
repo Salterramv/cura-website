@@ -23,7 +23,7 @@ export async function DELETE(
       await supabase
         .from("education_sections")
         .update({
-          published: false,
+          is_published: false,
           updated_at:
             new Date().toISOString(),
         })
@@ -48,3 +48,67 @@ export async function DELETE(
     )
   }
 }
+
+
+export async function PATCH(
+  request: Request,
+  context: {
+    params: Promise<{ id: string }>
+  }
+) {
+  try {
+    const { id } = await context.params
+    const body = await request.json()
+    const supabase = await createClient()
+
+    const update: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (typeof body.title === "string") {
+      const title = body.title.trim()
+
+      if (!title) {
+        return NextResponse.json(
+          {
+            error: "Section title cannot be empty.",
+          },
+          { status: 400 }
+        )
+      }
+
+      update.title = title
+    }
+
+    if (typeof body.is_published === "boolean") {
+      update.is_published = body.is_published
+    }
+
+    const { data, error } = await supabase
+      .from("education_sections")
+      .update(update)
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return NextResponse.json({
+      success: true,
+      section: data,
+    })
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to update section.",
+      },
+      { status: 500 }
+    )
+  }
+}
+

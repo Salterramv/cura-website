@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import CuraRichTextEditor from "@/components/admin/CuraRichTextEditor"
 
 type LegalCase = {
   id: string
@@ -1707,15 +1708,15 @@ export default function AdminCasesPage() {
                       {label as string}
                     </label>
 
-                    <textarea
+                    <CuraRichTextEditor
                       value={value as string}
-                      onChange={(e) =>
+                      onChange={(newValue) =>
                         (setter as React.Dispatch<
                           React.SetStateAction<string>
-                        >)(e.target.value)
+                        >)(newValue)
                       }
-                      rows={5}
-                      className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 text-sm"
+                      placeholder={`Enter ${label as string}...`}
+                      minHeight="180px"
                     />
                   </div>
                 ))}

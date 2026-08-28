@@ -63,6 +63,64 @@ function formatDate(date: string | null) {
   })
 }
 
+
+function formatArticleText(
+  command: string,
+  value?: string
+) {
+  document.execCommand(
+    command,
+    false,
+    value
+  )
+}
+
+function formatArticleColor() {
+  const color = window.prompt(
+    "Enter text colour (for example #071B49 or #18B8EE):",
+    "#071B49"
+  )
+
+  if (!color) return
+
+  formatArticleText("foreColor", color)
+}
+
+function formatArticleFontSize(size: string) {
+  if (!size) return
+
+  document.execCommand(
+    "fontSize",
+    false,
+    "7"
+  )
+
+  const editor =
+    document.querySelector(
+      '[contenteditable="true"]'
+    )
+
+  if (!editor) return
+
+  const fonts =
+    editor.querySelectorAll(
+      'font[size="7"]'
+    )
+
+  fonts.forEach((font) => {
+    const span =
+      document.createElement("span")
+
+    span.style.fontSize =
+      `${size}px`
+
+    span.innerHTML =
+      font.innerHTML
+
+    font.replaceWith(span)
+  })
+}
+
 export default function AdminArticlesPage() {
   const supabase = createClient()
   const editorRef = useRef<HTMLDivElement>(null)
@@ -850,6 +908,146 @@ export default function AdminArticlesPage() {
                   className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                 >
                   Table
+                </button>
+
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 border border-slate-300 bg-slate-50 p-3">
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => formatArticleText("bold")}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
+                >
+                  B
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => formatArticleText("italic")}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm italic text-slate-700 hover:bg-slate-100"
+                >
+                  I
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => formatArticleText("underline")}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm underline text-slate-700 hover:bg-slate-100"
+                >
+                  U
+                </button>
+
+                <select
+                  defaultValue=""
+                  aria-label="Article font size"
+                  onChange={(e) => {
+                    formatArticleFontSize(e.target.value)
+                    e.target.value = ""
+                    updateEditorContent()
+                  }}
+                  className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700"
+                >
+                  <option value="">Font size</option>
+                  <option value="12">12px</option>
+                  <option value="14">14px</option>
+                  <option value="16">16px</option>
+                  <option value="18">18px</option>
+                  <option value="20">20px</option>
+                  <option value="24">24px</option>
+                  <option value="28">28px</option>
+                  <option value="32">32px</option>
+                  <option value="36">36px</option>
+                </select>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    formatArticleColor()
+                    updateEditorContent()
+                  }}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  A <span className="text-[#18B8EE]">Colour</span>
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    formatArticleText("formatBlock", "h2")
+                    updateEditorContent()
+                  }}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  H2
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    formatArticleText("formatBlock", "h3")
+                    updateEditorContent()
+                  }}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  H3
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    formatArticleText("insertUnorderedList")
+                    updateEditorContent()
+                  }}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  • List
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    formatArticleText("insertOrderedList")
+                    updateEditorContent()
+                  }}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  1. List
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    const url = window.prompt("Enter URL:")
+                    if (url) {
+                      formatArticleText("createLink", url)
+                      updateEditorContent()
+                    }
+                  }}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  Link
+                </button>
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    formatArticleText("removeFormat")
+                    updateEditorContent()
+                  }}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  Clear
                 </button>
 
               </div>

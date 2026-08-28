@@ -43,6 +43,14 @@ export async function PATCH(
         body.presentation
     }
 
+    if (
+      typeof body.is_published ===
+      "boolean"
+    ) {
+      update.is_published =
+        body.is_published
+    }
+
     update.updated_at =
       new Date().toISOString()
 

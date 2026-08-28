@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
 import { createClient } from "@/lib/supabase/client"
+import { sanitizeRichText } from "@/lib/sanitize-html"
 
 type PageProps = {
   params: Promise<{
@@ -405,6 +406,50 @@ function isHumanVerified(
   ].includes(status)
 }
 
+
+function isRichText(value: string | null | undefined) {
+  return /<(strong|b|em|i|u|span|p|h[1-6]|ul|ol|li|a|br)\b/i.test(
+    value || ""
+  )
+}
+
+function CaseRichText({
+  value,
+}: {
+  value: string | null | undefined
+}) {
+  if (!value) return null
+
+  if (!isRichText(value)) {
+    return (
+      <div className="whitespace-pre-wrap break-words">
+        {value}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="
+        break-words
+        [&_p]:mb-4
+        [&_strong]:font-bold
+        [&_b]:font-bold
+        [&_em]:italic
+        [&_i]:italic
+        [&_u]:underline
+        [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6
+        [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6
+        [&_li]:mb-1
+        [&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-[#071B49]
+        [&_h3]:mb-3 [&_h3]:mt-5 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-[#071B49]
+        [&_a]:font-semibold [&_a]:text-[#168BC4] [&_a]:underline
+      "
+      dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
+    />
+  )
+}
+
 export default async function CasePage({
   params,
 }: PageProps) {
@@ -782,7 +827,7 @@ export default async function CasePage({
 
             {typedCase.description && (
               <p className="mt-6 max-w-3xl text-base leading-8 text-slate-300">
-                {typedCase.description}
+                <CaseRichText value={typedCase.description} />
               </p>
             )}
 

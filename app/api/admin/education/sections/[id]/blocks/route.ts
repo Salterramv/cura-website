@@ -74,7 +74,7 @@ export async function POST(
           block_type: blockType,
           content: initialContent,
           display_order: nextOrder,
-          is_published: false,
+          is_published: true,
           version: 1,
           presentation: {
             font: "Geist Sans",

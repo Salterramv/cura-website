@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import CuraRichTextEditor from "@/components/admin/CuraRichTextEditor"
 
 type BlockType =
   | "paragraph"
@@ -200,12 +201,112 @@ export default function SectionEditor({
         )
       )
 
-      setMessage("Saved.")
+      setMessage("Draft saved.")
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Unable to save block."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveAndPublish() {
+    if (!sectionId) return
+
+    try {
+      setSaving(true)
+      setError("")
+      setMessage("")
+
+      /*
+       * Save every editable block and explicitly publish it.
+       * This is intentionally done at block level because
+       * the public Education page reads block publication
+       * state.
+       */
+      for (const block of blocks) {
+        const response = await fetch(
+          `/api/admin/education/blocks/${block.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              title: block.title || "",
+              content: block.content || "",
+              presentation:
+                block.presentation || {},
+              is_published: true,
+            }),
+          }
+        )
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              `Unable to save block ${block.id}.`
+          )
+        }
+      }
+
+      /*
+       * Publish the section itself as well.
+       * Without this, newly-created sections can remain
+       * invisible on the public Education page.
+       */
+      const sectionResponse = await fetch(
+        `/api/admin/education/sections/${sectionId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            is_published: true,
+          }),
+        }
+      )
+
+      const sectionData =
+        await sectionResponse.json()
+
+      if (!sectionResponse.ok) {
+        throw new Error(
+          sectionData.error ||
+            "Unable to publish section."
+        )
+      }
+
+      setBlocks((current) =>
+        current.map((block) => ({
+          ...block,
+          is_published: true,
+        }))
+      )
+
+      setSection((current) =>
+        current
+          ? {
+              ...current,
+              is_published: true,
+            }
+          : current
+      )
+
+      setMessage(
+        "Changes saved and published successfully."
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to save and publish changes."
       )
     } finally {
       setSaving(false)
@@ -312,11 +413,18 @@ export default function SectionEditor({
     }
   }
 
+  /*
+   * IMPORTANT:
+   * The admin editor must show unpublished blocks too.
+   * Otherwise newly-created blocks disappear immediately
+   * because the creation API initially/previously marked
+   * them unpublished.
+   *
+   * Publication is controlled separately from visibility
+   * inside the CMS.
+   */
   const activeBlocks = useMemo(
-    () =>
-      blocks.filter(
-        (block) => block.is_published !== false
-      ),
+    () => blocks,
     [blocks]
   )
 
@@ -447,14 +555,27 @@ export default function SectionEditor({
           </div>
         </section>
 
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-[#071B49]">
-            Section Content
-          </h2>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-[#071B49]">
+              Section Content
+            </h2>
 
-          <span className="text-xs text-[#71827C]">
-            {activeBlocks.length} blocks
-          </span>
+            <span className="text-xs text-[#71827C]">
+              {activeBlocks.length} blocks
+            </span>
+          </div>
+
+          <button
+            type="button"
+            disabled={saving || loading}
+            onClick={saveAndPublish}
+            className="rounded-xl bg-[#071B49] px-5 py-3 text-sm font-bold !text-white shadow-sm transition hover:bg-[#0B285E] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving
+              ? "Saving…"
+              : "Save & Publish"}
+          </button>
         </div>
 
         {loading ? (
@@ -490,6 +611,18 @@ export default function SectionEditor({
                           block.block_type
                         ] ||
                           block.block_type}
+                      </span>
+
+                      <span
+                        className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${
+                          block.is_published
+                            ? "bg-[#EAF6F1] text-[#159B78]"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {block.is_published
+                          ? "Published"
+                          : "Draft"}
                       </span>
                     </div>
 
