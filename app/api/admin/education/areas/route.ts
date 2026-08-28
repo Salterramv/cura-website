@@ -23,10 +23,7 @@ async function requireAdmin() {
     data: isAdmin,
     error: adminError,
   } = await supabase.rpc(
-    "is_current_user_admin",
-    {
-      user_id: user.id,
-    }
+    "is_current_user_admin"
   )
 
   if (adminError || !isAdmin) {

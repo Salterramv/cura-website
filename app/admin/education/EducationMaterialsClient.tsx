@@ -562,7 +562,7 @@ export default function EducationMaterialsClient() {
             <div className="flex items-center gap-3">
               <Link
                 href="/education"
-                className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#071B49]"
+                className="rounded-lg bg-white px-4 py-2 text-sm font-semibold !text-[#071B49] hover:bg-slate-50"
               >
                 View Education
               </Link>
@@ -886,7 +886,7 @@ export default function EducationMaterialsClient() {
           <div className="flex items-center gap-3">
             <Link
               href="/education"
-              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#071B49]"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold !text-[#071B49] hover:bg-slate-50"
             >
               View Education
             </Link>
