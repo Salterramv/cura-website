@@ -29,8 +29,6 @@ export default function EducationTopicAdmin({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [editingTopic, setEditingTopic] = useState(false)
-  const [topicTitleDraft, setTopicTitleDraft] = useState("")
 
   useEffect(() => {
     params.then(({ id }) => {
@@ -71,57 +69,6 @@ export default function EducationTopicAdmin({
       )
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function renameTopic() {
-    const title = topicTitleDraft.trim()
-
-    if (!title || !topicId) return
-
-    if (
-      title === topic?.title
-    ) {
-      setEditingTopic(false)
-      return
-    }
-
-    try {
-      setSaving(true)
-      setError("")
-
-      const response = await fetch(
-        `/api/admin/education/topics/${topicId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title,
-          }),
-        }
-      )
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            "Unable to rename topic."
-        )
-      }
-
-      setEditingTopic(false)
-      await load(topicId)
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to rename topic."
-      )
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -267,144 +214,12 @@ export default function EducationTopicAdmin({
               CURA Education
             </div>
 
-            <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center">
-              {editingTopic ? (
-                <>
-                  <input
-                    value={topicTitleDraft}
-                    onChange={(event) =>
-                      setTopicTitleDraft(
-                        event.target.value
-                      )
-                    }
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter"
-                      ) {
-                        renameTopic()
-                      }
-
-                      if (
-                        event.key === "Escape"
-                      ) {
-                        setEditingTopic(false)
-                        setTopicTitleDraft(
-                          topic?.title || ""
-                        )
-                      }
-                    }}
-                    autoFocus
-                    className="
-                      min-h-12
-                      w-full
-                      max-w-2xl
-                      rounded-xl
-                      border
-                      border-[#D6E3DE]
-                      bg-white
-                      px-4
-                      text-3xl
-                      font-bold
-                      text-[#071B49]
-                      outline-none
-                      focus:border-[#159B78]
-                      focus:ring-2
-                      focus:ring-[#159B78]/10
-                    "
-                  />
-
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      type="button"
-                      disabled={
-                        saving ||
-                        !topicTitleDraft.trim()
-                      }
-                      onClick={renameTopic}
-                      className="
-                        rounded-xl
-                        bg-[#071B49]
-                        px-5
-                        py-3
-                        text-sm
-                        font-bold
-                        text-white
-                        disabled:opacity-50
-                      "
-                    >
-                      {saving
-                        ? "Saving…"
-                        : "Save Name"}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => {
-                        setEditingTopic(false)
-                        setTopicTitleDraft(
-                          topic?.title || ""
-                        )
-                      }}
-                      className="
-                        rounded-xl
-                        border
-                        border-[#D6E3DE]
-                        bg-white
-                        px-5
-                        py-3
-                        text-sm
-                        font-semibold
-                        text-[#355B50]
-                        disabled:opacity-50
-                      "
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h1 className="text-3xl font-bold text-[#071B49]">
-                    {loading
-                      ? "Loading…"
-                      : topic?.title ||
-                        "Education Topic"}
-                  </h1>
-
-                  {topic && (
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => {
-                        setTopicTitleDraft(
-                          topic.title
-                        )
-                        setEditingTopic(true)
-                      }}
-                      className="
-                        w-fit
-                        rounded-lg
-                        border
-                        border-[#D6E3DE]
-                        bg-white
-                        px-4
-                        py-2
-                        text-xs
-                        font-bold
-                        text-[#355B50]
-                        transition
-                        hover:border-[#159B78]
-                        hover:text-[#159B78]
-                        disabled:opacity-50
-                      "
-                    >
-                      Rename / Edit
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
+            <h1 className="mt-2 text-3xl font-bold text-[#071B49]">
+              {loading
+                ? "Loading…"
+                : topic?.title ||
+                  "Education Topic"}
+            </h1>
 
             {topic && (
               <p className="mt-2 text-sm text-[#71827C]">

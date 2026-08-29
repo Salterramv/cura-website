@@ -607,7 +607,16 @@ export default function CuraRichTextEditor({
         onKeyUp={saveSelection}
         onMouseUp={saveSelection}
         onFocus={saveSelection}
-        className="cura-rich-editor max-w-none px-5 py-4 text-sm leading-7 text-[#102A5F] outline-none"
+        className="
+          cura-rich-editor
+          max-w-none
+          px-5
+          py-4
+          text-sm
+          leading-7
+          text-[#102A5F]
+          outline-none
+        "
         style={{
           minHeight,
         }}

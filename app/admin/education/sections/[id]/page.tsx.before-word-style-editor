@@ -631,6 +631,51 @@ export default function SectionEditor({
           </div>
         )}
 
+        <section className="mb-8 rounded-3xl border border-[#DCE9E4] bg-white p-5 shadow-[0_10px_35px_rgba(20,70,55,0.05)] sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-[#071B49]">
+                Add Content
+              </h2>
+
+              <p className="mt-1 text-xs leading-5 text-[#71827C]">
+                Insert a block anywhere in this section.
+                Existing content is not replaced.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["paragraph", "Text"],
+                  ["heading", "Heading"],
+                  ["bullet_list", "Bullets"],
+                  ["numbered_list", "Numbered"],
+                  ["callout", "Key Point"],
+                  ["note", "Note"],
+                  ["formula", "Formula"],
+                  ["illustration", "Illustration"],
+                  ["table", "Table"],
+                ] as const
+              ).map(
+                ([type, label]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    disabled={saving}
+                    onClick={() =>
+                      addBlock(type)
+                    }
+                    className="rounded-xl border border-[#D6E3DE] bg-white px-3 py-2 text-xs font-semibold text-[#355B50] transition hover:border-[#159B78] hover:bg-[#F1FAF6] disabled:opacity-50"
+                  >
+                    + {label}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </section>
+
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-bold text-[#071B49]">

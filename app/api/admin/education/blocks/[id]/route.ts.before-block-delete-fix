@@ -88,30 +88,11 @@ export async function DELETE(
     const { id } = await context.params
     const supabase = await db()
 
-    const { data: existingBlock, error: readError } =
-      await supabase
-        .from("education_content_blocks")
-        .select("presentation")
-        .eq("id", id)
-        .single()
-
-    if (readError) throw readError
-
-    const presentation =
-      existingBlock?.presentation &&
-      typeof existingBlock.presentation === "object"
-        ? existingBlock.presentation
-        : {}
-
     const { error } =
       await supabase
         .from("education_content_blocks")
         .update({
           is_published: false,
-          presentation: {
-            ...(presentation as Record<string, unknown>),
-            cura_deleted: true,
-          },
           updated_at:
             new Date().toISOString(),
         })
