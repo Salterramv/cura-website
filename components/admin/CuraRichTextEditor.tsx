@@ -282,14 +282,15 @@ export default function CuraRichTextEditor({
         "cura-editor-image"
 
       imageWrapper.contentEditable = "false"
+      imageWrapper.draggable = true
 
       imageWrapper.style.width = "60%"
       imageWrapper.style.maxWidth = "100%"
       imageWrapper.style.minWidth = "120px"
-      imageWrapper.style.resize = "both"
-      imageWrapper.style.overflow = "auto"
       imageWrapper.style.margin = "1rem auto"
       imageWrapper.style.position = "relative"
+      imageWrapper.style.display = "block"
+      imageWrapper.style.cursor = "move"
 
       const image =
         document.createElement("img")
@@ -300,9 +301,143 @@ export default function CuraRichTextEditor({
       image.style.width = "100%"
       image.style.height = "auto"
       image.style.maxWidth = "100%"
+      image.style.pointerEvents = "none"
       image.draggable = false
 
       imageWrapper.appendChild(image)
+
+      const resizeHandle =
+        document.createElement("span")
+
+      resizeHandle.className =
+        "cura-image-resize-handle"
+
+      resizeHandle.setAttribute(
+        "data-cura-editor-ui",
+        "true"
+      )
+
+      imageWrapper.appendChild(
+        resizeHandle
+      )
+
+      let resizing = false
+
+      resizeHandle.addEventListener(
+        "mousedown",
+        (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+
+          resizing = true
+
+          const startX = event.clientX
+          const startWidth =
+            imageWrapper.getBoundingClientRect().width
+
+          const editorWidth =
+            editor.getBoundingClientRect().width
+
+          function resize(
+            moveEvent: MouseEvent
+          ) {
+            const delta =
+              moveEvent.clientX - startX
+
+            const width = Math.max(
+              120,
+              Math.min(
+                editorWidth,
+                startWidth + delta
+              )
+            )
+
+            imageWrapper.style.width =
+              `${width}px`
+          }
+
+          function finish() {
+            resizing = false
+
+            document.removeEventListener(
+              "mousemove",
+              resize
+            )
+
+            document.removeEventListener(
+              "mouseup",
+              finish
+            )
+
+            update()
+          }
+
+          document.addEventListener(
+            "mousemove",
+            resize
+          )
+
+          document.addEventListener(
+            "mouseup",
+            finish
+          )
+        }
+      )
+
+      imageWrapper.addEventListener(
+        "click",
+        (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+
+          editor
+            .querySelectorAll(
+              ".cura-editor-image"
+            )
+            .forEach((node) => {
+              node.classList.remove(
+                "cura-image-selected"
+              )
+            })
+
+          imageWrapper.classList.add(
+            "cura-image-selected"
+          )
+        }
+      )
+
+      imageWrapper.addEventListener(
+        "dragstart",
+        (event) => {
+          if (resizing) {
+            event.preventDefault()
+            return
+          }
+
+          imageWrapper.classList.add(
+            "cura-image-dragging"
+          )
+
+          event.dataTransfer?.setData(
+            "text/plain",
+            "cura-image"
+          )
+
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed =
+              "move"
+          }
+        }
+      )
+
+      imageWrapper.addEventListener(
+        "dragend",
+        () => {
+          imageWrapper.classList.remove(
+            "cura-image-dragging"
+          )
+        }
+      )
 
       const range = savedRangeRef.current
 
