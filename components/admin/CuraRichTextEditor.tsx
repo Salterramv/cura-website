@@ -74,6 +74,8 @@ export default function CuraRichTextEditor({
     if (editorRef.current.innerHTML !== value) {
       editorRef.current.innerHTML = value || ""
     }
+
+    hydrateImages(editorRef.current)
   }, [value])
 
   function saveSelection() {
@@ -107,6 +109,182 @@ export default function CuraRichTextEditor({
 
   function focusEditor() {
     editorRef.current?.focus()
+  }
+
+  function setupImageControls(
+    imageWrapper: HTMLElement,
+    editor: HTMLDivElement
+  ) {
+    if (
+      imageWrapper.dataset.curaImageReady === "true"
+    ) {
+      return
+    }
+
+    const image =
+      imageWrapper.querySelector("img")
+
+    if (!image) return
+
+    imageWrapper.dataset.curaImageReady = "true"
+    imageWrapper.contentEditable = "false"
+    imageWrapper.draggable = true
+    image.draggable = false
+    image.style.pointerEvents = "none"
+
+    imageWrapper.style.position = "relative"
+    imageWrapper.style.cursor = "move"
+
+    let handle =
+      imageWrapper.querySelector(
+        ".cura-image-resize-handle"
+      ) as HTMLElement | null
+
+    if (!handle) {
+      handle = document.createElement("span")
+      handle.className =
+        "cura-image-resize-handle"
+      handle.contentEditable = "false"
+      handle.setAttribute(
+        "data-cura-editor-ui",
+        "true"
+      )
+      imageWrapper.appendChild(handle)
+    }
+
+    let resizing = false
+
+    handle.addEventListener(
+      "mousedown",
+      (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+
+        resizing = true
+
+        imageWrapper.classList.add(
+          "cura-image-selected"
+        )
+
+        const startX = event.clientX
+        const startWidth =
+          imageWrapper.getBoundingClientRect().width
+
+        const maxWidth =
+          editor.getBoundingClientRect().width - 10
+
+        function move(moveEvent: MouseEvent) {
+          const nextWidth = Math.max(
+            120,
+            Math.min(
+              maxWidth,
+              startWidth +
+                moveEvent.clientX -
+                startX
+            )
+          )
+
+          imageWrapper.style.width =
+            `${nextWidth}px`
+        }
+
+        function stop() {
+          resizing = false
+
+          document.removeEventListener(
+            "mousemove",
+            move
+          )
+
+          document.removeEventListener(
+            "mouseup",
+            stop
+          )
+
+          update()
+        }
+
+        document.addEventListener(
+          "mousemove",
+          move
+        )
+
+        document.addEventListener(
+          "mouseup",
+          stop
+        )
+      }
+    )
+
+    imageWrapper.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+
+        editor
+          .querySelectorAll(
+            ".cura-editor-image"
+          )
+          .forEach((node) => {
+            node.classList.remove(
+              "cura-image-selected"
+            )
+          })
+
+        imageWrapper.classList.add(
+          "cura-image-selected"
+        )
+      }
+    )
+
+    imageWrapper.addEventListener(
+      "dragstart",
+      (event) => {
+        if (resizing) {
+          event.preventDefault()
+          return
+        }
+
+        imageWrapper.classList.add(
+          "cura-image-dragging"
+        )
+
+        event.dataTransfer?.setData(
+          "text/plain",
+          "cura-image"
+        )
+
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed =
+            "move"
+        }
+      }
+    )
+
+    imageWrapper.addEventListener(
+      "dragend",
+      () => {
+        imageWrapper.classList.remove(
+          "cura-image-dragging"
+        )
+      }
+    )
+  }
+
+  function hydrateImages(
+    editor: HTMLDivElement
+  ) {
+    editor
+      .querySelectorAll(
+        ".cura-editor-image"
+      )
+      .forEach((node) => {
+        setupImageControls(
+          node as HTMLElement,
+          editor
+        )
+      })
   }
 
   function update() {
