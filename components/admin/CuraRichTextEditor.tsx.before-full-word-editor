@@ -1,0 +1,698 @@
+"use client"
+
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react"
+
+type Props = {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  minHeight?: string
+}
+
+const buttonClass =
+  "rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 active:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+
+const COLORS = [
+  "#071B49",
+  "#168BC4",
+  "#18B8EE",
+  "#159B78",
+  "#000000",
+  "#475569",
+  "#64748B",
+  "#DC2626",
+  "#EA580C",
+  "#CA8A04",
+  "#7C3AED",
+  "#DB2777",
+]
+
+const HIGHLIGHTS = [
+  "#FEF08A",
+  "#BBF7D0",
+  "#BAE6FD",
+  "#DDD6FE",
+  "#FBCFE8",
+  "#FED7AA",
+  "#E2E8F0",
+  "#FFFFFF",
+]
+
+export default function CuraRichTextEditor({
+  value,
+  onChange,
+  placeholder = "Enter content...",
+  minHeight = "240px",
+}: Props) {
+  const editorRef = useRef<HTMLDivElement>(null)
+  const savedRangeRef = useRef<Range | null>(null)
+
+  const [showColors, setShowColors] = useState(false)
+  const [showHighlights, setShowHighlights] = useState(false)
+
+  useEffect(() => {
+    if (!editorRef.current) return
+
+    if (editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value || ""
+    }
+  }, [value])
+
+  function saveSelection() {
+    const editor = editorRef.current
+    const selection = window.getSelection()
+
+    if (
+      !editor ||
+      !selection ||
+      selection.rangeCount === 0
+    ) {
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+
+    if (editor.contains(range.commonAncestorContainer)) {
+      savedRangeRef.current = range.cloneRange()
+    }
+  }
+
+  function restoreSelection() {
+    const selection = window.getSelection()
+    const range = savedRangeRef.current
+
+    if (!selection || !range) return
+
+    try {
+      selection.removeAllRanges()
+      selection.addRange(range)
+    } catch {
+      // Selection may no longer exist after DOM changes.
+    }
+  }
+
+  function toolbarMouseDown(
+    event: React.MouseEvent<HTMLButtonElement>
+  ) {
+    event.preventDefault()
+    saveSelection()
+  }
+
+  function update() {
+    if (!editorRef.current) return
+
+    onChange(editorRef.current.innerHTML)
+    saveSelection()
+  }
+
+  function exec(
+    command: string,
+    commandValue?: string
+  ) {
+    editorRef.current?.focus()
+    restoreSelection()
+
+    document.execCommand(
+      command,
+      false,
+      commandValue
+    )
+
+    update()
+  }
+
+  function applyColor(color: string) {
+    editorRef.current?.focus()
+    restoreSelection()
+
+    document.execCommand(
+      "foreColor",
+      false,
+      color
+    )
+
+    update()
+    setShowColors(false)
+  }
+
+  function applyHighlight(color: string) {
+    editorRef.current?.focus()
+    restoreSelection()
+
+    document.execCommand(
+      "hiliteColor",
+      false,
+      color
+    )
+
+    update()
+    setShowHighlights(false)
+  }
+
+  function applyFontSize(px: number) {
+    editorRef.current?.focus()
+    restoreSelection()
+
+    document.execCommand(
+      "fontSize",
+      false,
+      "7"
+    )
+
+    const fonts =
+      editorRef.current?.querySelectorAll(
+        'font[size="7"]'
+      )
+
+    fonts?.forEach((font) => {
+      const span =
+        document.createElement("span")
+
+      span.style.fontSize = `${px}px`
+      span.innerHTML = font.innerHTML
+
+      font.replaceWith(span)
+    })
+
+    update()
+  }
+
+  function applyList(
+    command: "insertUnorderedList" | "insertOrderedList"
+  ) {
+    editorRef.current?.focus()
+    restoreSelection()
+
+    document.execCommand(command, false)
+
+    update()
+  }
+
+  function insertLink() {
+    saveSelection()
+
+    const url = window.prompt(
+      "Enter URL:"
+    )
+
+    if (!url) return
+
+    exec("createLink", url)
+  }
+
+  return (
+    <div className="overflow-visible rounded-xl border border-slate-300 bg-white">
+
+      {/* =====================================================
+          WORD-STYLE TOOLBAR
+          ===================================================== */}
+
+      <div className="relative flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50 p-3">
+
+        {/* UNDO / REDO */}
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() => exec("undo")}
+          title="Undo"
+        >
+          ↶
+        </button>
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() => exec("redo")}
+          title="Redo"
+        >
+          ↷
+        </button>
+
+        <span className="mx-1 h-6 w-px bg-slate-300" />
+
+        {/* BOLD */}
+
+        <button
+          type="button"
+          className={`${buttonClass} font-bold`}
+          onMouseDown={toolbarMouseDown}
+          onClick={() => exec("bold")}
+          title="Bold"
+        >
+          B
+        </button>
+
+        {/* ITALIC */}
+
+        <button
+          type="button"
+          className={`${buttonClass} italic`}
+          onMouseDown={toolbarMouseDown}
+          onClick={() => exec("italic")}
+          title="Italic"
+        >
+          I
+        </button>
+
+        {/* UNDERLINE */}
+
+        <button
+          type="button"
+          className={`${buttonClass} underline`}
+          onMouseDown={toolbarMouseDown}
+          onClick={() => exec("underline")}
+          title="Underline"
+        >
+          U
+        </button>
+
+        {/* FONT SIZE */}
+
+        <select
+          defaultValue=""
+          aria-label="Font size"
+          className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700"
+          onMouseDown={() => saveSelection()}
+          onChange={(event) => {
+            const size = event.target.value
+
+            if (!size) return
+
+            applyFontSize(Number(size))
+            event.target.value = ""
+          }}
+        >
+          <option value="">
+            Font size
+          </option>
+          <option value="12">12px</option>
+          <option value="14">14px</option>
+          <option value="16">16px</option>
+          <option value="18">18px</option>
+          <option value="20">20px</option>
+          <option value="24">24px</option>
+          <option value="28">28px</option>
+          <option value="32">32px</option>
+          <option value="36">36px</option>
+        </select>
+
+        {/* TEXT COLOUR */}
+
+        <div className="relative">
+          <button
+            type="button"
+            className={buttonClass}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              saveSelection()
+            }}
+            onClick={() =>
+              setShowColors((current) => !current)
+            }
+            title="Text colour"
+          >
+            <span className="font-bold">A</span>
+            <span className="ml-1 text-[#168BC4]">
+              Colour
+            </span>
+          </button>
+
+          {showColors && (
+            <div
+              className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+              onMouseDown={(event) =>
+                event.preventDefault()
+              }
+            >
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
+                Text colour
+              </div>
+
+              <div className="grid grid-cols-6 gap-2">
+                {COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`Text colour ${color}`}
+                    className="h-8 w-8 rounded-full border border-slate-300 shadow-sm transition hover:scale-110"
+                    style={{
+                      backgroundColor: color,
+                    }}
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      saveSelection()
+                    }}
+                    onClick={() =>
+                      applyColor(color)
+                    }
+                  />
+                ))}
+              </div>
+
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <label className="flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
+                  Custom
+                  <input
+                    type="color"
+                    defaultValue="#071B49"
+                    className="h-8 w-10 cursor-pointer"
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      saveSelection()
+                    }}
+                    onChange={(event) =>
+                      applyColor(
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* HIGHLIGHT */}
+
+        <div className="relative">
+          <button
+            type="button"
+            className={buttonClass}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              saveSelection()
+            }}
+            onClick={() =>
+              setShowHighlights(
+                (current) => !current
+              )
+            }
+            title="Highlight"
+          >
+            <span className="font-bold">A</span>
+            <span className="ml-1 rounded bg-yellow-200 px-1">
+              Highlight
+            </span>
+          </button>
+
+          {showHighlights && (
+            <div
+              className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+              onMouseDown={(event) =>
+                event.preventDefault()
+              }
+            >
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
+                Highlight
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                {HIGHLIGHTS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`Highlight ${color}`}
+                    className="h-8 w-8 rounded border border-slate-300"
+                    style={{
+                      backgroundColor: color,
+                    }}
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      saveSelection()
+                    }}
+                    onClick={() =>
+                      applyHighlight(color)
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <span className="mx-1 h-6 w-px bg-slate-300" />
+
+        {/* HEADINGS */}
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            exec("formatBlock", "h2")
+          }
+          title="Heading 2"
+        >
+          H2
+        </button>
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            exec("formatBlock", "h3")
+          }
+          title="Heading 3"
+        >
+          H3
+        </button>
+
+        {/* LISTS */}
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            applyList("insertUnorderedList")
+          }
+          title="Bulleted list"
+        >
+          • List
+        </button>
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            applyList("insertOrderedList")
+          }
+          title="Numbered list"
+        >
+          1. List
+        </button>
+
+        {/* INDENT */}
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() => exec("outdent")}
+          title="Decrease indent"
+        >
+          ←
+        </button>
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() => exec("indent")}
+          title="Increase indent"
+        >
+          →
+        </button>
+
+        <span className="mx-1 h-6 w-px bg-slate-300" />
+
+        {/* ALIGNMENT */}
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            exec("justifyLeft")
+          }
+          title="Align left"
+        >
+          ≡
+        </button>
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            exec("justifyCenter")
+          }
+          title="Centre"
+        >
+          ☰
+        </button>
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            exec("justifyRight")
+          }
+          title="Align right"
+        >
+          ≡
+        </button>
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            exec("justifyFull")
+          }
+          title="Justify"
+        >
+          ☰
+        </button>
+
+        <span className="mx-1 h-6 w-px bg-slate-300" />
+
+        {/* LINK */}
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={insertLink}
+          title="Insert link"
+        >
+          Link
+        </button>
+
+        {/* CLEAR */}
+
+        <button
+          type="button"
+          className={buttonClass}
+          onMouseDown={toolbarMouseDown}
+          onClick={() =>
+            exec("removeFormat")
+          }
+          title="Clear formatting"
+        >
+          Clear
+        </button>
+      </div>
+
+      {/* =====================================================
+          EDITOR
+          ===================================================== */}
+
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        data-placeholder={placeholder}
+        onInput={update}
+        onKeyUp={saveSelection}
+        onMouseUp={saveSelection}
+        onFocus={saveSelection}
+        className="cura-rich-editor max-w-none px-5 py-4 text-sm leading-7 text-[#102A5F] outline-none"
+        style={{
+          minHeight,
+        }}
+      />
+
+      {/* =====================================================
+          WORD-LIKE EDITOR STYLING
+          ===================================================== */}
+
+      <style jsx>{`
+        .cura-rich-editor {
+          white-space: normal;
+        }
+
+        .cura-rich-editor:empty:before {
+          content: attr(data-placeholder);
+          color: #94a3b8;
+          pointer-events: none;
+        }
+
+        .cura-rich-editor p {
+          margin: 0 0 0.75rem 0;
+        }
+
+        .cura-rich-editor h2 {
+          margin: 1rem 0 0.75rem;
+          font-size: 1.5rem;
+          line-height: 1.3;
+          font-weight: 700;
+          color: #071b49;
+        }
+
+        .cura-rich-editor h3 {
+          margin: 0.9rem 0 0.6rem;
+          font-size: 1.2rem;
+          line-height: 1.4;
+          font-weight: 700;
+          color: #071b49;
+        }
+
+        .cura-rich-editor ul {
+          list-style-type: disc;
+          margin: 0.5rem 0 0.75rem;
+          padding-left: 2rem;
+        }
+
+        .cura-rich-editor ol {
+          list-style-type: decimal;
+          margin: 0.5rem 0 0.75rem;
+          padding-left: 2rem;
+        }
+
+        .cura-rich-editor ul ul {
+          list-style-type: circle;
+        }
+
+        .cura-rich-editor ul ul ul {
+          list-style-type: square;
+        }
+
+        .cura-rich-editor ol ol {
+          list-style-type: lower-alpha;
+        }
+
+        .cura-rich-editor li {
+          margin: 0.2rem 0;
+          padding-left: 0.2rem;
+        }
+
+        .cura-rich-editor a {
+          color: #168bc4;
+          text-decoration: underline;
+        }
+
+        .cura-rich-editor blockquote {
+          margin: 0.75rem 0;
+          border-left: 4px solid #159b78;
+          padding-left: 1rem;
+          color: #475569;
+        }
+
+        .cura-rich-editor div {
+          margin: 0;
+        }
+      `}</style>
+    </div>
+  )
+}

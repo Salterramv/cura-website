@@ -1563,7 +1563,7 @@ export default function CuraRichTextEditor({
         }}
       />
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style jsx>{`
         .cura-rich-editor {
           white-space: normal;
         }
@@ -1671,7 +1671,7 @@ export default function CuraRichTextEditor({
         .cura-rich-editor div {
           margin: 0;
         }
-      ` }} />
+      `}</style>
     </div>
   )
 }
