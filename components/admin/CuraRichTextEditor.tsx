@@ -62,6 +62,11 @@ export default function CuraRichTextEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const savedRangeRef = useRef<Range | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const selectedObjectRef =
+    useRef<HTMLElement | null>(null)
+
+  const draggedObjectRef =
+    useRef<HTMLElement | null>(null)
 
   const [showColors, setShowColors] = useState(false)
   const [showHighlights, setShowHighlights] = useState(false)
@@ -76,6 +81,7 @@ export default function CuraRichTextEditor({
     }
 
     hydrateImages(editorRef.current)
+    hydrateTables(editorRef.current)
   }, [value])
 
   function saveSelection() {
@@ -111,70 +117,238 @@ export default function CuraRichTextEditor({
     editorRef.current?.focus()
   }
 
-  function setupImageControls(
-    imageWrapper: HTMLElement,
-    editor: HTMLDivElement
+  function clearEditorObjectSelection() {
+    const editor = editorRef.current
+    if (!editor) return
+
+    editor
+      .querySelectorAll(
+        ".cura-image-selected, .cura-table-selected"
+      )
+      .forEach((node) => {
+        node.classList.remove(
+          "cura-image-selected",
+          "cura-table-selected"
+        )
+      })
+
+    selectedObjectRef.current = null
+  }
+
+  function selectEditorObject(
+    object: HTMLElement
+  ) {
+    const editor = editorRef.current
+    if (!editor) return
+
+    clearEditorObjectSelection()
+
+    selectedObjectRef.current =
+      object
+
+    if (
+      object.classList.contains(
+        "cura-editor-image"
+      )
+    ) {
+      object.classList.add(
+        "cura-image-selected"
+      )
+    }
+
+    if (
+      object.classList.contains(
+        "cura-editor-table-object"
+      )
+    ) {
+      object.classList.add(
+        "cura-table-selected"
+      )
+    }
+  }
+
+  function enableEditorObjectDrag(
+    object: HTMLElement,
+    editor: HTMLDivElement,
+    type: "image" | "table"
   ) {
     if (
-      imageWrapper.dataset.curaImageReady === "true"
+      object.dataset.curaObjectReady ===
+      "true"
     ) {
       return
     }
 
-    const image =
-      imageWrapper.querySelector("img")
+    object.dataset.curaObjectReady =
+      "true"
 
-    if (!image) return
+    object.draggable = true
 
-    imageWrapper.dataset.curaImageReady = "true"
-    imageWrapper.contentEditable = "false"
-    imageWrapper.draggable = true
-    image.draggable = false
-    image.style.pointerEvents = "none"
+    object.addEventListener(
+      "mousedown",
+      (event) => {
+        const target =
+          event.target as HTMLElement | null
 
-    imageWrapper.style.position = "relative"
-    imageWrapper.style.cursor = "move"
+        if (
+          target?.closest(
+            "[data-cura-editor-ui]"
+          )
+        ) {
+          return
+        }
+
+        if (
+          type === "table" &&
+          target?.closest(
+            "td, th"
+          )
+        ) {
+          selectEditorObject(
+            object
+          )
+          return
+        }
+
+        event.preventDefault()
+
+        selectEditorObject(
+          object
+        )
+      }
+    )
+
+    object.addEventListener(
+      "click",
+      (event) => {
+        const target =
+          event.target as HTMLElement | null
+
+        if (
+          target?.closest(
+            "[data-cura-editor-ui]"
+          )
+        ) {
+          return
+        }
+
+        selectEditorObject(
+          object
+        )
+      }
+    )
+
+    object.addEventListener(
+      "dragstart",
+      (event) => {
+        draggedObjectRef.current =
+          object
+
+        selectEditorObject(
+          object
+        )
+
+        object.classList.add(
+          type === "image"
+            ? "cura-image-dragging"
+            : "cura-table-dragging"
+        )
+
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed =
+            "move"
+
+          event.dataTransfer.setData(
+            "text/plain",
+            "cura-editor-object"
+          )
+        }
+      }
+    )
+
+    object.addEventListener(
+      "dragend",
+      () => {
+        object.classList.remove(
+          "cura-image-dragging",
+          "cura-table-dragging"
+        )
+
+        draggedObjectRef.current =
+          null
+      }
+    )
+
+    addObjectResizeHandle(
+      object,
+      editor,
+      type
+    )
+  }
+
+  function addObjectResizeHandle(
+    object: HTMLElement,
+    editor: HTMLDivElement,
+    type: "image" | "table"
+  ) {
+    const className =
+      type === "image"
+        ? "cura-image-resize-handle"
+        : "cura-table-resize-handle"
 
     let handle =
-      imageWrapper.querySelector(
-        ".cura-image-resize-handle"
+      object.querySelector(
+        `.${className}`
       ) as HTMLElement | null
 
     if (!handle) {
-      handle = document.createElement("span")
+      handle =
+        document.createElement(
+          "span"
+        )
+
       handle.className =
-        "cura-image-resize-handle"
-      handle.contentEditable = "false"
+        className
+
+      handle.contentEditable =
+        "false"
+
       handle.setAttribute(
         "data-cura-editor-ui",
         "true"
       )
-      imageWrapper.appendChild(handle)
+
+      object.appendChild(
+        handle
+      )
     }
 
-    let resizing = false
+    handle.onmousedown = (
+      event
+    ) => {
+      event.preventDefault()
+      event.stopPropagation()
 
-    handle.addEventListener(
-      "mousedown",
-      (event) => {
-        event.preventDefault()
-        event.stopPropagation()
+      selectEditorObject(
+        object
+      )
 
-        resizing = true
+      const startX =
+        event.clientX
 
-        imageWrapper.classList.add(
-          "cura-image-selected"
-        )
+      const startWidth =
+        object.getBoundingClientRect()
+          .width
 
-        const startX = event.clientX
-        const startWidth =
-          imageWrapper.getBoundingClientRect().width
+      const maxWidth =
+        editor.getBoundingClientRect()
+          .width
 
-        const maxWidth =
-          editor.getBoundingClientRect().width - 10
-
-        function move(moveEvent: MouseEvent) {
-          const nextWidth = Math.max(
+      function move(
+        moveEvent: MouseEvent
+      ) {
+        const width =
+          Math.max(
             120,
             Math.min(
               maxWidth,
@@ -184,92 +358,341 @@ export default function CuraRichTextEditor({
             )
           )
 
-          imageWrapper.style.width =
-            `${nextWidth}px`
-        }
+        object.style.width =
+          `${width}px`
+      }
 
-        function stop() {
-          resizing = false
-
-          document.removeEventListener(
-            "mousemove",
-            move
-          )
-
-          document.removeEventListener(
-            "mouseup",
-            stop
-          )
-
-          update()
-        }
-
-        document.addEventListener(
+      function finish() {
+        document.removeEventListener(
           "mousemove",
           move
         )
 
-        document.addEventListener(
+        document.removeEventListener(
           "mouseup",
-          stop
+          finish
         )
+
+        update()
       }
-    )
 
-    imageWrapper.addEventListener(
-      "click",
-      (event) => {
-        event.preventDefault()
-        event.stopPropagation()
+      document.addEventListener(
+        "mousemove",
+        move
+      )
 
-        editor
-          .querySelectorAll(
-            ".cura-editor-image"
+      document.addEventListener(
+        "mouseup",
+        finish
+      )
+    }
+  }
+
+  function hydrateTables(
+    editor: HTMLDivElement
+  ) {
+    const tables =
+      Array.from(
+        editor.querySelectorAll(
+          "table"
+        )
+      )
+
+    tables.forEach((table) => {
+      let wrapper =
+        table.parentElement
+
+      if (
+        !wrapper?.classList.contains(
+          "cura-editor-table-object"
+        )
+      ) {
+        wrapper =
+          document.createElement(
+            "div"
           )
-          .forEach((node) => {
-            node.classList.remove(
-              "cura-image-selected"
-            )
-          })
 
-        imageWrapper.classList.add(
-          "cura-image-selected"
+        wrapper.className =
+          "cura-editor-table-object"
+
+        wrapper.style.width =
+          table.style.width ||
+          "100%"
+
+        wrapper.style.maxWidth =
+          "100%"
+
+        wrapper.style.margin =
+          table.style.margin ||
+          "1rem 0"
+
+        wrapper.style.position =
+          "relative"
+
+        table.parentNode?.insertBefore(
+          wrapper,
+          table
+        )
+
+        wrapper.appendChild(
+          table
         )
       }
-    )
 
-    imageWrapper.addEventListener(
-      "dragstart",
-      (event) => {
-        if (resizing) {
-          event.preventDefault()
-          return
-        }
+      table.contentEditable =
+        "true"
 
-        imageWrapper.classList.add(
-          "cura-image-dragging"
+      table
+        .querySelectorAll(
+          "td, th"
         )
+        .forEach((cell) => {
+          ;(
+            cell as HTMLElement
+          ).contentEditable =
+            "true"
+        })
 
-        event.dataTransfer?.setData(
-          "text/plain",
-          "cura-image"
-        )
+      enableEditorObjectDrag(
+        wrapper,
+        editor,
+        "table"
+      )
+    })
+  }
 
-        if (event.dataTransfer) {
-          event.dataTransfer.effectAllowed =
-            "move"
-        }
+  function installObjectEvents(
+    editor: HTMLDivElement
+  ) {
+    const onDragOver = (
+      event: DragEvent
+    ) => {
+      if (
+        !draggedObjectRef.current
+      ) {
+        return
       }
-    )
 
-    imageWrapper.addEventListener(
-      "dragend",
-      () => {
-        imageWrapper.classList.remove(
-          "cura-image-dragging"
+      event.preventDefault()
+
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect =
+          "move"
+      }
+    }
+
+    const onDrop = (
+      event: DragEvent
+    ) => {
+      const dragged =
+        draggedObjectRef.current
+
+      if (!dragged) return
+
+      event.preventDefault()
+
+      const target =
+        event.target as Node | null
+
+      if (
+        !target ||
+        dragged.contains(target)
+      ) {
+        return
+      }
+
+      const element =
+        target instanceof HTMLElement
+          ? target
+          : target.parentElement
+
+      if (!element) return
+
+      let dropTarget =
+        element
+
+      while (
+        dropTarget.parentElement &&
+        dropTarget.parentElement !==
+          editor
+      ) {
+        dropTarget =
+          dropTarget.parentElement
+      }
+
+      if (
+        dropTarget === dragged
+      ) {
+        return
+      }
+
+      const rect =
+        dropTarget.getBoundingClientRect()
+
+      const before =
+        event.clientY <
+        rect.top +
+          rect.height / 2
+
+      if (before) {
+        editor.insertBefore(
+          dragged,
+          dropTarget
+        )
+      } else {
+        editor.insertBefore(
+          dragged,
+          dropTarget.nextSibling
         )
       }
+
+      draggedObjectRef.current =
+        null
+
+      dragged.classList.remove(
+        "cura-image-dragging",
+        "cura-table-dragging"
+      )
+
+      update()
+    }
+
+    const onKeyDown = (
+      event: KeyboardEvent
+    ) => {
+      const selected =
+        selectedObjectRef.current
+
+      if (!selected) return
+
+      const target =
+        event.target as HTMLElement | null
+
+      if (
+        selected.classList.contains(
+          "cura-editor-table-object"
+        ) &&
+        target?.closest(
+          "td, th"
+        )
+      ) {
+        return
+      }
+
+      if (
+        event.key === "Delete" ||
+        event.key === "Backspace"
+      ) {
+        event.preventDefault()
+
+        selected.remove()
+
+        selectedObjectRef.current =
+          null
+
+        update()
+      }
+    }
+
+    const onMouseDown = (
+      event: MouseEvent
+    ) => {
+      const target =
+        event.target as HTMLElement | null
+
+      if (
+        !target?.closest(
+          ".cura-editor-image, .cura-editor-table-object"
+        )
+      ) {
+        clearEditorObjectSelection()
+      }
+    }
+
+    editor.addEventListener(
+      "dragover",
+      onDragOver
     )
+
+    editor.addEventListener(
+      "drop",
+      onDrop
+    )
+
+    editor.addEventListener(
+      "keydown",
+      onKeyDown
+    )
+
+    editor.addEventListener(
+      "mousedown",
+      onMouseDown
+    )
+
+    return () => {
+      editor.removeEventListener(
+        "dragover",
+        onDragOver
+      )
+
+      editor.removeEventListener(
+        "drop",
+        onDrop
+      )
+
+      editor.removeEventListener(
+        "keydown",
+        onKeyDown
+      )
+
+      editor.removeEventListener(
+        "mousedown",
+        onMouseDown
+      )
+    }
+  }
+
+  function setupImageControls(
+    imageWrapper: HTMLElement,
+    editor: HTMLDivElement
+  ) {
+    const image =
+      imageWrapper.querySelector(
+        "img"
+      )
+
+    if (!image) return
+
+    imageWrapper.classList.add(
+      "cura-editor-image"
+    )
+
+    imageWrapper.contentEditable =
+      "false"
+
+    imageWrapper.style.position =
+      "relative"
+
+    imageWrapper.style.maxWidth =
+      "100%"
+
+    imageWrapper.style.minWidth =
+      "120px"
+
+    image.draggable =
+      false
+
+    image.style.display =
+      "block"
+
+    image.style.width =
+      "100%"
+
+    image.style.height =
+      "auto"
+
+    image.style.maxWidth =
+      "100%"
   }
 
   function hydrateImages(
@@ -280,17 +703,70 @@ export default function CuraRichTextEditor({
         ".cura-editor-image"
       )
       .forEach((node) => {
+        const wrapper =
+          node as HTMLElement
+
         setupImageControls(
-          node as HTMLElement,
+          wrapper,
           editor
+        )
+
+        enableEditorObjectDrag(
+          wrapper,
+          editor,
+          "image"
         )
       })
   }
 
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    return installObjectEvents(editor)
+  }, [])
+
   function update() {
     if (!editorRef.current) return
 
-    onChange(editorRef.current.innerHTML)
+    const clone =
+      editorRef.current.cloneNode(
+        true
+      ) as HTMLElement
+
+    clone
+      .querySelectorAll(
+        "[data-cura-editor-ui]"
+      )
+      .forEach((node) => node.remove())
+
+    clone
+      .querySelectorAll(
+        ".cura-image-selected, .cura-table-selected, .cura-image-dragging, .cura-table-dragging"
+      )
+      .forEach((node) => {
+        node.classList.remove(
+          "cura-image-selected",
+          "cura-table-selected",
+          "cura-image-dragging",
+          "cura-table-dragging"
+        )
+      })
+
+    clone
+      .querySelectorAll(
+        "[data-cura-object-ready]"
+      )
+      .forEach((node) => {
+        node.removeAttribute(
+          "data-cura-object-ready"
+        )
+      })
+
+    onChange(
+      clone.innerHTML
+    )
+
     saveSelection()
   }
 
@@ -808,12 +1284,36 @@ export default function CuraRichTextEditor({
 
     table.appendChild(tbody)
 
+    const tableWrapper =
+      document.createElement("div")
+
+    tableWrapper.className =
+      "cura-editor-table-object"
+
+    tableWrapper.style.width =
+      "100%"
+
+    tableWrapper.style.maxWidth =
+      "100%"
+
+    tableWrapper.style.margin =
+      "1rem 0"
+
+    tableWrapper.style.position =
+      "relative"
+
+    tableWrapper.appendChild(
+      table
+    )
+
     const range =
       savedRangeRef.current
 
     if (range) {
       range.deleteContents()
-      range.insertNode(table)
+      range.insertNode(
+        tableWrapper
+      )
 
       const paragraph =
         document.createElement("p")
@@ -821,7 +1321,9 @@ export default function CuraRichTextEditor({
       paragraph.innerHTML =
         "<br>"
 
-      table.after(paragraph)
+      tableWrapper.after(
+        paragraph
+      )
 
       const after =
         document.createRange()
@@ -838,7 +1340,7 @@ export default function CuraRichTextEditor({
       selection?.addRange(after)
     } else {
       editorRef.current?.appendChild(
-        table
+        tableWrapper
       )
     }
 
