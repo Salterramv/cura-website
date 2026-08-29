@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
 import { createClient } from "@/lib/supabase/client"
+import { sanitizeRichText } from "@/lib/sanitize-html"
 
 type PageProps = {
   params: Promise<{
@@ -29,6 +30,51 @@ function formatDate(date: string | null) {
     month: "long",
     year: "numeric",
   })
+}
+
+
+function ArticleRichText({
+  value,
+}: {
+  value: string | null | undefined
+}) {
+  if (!value) return null
+
+  const containsHtml =
+    /<(strong|b|em|i|u|span|p|h[1-6]|ul|ol|li|a|br)\b/i.test(
+      value
+    )
+
+  if (!containsHtml) {
+    return (
+      <div className="whitespace-pre-wrap break-words">
+        {value}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="
+        break-words
+        [&_p]:mb-4
+        [&_strong]:font-bold
+        [&_b]:font-bold
+        [&_em]:italic
+        [&_i]:italic
+        [&_u]:underline
+        [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6
+        [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6
+        [&_li]:mb-1
+        [&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-[#071B49]
+        [&_h3]:mb-3 [&_h3]:mt-5 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-[#071B49]
+        [&_a]:font-semibold [&_a]:text-[#168BC4] [&_a]:underline
+      "
+      dangerouslySetInnerHTML={{
+        __html: sanitizeRichText(value),
+      }}
+    />
+  )
 }
 
 export default async function ArticlePage({
@@ -119,8 +165,10 @@ export default async function ArticlePage({
 
           <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-12">
 
-            <div className="whitespace-pre-wrap text-base leading-8 text-slate-700">
-              {typedArticle.content}
+            <div className="text-base leading-8 text-slate-700">
+              <ArticleRichText
+                value={typedArticle.content}
+              />
             </div>
 
           </div>

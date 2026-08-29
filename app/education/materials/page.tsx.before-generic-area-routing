@@ -35,11 +35,13 @@ function areaHref(area: EducationArea) {
   }
 
   /*
-   * Every active education area has its own public catalogue.
-   * Accounting retains its existing dedicated route.
-   * All other areas use the generic area route.
+   * Other areas can be connected to their dedicated public
+   * material pages when those pages are developed.
+   *
+   * For now, use a stable hash so the card remains navigable
+   * without inventing a route that does not yet exist.
    */
-  return `/education/materials/${slugify(area.name)}`
+  return `#${slugify(area.name)}`
 }
 
 export default function EducationMaterialsPage() {
