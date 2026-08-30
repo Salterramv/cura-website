@@ -2611,11 +2611,58 @@ export default function AccountingTopicPage() {
         sectionIndex === 0
 
 
+              /*
+               * ======================================================
+               * CURA CMS CONTENT IS AUTHORITATIVE
+               * ======================================================
+               *
+               * Content created/edited through the CURA admin
+               * rich-text editor is stored directly in block.content.
+               *
+               * This must be rendered as-is through the public
+               * sanitizer. Do not replace it with the legacy
+               * presentation.paragraphs representation.
+               *
+               * This is especially important for:
+               *   - rich text
+               *   - tables
+               *   - table colours
+               *   - images
+               *   - image sizing/alignment
+               *   - headings
+               *   - lists
+               *   - inline formatting
+               *
+               * Legacy imported content continues through the
+               * presentation/legacy branches below.
+               */
+              const hasCmsContent =
+                typeof block.content === "string" &&
+                block.content.trim().length > 0
+
+              if (hasCmsContent) {
+                return {
+                  ...contentBlock,
+                  block: {
+                    ...block,
+                    title:
+                      isFirstCoverSection &&
+                      isFirstSlideLecturerName(
+                        block.title || ""
+                      )
+                        ? ""
+                        : block.title,
+                    content:
+                      block.content,
+                  },
+                }
+              }
+
               const presentation =
                 getPresentation(block)
 
               /*
-               * Presentation data is authoritative.
+               * Legacy presentation data.
                */
               if (
                 presentation &&
