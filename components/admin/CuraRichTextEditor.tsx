@@ -321,6 +321,17 @@ export default function CuraRichTextEditor({
     let offsetX = 0
     let offsetY = 0
 
+    let dropAlignment:
+      | "left"
+      | "center"
+      | "right" = "left"
+
+    /*
+     * ----------------------------------------------------------
+     * CLEANUP
+     * ----------------------------------------------------------
+     */
+
     function removeDragUI() {
       if (clone) {
         clone.remove()
@@ -333,11 +344,81 @@ export default function CuraRichTextEditor({
       }
 
       object.style.visibility = ""
+
       object.classList.remove(
         "cura-image-dragging",
         "cura-table-dragging"
       )
     }
+
+    /*
+     * ----------------------------------------------------------
+     * HORIZONTAL ALIGNMENT
+     *
+     * The pointer position across the editor determines:
+     *
+     * LEFT   = first third
+     * CENTER = middle third
+     * RIGHT  = last third
+     *
+     * This gives Word-style positioning without making the
+     * editor object absolutely positioned.
+     * ----------------------------------------------------------
+     */
+
+    function calculateHorizontalAlignment(
+      clientX: number
+    ): "left" | "center" | "right" {
+      const rect =
+        editor.getBoundingClientRect()
+
+      const relativeX =
+        clientX - rect.left
+
+      const width =
+        rect.width
+
+      if (relativeX < width / 3) {
+        return "left"
+      }
+
+      if (relativeX > (width * 2) / 3) {
+        return "right"
+      }
+
+      return "center"
+    }
+
+    function applyHorizontalAlignment(
+      alignment:
+        | "left"
+        | "center"
+        | "right"
+    ) {
+      object.style.marginTop = "1rem"
+      object.style.marginBottom = "1rem"
+
+      if (alignment === "left") {
+        object.style.marginLeft = "0"
+        object.style.marginRight = "auto"
+      }
+
+      if (alignment === "center") {
+        object.style.marginLeft = "auto"
+        object.style.marginRight = "auto"
+      }
+
+      if (alignment === "right") {
+        object.style.marginLeft = "auto"
+        object.style.marginRight = "0"
+      }
+    }
+
+    /*
+     * ----------------------------------------------------------
+     * DROP MARKER
+     * ----------------------------------------------------------
+     */
 
     function createInsertionMarker() {
       const marker =
@@ -354,8 +435,7 @@ export default function CuraRichTextEditor({
       marker.style.width = "100%"
       marker.style.margin = "8px 0"
       marker.style.borderRadius = "4px"
-      marker.style.background =
-        "#18B8EE"
+      marker.style.background = "#18B8EE"
       marker.style.pointerEvents = "none"
       marker.style.boxSizing = "border-box"
 
@@ -407,20 +487,20 @@ export default function CuraRichTextEditor({
     ) {
       if (!insertionMarker) return
 
-      const previousPointerEvents =
-        insertionMarker.style.pointerEvents
-
-      insertionMarker.style.pointerEvents =
-        "none"
+      /*
+       * Always calculate horizontal alignment from
+       * the actual pointer position.
+       */
+      dropAlignment =
+        calculateHorizontalAlignment(
+          clientX
+        )
 
       const target =
         document.elementFromPoint(
           clientX,
           clientY
         )
-
-      insertionMarker.style.pointerEvents =
-        previousPointerEvents
 
       if (!target) return
 
@@ -430,8 +510,11 @@ export default function CuraRichTextEditor({
           : target.parentElement
 
       /*
-       * First try to find a direct object.
+       * --------------------------------------------------------
+       * OBJECT TARGET
+       * --------------------------------------------------------
        */
+
       let targetObject:
         | HTMLElement
         | null = null
@@ -473,28 +556,28 @@ export default function CuraRichTextEditor({
             insertionMarker,
             targetObject
           )
-        } else {
-          if (
+        } else if (
+          targetObject.nextSibling
+        ) {
+          editor.insertBefore(
+            insertionMarker,
             targetObject.nextSibling
-          ) {
-            editor.insertBefore(
-              insertionMarker,
-              targetObject.nextSibling
-            )
-          } else {
-            editor.appendChild(
-              insertionMarker
-            )
-          }
+          )
+        } else {
+          editor.appendChild(
+            insertionMarker
+          )
         }
 
         return
       }
 
       /*
-       * If the pointer is over text, find the
-       * top-level text block.
+       * --------------------------------------------------------
+       * TEXT TARGET
+       * --------------------------------------------------------
        */
+
       const topLevel =
         getTopLevelElement(target)
 
@@ -515,27 +598,28 @@ export default function CuraRichTextEditor({
             insertionMarker,
             topLevel
           )
+        } else if (
+          topLevel.nextSibling
+        ) {
+          editor.insertBefore(
+            insertionMarker,
+            topLevel.nextSibling
+          )
         } else {
-          if (topLevel.nextSibling) {
-            editor.insertBefore(
-              insertionMarker,
-              topLevel.nextSibling
-            )
-          } else {
-            editor.appendChild(
-              insertionMarker
-            )
-          }
+          editor.appendChild(
+            insertionMarker
+          )
         }
 
         return
       }
 
       /*
-       * Empty editor space:
-       * determine the nearest top-level element
-       * vertically.
+       * --------------------------------------------------------
+       * EMPTY SPACE
+       * --------------------------------------------------------
        */
+
       const candidates =
         Array.from(
           editor.children
@@ -622,6 +706,12 @@ export default function CuraRichTextEditor({
       }
     }
 
+    /*
+     * ----------------------------------------------------------
+     * DRAG CLONE
+     * ----------------------------------------------------------
+     */
+
     function moveClone(
       clientX: number,
       clientY: number
@@ -634,6 +724,19 @@ export default function CuraRichTextEditor({
       clone.style.top =
         `${clientY - offsetY}px`
     }
+
+    /*
+     * ----------------------------------------------------------
+     * POINTER DOWN
+     *
+     * IMPORTANT:
+     * After this point the document listens for movement.
+     *
+     * This prevents the old problem where the drag appeared
+     * to get "stuck" when the pointer moved away from the
+     * small handle.
+     * ----------------------------------------------------------
+     */
 
     const pointerDown =
       (event: PointerEvent) => {
@@ -649,16 +752,25 @@ export default function CuraRichTextEditor({
           object.getBoundingClientRect()
 
         offsetX =
-          event.clientX - rect.left
+          event.clientX -
+          rect.left
 
         offsetY =
-          event.clientY - rect.top
+          event.clientY -
+          rect.top
+
+        dropAlignment =
+          calculateHorizontalAlignment(
+            event.clientX
+          )
 
         /*
-         * Create a visual copy.
+         * Create visual drag clone.
          */
         clone =
-          object.cloneNode(true) as HTMLElement
+          object.cloneNode(
+            true
+          ) as HTMLElement
 
         clone
           .querySelectorAll(
@@ -688,13 +800,21 @@ export default function CuraRichTextEditor({
         clone.style.height =
           `${rect.height}px`
 
-        clone.style.margin = "0"
-        clone.style.zIndex = "999999"
+        clone.style.margin =
+          "0"
+
+        clone.style.zIndex =
+          "999999"
+
         clone.style.pointerEvents =
           "none"
-        clone.style.opacity = "0.88"
+
+        clone.style.opacity =
+          "0.88"
+
         clone.style.boxSizing =
           "border-box"
+
         clone.style.maxWidth =
           "none"
 
@@ -703,8 +823,8 @@ export default function CuraRichTextEditor({
         )
 
         /*
-         * Keep the real object in the layout
-         * while dragging.
+         * Hide the real object while the clone
+         * visually follows the pointer.
          */
         object.style.visibility =
           "hidden"
@@ -715,34 +835,67 @@ export default function CuraRichTextEditor({
             : "cura-table-dragging"
         )
 
+        /*
+         * Create insertion marker.
+         */
         insertionMarker =
           createInsertionMarker()
 
         /*
-         * Put the marker at the object's
-         * current location initially.
+         * Do NOT insert the marker before the
+         * object blindly. Keep it out of the
+         * object's current position until the
+         * first pointer movement.
          */
-        editor.insertBefore(
-          insertionMarker,
-          object
+        editor.appendChild(
+          insertionMarker
         )
 
-        event.currentTarget instanceof HTMLElement &&
-          event.currentTarget.setPointerCapture?.(
-            event.pointerId
-          )
+        /*
+         * Listen on document rather than only
+         * on the small move handle.
+         */
+        document.addEventListener(
+          "pointermove",
+          documentPointerMove,
+          true
+        )
+
+        document.addEventListener(
+          "pointerup",
+          documentPointerUp,
+          true
+        )
+
+        document.addEventListener(
+          "pointercancel",
+          documentPointerUp,
+          true
+        )
 
         moveClone(
           event.clientX,
           event.clientY
         )
+
+        findDropPosition(
+          event.clientX,
+          event.clientY
+        )
       }
 
-    const pointerMove =
+    /*
+     * ----------------------------------------------------------
+     * DOCUMENT POINTER MOVE
+     * ----------------------------------------------------------
+     */
+
+    const documentPointerMove =
       (event: PointerEvent) => {
         if (!moving) return
 
         event.preventDefault()
+        event.stopPropagation()
 
         moved = true
 
@@ -757,29 +910,85 @@ export default function CuraRichTextEditor({
         )
       }
 
-    const pointerUp =
-      () => {
+    /*
+     * ----------------------------------------------------------
+     * DOCUMENT POINTER UP
+     * ----------------------------------------------------------
+     */
+
+    const documentPointerUp =
+      (event: PointerEvent) => {
         if (!moving) return
+
+        event.preventDefault()
+        event.stopPropagation()
 
         moving = false
 
-        if (
-          insertionMarker &&
-          insertionMarker.parentNode
-        ) {
-          const marker =
-            insertionMarker
+        /*
+         * Stop document-level listeners first.
+         */
+        document.removeEventListener(
+          "pointermove",
+          documentPointerMove,
+          true
+        )
 
+        document.removeEventListener(
+          "pointerup",
+          documentPointerUp,
+          true
+        )
+
+        document.removeEventListener(
+          "pointercancel",
+          documentPointerUp,
+          true
+        )
+
+        /*
+         * Move the real object to the marker.
+         */
+        const marker =
+          insertionMarker
+
+        if (
+          moved &&
+          marker &&
+          marker.parentNode
+        ) {
           const parent =
             marker.parentNode
 
-          if (parent) {
-            parent.insertBefore(
-              object,
-              marker
-            )
-          }
+          parent.insertBefore(
+            object,
+            marker
+          )
 
+          /*
+           * Apply horizontal position after
+           * the object is back in the editor.
+           */
+          applyHorizontalAlignment(
+            dropAlignment
+          )
+        }
+
+        /*
+         * If nothing was moved, return the object
+         * without changing its position.
+         */
+        if (
+          !moved &&
+          marker
+        ) {
+          marker.remove()
+        }
+
+        if (
+          moved &&
+          marker
+        ) {
           marker.remove()
         }
 
@@ -795,21 +1004,6 @@ export default function CuraRichTextEditor({
     moveHandle.addEventListener(
       "pointerdown",
       pointerDown
-    )
-
-    moveHandle.addEventListener(
-      "pointermove",
-      pointerMove
-    )
-
-    moveHandle.addEventListener(
-      "pointerup",
-      pointerUp
-    )
-
-    moveHandle.addEventListener(
-      "pointercancel",
-      pointerUp
     )
 
     /*
@@ -1454,7 +1648,7 @@ export default function CuraRichTextEditor({
         "120px"
 
       imageWrapper.style.margin =
-        "1rem auto"
+        "1rem 0"
 
       imageWrapper.style.position =
         "relative"
