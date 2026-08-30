@@ -1374,29 +1374,35 @@ export default function CuraRichTextEditor({
     const deleteSelected =
       (event: KeyboardEvent) => {
         /*
-         * NEVER delete an editor object when the user is
-         * typing inside a table cell.
+         * ========================================================
+         * TABLE CELL PROTECTION
+         * ========================================================
          *
-         * Backspace/Delete must behave normally inside
-         * td/th contenteditable cells.
+         * The editor itself is contentEditable, so depending on
+         * the browser, event.target may be the editor <div>
+         * rather than the actual <td>.
+         *
+         * Therefore we inspect the browser Selection as well.
+         *
+         * If the caret is anywhere inside a table cell:
+         *
+         *   Backspace -> delete text
+         *   Delete    -> delete text
+         *
+         * NEVER delete the table object.
          */
+
         const target =
           event.target as HTMLElement | null
 
-        const cell =
+        if (
           target?.closest(
             "td, th"
           )
-
-        if (cell) {
+        ) {
           return
         }
 
-        /*
-         * Also protect against cases where the active element
-         * is the table cell but the keyboard event target is
-         * reported differently by the browser.
-         */
         const active =
           document.activeElement as HTMLElement | null
 
@@ -1408,30 +1414,105 @@ export default function CuraRichTextEditor({
           return
         }
 
+        const selection =
+          window.getSelection()
+
+        if (
+          selection &&
+          selection.rangeCount > 0
+        ) {
+          const range =
+            selection.getRangeAt(0)
+
+          let node:
+            Node | null =
+            range.commonAncestorContainer
+
+          while (
+            node &&
+            node !== editorRef.current
+          ) {
+            if (
+              node instanceof HTMLElement &&
+              node.closest(
+                "td, th"
+              )
+            ) {
+              return
+            }
+
+            node =
+              node.parentNode
+          }
+
+          /*
+           * Also explicitly check the selection's anchor
+           * and focus nodes.
+           */
+          const selectionNodes = [
+            selection.anchorNode,
+            selection.focusNode,
+          ]
+
+          for (
+            const selectionNode
+            of selectionNodes
+          ) {
+            let current:
+              Node | null =
+              selectionNode
+
+            while (
+              current &&
+              current !== editorRef.current
+            ) {
+              if (
+                current instanceof HTMLElement &&
+                current.closest(
+                  "td, th"
+                )
+              ) {
+                return
+              }
+
+              current =
+                current.parentNode
+            }
+          }
+        }
+
+        /*
+         * Only after all table-cell checks have passed do we
+         * consider deleting a selected editor object.
+         */
         const selected =
           selectedObjectRef.current
 
-        if (!selected) return
+        if (!selected) {
+          return
+        }
 
         if (
-          event.key === "Delete" ||
-          event.key === "Backspace"
+          event.key !== "Delete" &&
+          event.key !== "Backspace"
         ) {
-          event.preventDefault()
-
-          selected.remove()
-
-          selectedObjectRef.current =
-            null
-
-          update()
+          return
         }
-      }
 
-    editor.addEventListener(
-      "mousedown",
-      clearSelection
-    )
+        /*
+         * Delete the selected object only when the user is
+         * actually operating on the object itself.
+         */
+        event.preventDefault()
+        event.stopPropagation()
+
+        selected.remove()
+
+        selectedObjectRef.current =
+          null
+
+        update()
+      }
 
     editor.addEventListener(
       "keydown",
