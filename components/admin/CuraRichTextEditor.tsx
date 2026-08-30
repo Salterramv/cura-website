@@ -71,6 +71,9 @@ export default function CuraRichTextEditor({
   const [showColors, setShowColors] = useState(false)
   const [showHighlights, setShowHighlights] = useState(false)
   const [showTableTools, setShowTableTools] = useState(false)
+  const [showTableRowColours, setShowTableRowColours] = useState(false)
+  const [showTableCellColours, setShowTableCellColours] = useState(false)
+  const [showTableHeaderColours, setShowTableHeaderColours] = useState(false)
   const [showShapeTools, setShowShapeTools] = useState(false)
 
   useEffect(() => {
@@ -3165,6 +3168,177 @@ export default function CuraRichTextEditor({
               >
                 Clear cell/row colour
               </button>
+            </div>
+          )}
+        </div>
+
+        {/* ROW COLOUR */}
+
+        <div className="relative">
+          <button
+            type="button"
+            className={buttonClass}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              saveSelection()
+              setShowTableRowColours(
+                (current) => !current
+              )
+              setShowTableCellColours(false)
+              setShowTableHeaderColours(false)
+              setShowTableTools(false)
+            }}
+            title="Colour current table row"
+          >
+            Row Colour
+          </button>
+
+          {showTableRowColours && (
+            <div
+              className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+              onMouseDown={(event) =>
+                event.preventDefault()
+              }
+            >
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Row colour
+              </div>
+
+              <div className="grid grid-cols-6 gap-2">
+                {TABLE_COLOURS.map(
+                  (color) => (
+                    <button
+                      key={`toolbar-row-${color}`}
+                      type="button"
+                      className="h-7 w-7 rounded border border-slate-300"
+                      style={{
+                        backgroundColor:
+                          color,
+                      }}
+                      onMouseDown={(event) =>
+                        colourTableRow(
+                          event,
+                          color
+                        )
+                      }
+                    />
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* CELL COLOUR */}
+
+        <div className="relative">
+          <button
+            type="button"
+            className={buttonClass}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              saveSelection()
+              setShowTableCellColours(
+                (current) => !current
+              )
+              setShowTableRowColours(false)
+              setShowTableHeaderColours(false)
+              setShowTableTools(false)
+            }}
+            title="Colour current table cell"
+          >
+            Cell Colour
+          </button>
+
+          {showTableCellColours && (
+            <div
+              className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+              onMouseDown={(event) =>
+                event.preventDefault()
+              }
+            >
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Cell colour
+              </div>
+
+              <div className="grid grid-cols-6 gap-2">
+                {TABLE_COLOURS.map(
+                  (color) => (
+                    <button
+                      key={`toolbar-cell-${color}`}
+                      type="button"
+                      className="h-7 w-7 rounded border border-slate-300"
+                      style={{
+                        backgroundColor:
+                          color,
+                      }}
+                      onMouseDown={(event) =>
+                        colourTableCell(
+                          event,
+                          color
+                        )
+                      }
+                    />
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* HEADER COLOUR */}
+
+        <div className="relative">
+          <button
+            type="button"
+            className={buttonClass}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              saveSelection()
+              setShowTableHeaderColours(
+                (current) => !current
+              )
+              setShowTableRowColours(false)
+              setShowTableCellColours(false)
+              setShowTableTools(false)
+            }}
+            title="Colour table header row"
+          >
+            Header Colour
+          </button>
+
+          {showTableHeaderColours && (
+            <div
+              className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+              onMouseDown={(event) =>
+                event.preventDefault()
+              }
+            >
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Header colour
+              </div>
+
+              <div className="grid grid-cols-6 gap-2">
+                {TABLE_COLOURS.map(
+                  (color) => (
+                    <button
+                      key={`toolbar-header-${color}`}
+                      type="button"
+                      className="h-7 w-7 rounded border border-slate-300"
+                      style={{
+                        backgroundColor:
+                          color,
+                      }}
+                      onMouseDown={(event) =>
+                        colourTableHeader(
+                          event,
+                          color
+                        )
+                      }
+                    />
+                  )
+                )}
+              </div>
             </div>
           )}
         </div>
