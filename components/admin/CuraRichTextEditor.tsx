@@ -177,171 +177,134 @@ export default function CuraRichTextEditor({
 
   function makeObjectDraggable(
     object: HTMLElement,
-    editor: HTMLDivElement,
-    type: "image" | "table"
+    editor: HTMLDivElement
   ) {
+    if (object.dataset.curaMovementReady === "true") {
+      return
+    }
+
+    object.dataset.curaMovementReady = "true"
+
     /*
-     * CURA WORD-STYLE OBJECT CONTROL
+     * ----------------------------------------------------------
+     * WORD-STYLE OBJECT MOVEMENT
      *
-     * Resize is handled independently.
+     * IMPORTANT:
+     * The object itself is NOT draggable.
      *
-     * Movement works as follows:
-     *   1. Grab the move handle.
-     *   2. Keep the real object in the document.
-     *   3. Create a visual clone which follows the pointer.
-     *   4. Show a thin insertion marker at the intended position.
-     *   5. On release, move the real object to that position.
+     * Only the small move handle starts movement.
      *
-     * This avoids the previous caret/placeholder implementation,
-     * which caused the object itself to disappear while dragging.
+     * This allows:
+     *   - table cells to remain editable
+     *   - images to remain selectable
+     *   - resize handle to continue working
+     *   - object movement to behave like Word
+     * ----------------------------------------------------------
      */
 
-    const existingControls =
-      object.querySelectorAll("[data-cura-editor-ui]")
-
-    existingControls.forEach((node) => node.remove())
-
-    object.dataset.curaPointerReady = "true"
     object.draggable = false
-    object.style.position = "relative"
 
-    if (type === "table") {
-      object.style.display = "block"
+    let moveHandle =
+      object.querySelector(
+        ".cura-object-move-handle"
+      ) as HTMLButtonElement | null
+
+    if (!moveHandle) {
+      moveHandle = document.createElement("button")
+
+      moveHandle.type = "button"
+      moveHandle.className =
+        "cura-object-move-handle"
+
+      moveHandle.innerHTML = "✣"
+
+      moveHandle.setAttribute(
+        "aria-label",
+        "Move object"
+      )
+
+      moveHandle.setAttribute(
+        "data-cura-editor-ui",
+        "true"
+      )
+
+      moveHandle.contentEditable = "false"
+
+      object.appendChild(moveHandle)
     }
 
     /*
      * ----------------------------------------------------------
-     * MOVE HANDLE
+     * OBJECT SELECTION
      * ----------------------------------------------------------
      */
 
-    const moveHandle =
-      document.createElement("button")
+    function selectObject() {
+      editor
+        .querySelectorAll(
+          ".cura-editor-image, .cura-editor-table"
+        )
+        .forEach((node) => {
+          node.classList.remove(
+            "cura-image-selected",
+            "cura-table-selected"
+          )
+        })
 
-    moveHandle.type = "button"
+      if (
+        object.classList.contains(
+          "cura-editor-image"
+        )
+      ) {
+        object.classList.add(
+          "cura-image-selected"
+        )
+      } else {
+        object.classList.add(
+          "cura-table-selected"
+        )
+      }
 
-    moveHandle.className =
-      type === "table"
-        ? "cura-table-move-handle"
-        : "cura-image-move-handle"
-
-    moveHandle.setAttribute(
-      "data-cura-editor-ui",
-      "true"
-    )
-
-    moveHandle.setAttribute(
-      "contenteditable",
-      "false"
-    )
-
-    moveHandle.setAttribute(
-      "aria-label",
-      "Move object"
-    )
-
-    moveHandle.title = "Drag to move"
-
-    moveHandle.innerHTML = "✣"
-
-    object.appendChild(moveHandle)
-
-    /*
-     * ----------------------------------------------------------
-     * RESIZE HANDLE
-     * ----------------------------------------------------------
-     */
-
-    const resizeHandle =
-      document.createElement("span")
-
-    resizeHandle.className =
-      type === "table"
-        ? "cura-table-resize-handle"
-        : "cura-image-resize-handle"
-
-    resizeHandle.setAttribute(
-      "data-cura-editor-ui",
-      "true"
-    )
-
-    resizeHandle.setAttribute(
-      "contenteditable",
-      "false"
-    )
-
-    resizeHandle.setAttribute(
-      "aria-label",
-      "Resize object"
-    )
-
-    resizeHandle.title = "Drag to resize"
-
-    object.appendChild(resizeHandle)
-
-    /*
-     * ----------------------------------------------------------
-     * SELECTION
-     * ----------------------------------------------------------
-     */
+      selectedObjectRef.current = object
+    }
 
     object.addEventListener(
       "click",
       (event) => {
-        const target =
-          event.target as HTMLElement | null
-
+        /*
+         * Do NOT stop propagation for table cells.
+         * The cell must remain editable.
+         */
         if (
-          target?.closest(
-            "[data-cura-editor-ui]"
+          (event.target as HTMLElement | null)?.closest(
+            ".cura-object-move-handle, .cura-image-resize-handle, .cura-table-resize-handle"
           )
         ) {
           return
         }
 
-        event.preventDefault()
-        event.stopPropagation()
-
-        selectEditorObject(object)
+        selectObject()
       }
     )
 
     /*
      * ----------------------------------------------------------
-     * MOVEMENT
+     * DROP MARKER
      * ----------------------------------------------------------
      */
 
-    let moving = false
+    let marker: HTMLElement | null = null
+    let dragging = false
     let moved = false
+    let pointerId: number | null = null
 
-    let clone: HTMLElement | null = null
-    let insertionMarker: HTMLElement | null = null
+    function createMarker() {
+      if (marker) return
 
-    let offsetX = 0
-    let offsetY = 0
+      marker = document.createElement("div")
 
-    function removeDragUI() {
-      if (clone) {
-        clone.remove()
-        clone = null
-      }
-
-      if (insertionMarker) {
-        insertionMarker.remove()
-        insertionMarker = null
-      }
-
-      object.style.visibility = ""
-      object.classList.remove(
-        "cura-image-dragging",
-        "cura-table-dragging"
-      )
-    }
-
-    function createInsertionMarker() {
-      const marker =
-        document.createElement("div")
+      marker.className =
+        "cura-object-drop-marker"
 
       marker.setAttribute(
         "data-cura-editor-ui",
@@ -350,639 +313,315 @@ export default function CuraRichTextEditor({
 
       marker.contentEditable = "false"
 
-      marker.style.height = "4px"
+      marker.style.height = "3px"
       marker.style.width = "100%"
-      marker.style.margin = "8px 0"
-      marker.style.borderRadius = "4px"
       marker.style.background =
         "#18B8EE"
-      marker.style.pointerEvents = "none"
-      marker.style.boxSizing = "border-box"
-
-      return marker
+      marker.style.borderRadius =
+        "999px"
+      marker.style.margin =
+        "6px 0"
+      marker.style.pointerEvents =
+        "none"
+      marker.style.boxSizing =
+        "border-box"
     }
 
-    function getTopLevelElement(
-      node: Node | null
-    ): HTMLElement | null {
-      if (!node) return null
+    function removeMarker() {
+      if (!marker) return
 
-      let element =
-        node instanceof HTMLElement
-          ? node
-          : node.parentElement
-
-      while (
-        element &&
-        element.parentElement &&
-        element.parentElement !== editor
-      ) {
-        element =
-          element.parentElement
-      }
-
-      if (
-        !element ||
-        element === editor ||
-        element === object ||
-        element === insertionMarker
-      ) {
-        return null
-      }
-
-      if (
-        element.hasAttribute(
-          "data-cura-editor-ui"
-        )
-      ) {
-        return null
-      }
-
-      return element
+      marker.remove()
+      marker = null
     }
 
-    function findDropPosition(
+    /*
+     * ----------------------------------------------------------
+     * FIND DROP POSITION
+     *
+     * Objects are treated as top-level blocks.
+     * This prevents the table from becoming trapped inside
+     * another table/cell.
+     * ----------------------------------------------------------
+     */
+
+    function getEditorBlocks(): HTMLElement[] {
+      return Array.from(
+        editor.children
+      ).filter((node) => {
+        const element =
+          node as HTMLElement
+
+        if (
+          element === object
+        ) {
+          return false
+        }
+
+        if (
+          element === marker
+        ) {
+          return false
+        }
+
+        if (
+          element.dataset.curaEditorUi ===
+          "true"
+        ) {
+          return false
+        }
+
+        return true
+      }) as HTMLElement[]
+    }
+
+    function moveMarker(
       clientX: number,
       clientY: number
     ) {
-      if (!insertionMarker) return
+      if (!marker) return
 
-      const previousPointerEvents =
-        insertionMarker.style.pointerEvents
+      const blocks =
+        getEditorBlocks()
 
-      insertionMarker.style.pointerEvents =
-        "none"
+      if (blocks.length === 0) {
+        editor.appendChild(marker)
+        return
+      }
 
-      const target =
-        document.elementFromPoint(
-          clientX,
-          clientY
-        )
+      let inserted = false
 
-      insertionMarker.style.pointerEvents =
-        previousPointerEvents
+      for (const block of blocks) {
+        const rect =
+          block.getBoundingClientRect()
 
-      if (!target) return
+        /*
+         * Only use the vertical position to determine
+         * where the object belongs in the document flow.
+         *
+         * This is important because tables contain many
+         * internal elements and must never be used as
+         * individual drop targets.
+         */
+        const midpoint =
+          rect.top +
+          rect.height / 2
 
-      let element =
-        target instanceof HTMLElement
-          ? target
-          : target.parentElement
-
-      /*
-       * First try to find a direct object.
-       */
-      let targetObject:
-        | HTMLElement
-        | null = null
-
-      while (
-        element &&
-        element !== editor
-      ) {
-        if (
-          element !== object &&
-          (
-            element.classList.contains(
-              "cura-editor-image"
-            ) ||
-            element.classList.contains(
-              "cura-editor-table-object"
-            )
+        if (clientY < midpoint) {
+          editor.insertBefore(
+            marker,
+            block
           )
-        ) {
-          targetObject = element
+
+          inserted = true
           break
         }
-
-        element =
-          element.parentElement
       }
 
-      if (targetObject) {
-        const rect =
-          targetObject.getBoundingClientRect()
-
-        const before =
-          clientY <
-          rect.top +
-            rect.height / 2
-
-        if (before) {
-          editor.insertBefore(
-            insertionMarker,
-            targetObject
-          )
-        } else {
-          if (
-            targetObject.nextSibling
-          ) {
-            editor.insertBefore(
-              insertionMarker,
-              targetObject.nextSibling
-            )
-          } else {
-            editor.appendChild(
-              insertionMarker
-            )
-          }
-        }
-
-        return
-      }
-
-      /*
-       * If the pointer is over text, find the
-       * top-level text block.
-       */
-      const topLevel =
-        getTopLevelElement(target)
-
-      if (
-        topLevel &&
-        topLevel !== object
-      ) {
-        const rect =
-          topLevel.getBoundingClientRect()
-
-        const before =
-          clientY <
-          rect.top +
-            rect.height / 2
-
-        if (before) {
-          editor.insertBefore(
-            insertionMarker,
-            topLevel
-          )
-        } else {
-          if (topLevel.nextSibling) {
-            editor.insertBefore(
-              insertionMarker,
-              topLevel.nextSibling
-            )
-          } else {
-            editor.appendChild(
-              insertionMarker
-            )
-          }
-        }
-
-        return
-      }
-
-      /*
-       * Empty editor space:
-       * determine the nearest top-level element
-       * vertically.
-       */
-      const candidates =
-        Array.from(
-          editor.children
-        ).filter(
-          (child) => {
-            const node =
-              child as HTMLElement
-
-            return (
-              node !== object &&
-              node !== insertionMarker &&
-              !node.hasAttribute(
-                "data-cura-editor-ui"
-              )
-            )
-          }
-        ) as HTMLElement[]
-
-      if (
-        candidates.length === 0
-      ) {
-        editor.appendChild(
-          insertionMarker
-        )
-        return
-      }
-
-      let closest =
-        candidates[0]
-
-      let closestDistance =
-        Number.POSITIVE_INFINITY
-
-      for (
-        const candidate of candidates
-      ) {
-        const rect =
-          candidate.getBoundingClientRect()
-
-        const distance =
-          Math.abs(
-            clientY -
-              (
-                rect.top +
-                rect.height / 2
-              )
-          )
-
-        if (
-          distance <
-          closestDistance
-        ) {
-          closestDistance =
-            distance
-
-          closest =
-            candidate
-        }
-      }
-
-      const closestRect =
-        closest.getBoundingClientRect()
-
-      if (
-        clientY <
-        closestRect.top +
-          closestRect.height / 2
-      ) {
-        editor.insertBefore(
-          insertionMarker,
-          closest
-        )
-      } else if (
-        closest.nextSibling
-      ) {
-        editor.insertBefore(
-          insertionMarker,
-          closest.nextSibling
-        )
-      } else {
-        editor.appendChild(
-          insertionMarker
-        )
+      if (!inserted) {
+        editor.appendChild(marker)
       }
     }
 
-    function moveClone(
-      clientX: number,
-      clientY: number
+    /*
+     * ----------------------------------------------------------
+     * APPLY WORD-STYLE HORIZONTAL POSITION
+     *
+     * Dragging to the:
+     *   left   = left aligned
+     *   middle = centred
+     *   right  = right aligned
+     *
+     * This avoids absolute positioning and keeps the object
+     * inside the document flow.
+     * ----------------------------------------------------------
+     */
+
+    function applyHorizontalPosition(
+      clientX: number
     ) {
-      if (!clone) return
+      const editorRect =
+        editor.getBoundingClientRect()
 
-      clone.style.left =
-        `${clientX - offsetX}px`
+      const relativeX =
+        clientX -
+        editorRect.left
 
-      clone.style.top =
-        `${clientY - offsetY}px`
+      const width =
+        editorRect.width
+
+      const ratio =
+        relativeX / width
+
+      object.style.float = "none"
+
+      if (ratio < 0.33) {
+        object.style.marginLeft = "0"
+        object.style.marginRight =
+          "auto"
+        object.style.display =
+          "block"
+      } else if (ratio > 0.67) {
+        object.style.marginLeft =
+          "auto"
+        object.style.marginRight =
+          "0"
+        object.style.display =
+          "block"
+      } else {
+        object.style.marginLeft =
+          "auto"
+        object.style.marginRight =
+          "auto"
+        object.style.display =
+          "block"
+      }
     }
 
-    const pointerDown =
-      (event: PointerEvent) => {
-        event.preventDefault()
-        event.stopPropagation()
-
-        selectEditorObject(object)
-
-        moving = true
-        moved = false
-
-        const rect =
-          object.getBoundingClientRect()
-
-        offsetX =
-          event.clientX - rect.left
-
-        offsetY =
-          event.clientY - rect.top
-
-        /*
-         * Create a visual copy.
-         */
-        clone =
-          object.cloneNode(true) as HTMLElement
-
-        clone
-          .querySelectorAll(
-            "[data-cura-editor-ui]"
-          )
-          .forEach(
-            (node) => node.remove()
-          )
-
-        clone.setAttribute(
-          "data-cura-drag-clone",
-          "true"
-        )
-
-        clone.style.position =
-          "fixed"
-
-        clone.style.left =
-          `${rect.left}px`
-
-        clone.style.top =
-          `${rect.top}px`
-
-        clone.style.width =
-          `${rect.width}px`
-
-        clone.style.height =
-          `${rect.height}px`
-
-        clone.style.margin = "0"
-        clone.style.zIndex = "999999"
-        clone.style.pointerEvents =
-          "none"
-        clone.style.opacity = "0.88"
-        clone.style.boxSizing =
-          "border-box"
-        clone.style.maxWidth =
-          "none"
-
-        document.body.appendChild(
-          clone
-        )
-
-        /*
-         * Keep the real object in the layout
-         * while dragging.
-         */
-        object.style.visibility =
-          "hidden"
-
-        object.classList.add(
-          type === "image"
-            ? "cura-image-dragging"
-            : "cura-table-dragging"
-        )
-
-        insertionMarker =
-          createInsertionMarker()
-
-        /*
-         * Put the marker at the object's
-         * current location initially.
-         */
-        editor.insertBefore(
-          insertionMarker,
-          object
-        )
-
-        event.currentTarget instanceof HTMLElement &&
-          event.currentTarget.setPointerCapture?.(
-            event.pointerId
-          )
-
-        moveClone(
-          event.clientX,
-          event.clientY
-        )
-      }
-
-    const pointerMove =
-      (event: PointerEvent) => {
-        if (!moving) return
-
-        event.preventDefault()
-
-        moved = true
-
-        moveClone(
-          event.clientX,
-          event.clientY
-        )
-
-        findDropPosition(
-          event.clientX,
-          event.clientY
-        )
-      }
-
-    const pointerUp =
-      () => {
-        if (!moving) return
-
-        moving = false
-
-        if (
-          insertionMarker &&
-          insertionMarker.parentNode
-        ) {
-          const marker =
-            insertionMarker
-
-          const parent =
-            marker.parentNode
-
-          if (parent) {
-            parent.insertBefore(
-              object,
-              marker
-            )
-          }
-
-          marker.remove()
-        }
-
-        removeDragUI()
-
-        if (moved) {
-          update()
-        }
-
-        moved = false
-      }
+    /*
+     * ----------------------------------------------------------
+     * POINTER DOWN — ONLY MOVE HANDLE
+     * ----------------------------------------------------------
+     */
 
     moveHandle.addEventListener(
       "pointerdown",
-      pointerDown
-    )
+      (event) => {
+        event.preventDefault()
+        event.stopPropagation()
 
-    moveHandle.addEventListener(
-      "pointermove",
-      pointerMove
-    )
+        selectObject()
 
-    moveHandle.addEventListener(
-      "pointerup",
-      pointerUp
-    )
+        dragging = true
+        moved = false
+        pointerId = event.pointerId
 
-    moveHandle.addEventListener(
-      "pointercancel",
-      pointerUp
+        moveHandle?.setPointerCapture?.(
+          event.pointerId
+        )
+
+        createMarker()
+
+        /*
+         * Temporarily hide the original object.
+         * The drop marker shows the destination.
+         */
+        object.classList.add(
+          "cura-object-being-moved"
+        )
+      }
     )
 
     /*
      * ----------------------------------------------------------
-     * RESIZE OBJECT
+     * POINTER MOVE
      * ----------------------------------------------------------
      */
 
-    let resizing = false
+    moveHandle.addEventListener(
+      "pointermove",
+      (event) => {
+        if (
+          !dragging ||
+          pointerId !== event.pointerId
+        ) {
+          return
+        }
 
-    let resizeStartX = 0
-    let resizeStartY = 0
+        moved = true
 
-    let resizeStartWidth = 0
-    let resizeStartHeight = 0
+        event.preventDefault()
 
-    const resizePointerDown =
-      (event: PointerEvent) => {
+        moveMarker(
+          event.clientX,
+          event.clientY
+        )
+      }
+    )
+
+    /*
+     * ----------------------------------------------------------
+     * POINTER UP
+     * ----------------------------------------------------------
+     */
+
+    moveHandle.addEventListener(
+      "pointerup",
+      (event) => {
+        if (
+          !dragging ||
+          pointerId !== event.pointerId
+        ) {
+          return
+        }
+
         event.preventDefault()
         event.stopPropagation()
 
-        selectEditorObject(object)
+        dragging = false
+        pointerId = null
 
-        resizing = true
-
-        resizeStartX =
-          event.clientX
-
-        resizeStartY =
-          event.clientY
-
-        const rect =
-          object.getBoundingClientRect()
-
-        resizeStartWidth =
-          rect.width
-
-        resizeStartHeight =
-          rect.height
-
-        resizeHandle.setPointerCapture?.(
+        moveHandle?.releasePointerCapture?.(
           event.pointerId
         )
-      }
 
-    const resizePointerMove =
-      (event: PointerEvent) => {
-        if (!resizing) return
-
-        const dx =
-          event.clientX -
-          resizeStartX
-
-        const dy =
-          event.clientY -
-          resizeStartY
-
-        const editorRect =
-          editor.getBoundingClientRect()
-
-        const maxWidth =
-          Math.max(
-            160,
-            editorRect.width - 20
-          )
-
-        const newWidth =
-          Math.max(
-            160,
-            Math.min(
-              maxWidth,
-              resizeStartWidth + dx
-            )
-          )
-
-        if (type === "table") {
-          object.style.width =
-            `${newWidth}px`
-
-          const table =
-            object.querySelector(
-              "table"
-            ) as HTMLTableElement | null
-
-          if (table) {
-            table.style.width =
-              "100%"
-          }
-        } else {
-          object.style.width =
-            `${newWidth}px`
-
-          const image =
-            object.querySelector(
-              "img"
-            ) as HTMLImageElement | null
-
-          if (image) {
-            image.style.width =
-              "100%"
-
-            image.style.height =
-              "auto"
-          }
-        }
-
-        /*
-         * Keep height calculation predictable
-         * for the editor.
-         */
         if (
-          type === "image" &&
-          resizeStartHeight > 0
+          moved &&
+          marker &&
+          marker.parentNode
         ) {
-          const ratio =
-            resizeStartHeight /
-            resizeStartWidth
+          /*
+           * Put the object where the marker is.
+           */
+          marker.parentNode.insertBefore(
+            object,
+            marker
+          )
 
-          object.style.height =
-            `${Math.max(
-              120,
-              newWidth * ratio
-            )}px`
-
-          const image =
-            object.querySelector(
-              "img"
-            ) as HTMLImageElement | null
-
-          if (image) {
-            image.style.height =
-              "100%"
-            image.style.objectFit =
-              "contain"
-          }
+          /*
+           * Apply horizontal positioning based
+           * on where the pointer was released.
+           */
+          applyHorizontalPosition(
+            event.clientX
+          )
         }
+
+        object.classList.remove(
+          "cura-object-being-moved"
+        )
+
+        removeMarker()
+
+        update()
       }
+    )
 
-    const resizePointerUp =
-      () => {
-        if (!resizing) return
+    /*
+     * ----------------------------------------------------------
+     * POINTER CANCEL
+     * ----------------------------------------------------------
+     */
 
-        resizing = false
+    moveHandle.addEventListener(
+      "pointercancel",
+      (event) => {
+        dragging = false
+        pointerId = null
+
+        object.classList.remove(
+          "cura-object-being-moved"
+        )
+
+        removeMarker()
 
         try {
-          resizeHandle.releasePointerCapture?.(
-            0
+          moveHandle?.releasePointerCapture?.(
+            event.pointerId
           )
         } catch {
           // Pointer capture may already be released.
         }
-
-        update()
       }
-
-    resizeHandle.addEventListener(
-      "pointerdown",
-      resizePointerDown
-    )
-
-    resizeHandle.addEventListener(
-      "pointermove",
-      resizePointerMove
-    )
-
-    resizeHandle.addEventListener(
-      "pointerup",
-      resizePointerUp
-    )
-
-    resizeHandle.addEventListener(
-      "pointercancel",
-      resizePointerUp
     )
   }
 
@@ -1034,8 +673,7 @@ export default function CuraRichTextEditor({
 
         makeObjectDraggable(
           object,
-          editor,
-          "image"
+          editor
         )
       })
   }
@@ -1124,8 +762,7 @@ export default function CuraRichTextEditor({
 
         makeObjectDraggable(
           wrapper,
-          editor,
-          "table"
+          editor
         )
       })
   }
@@ -1539,8 +1176,7 @@ export default function CuraRichTextEditor({
 
       makeObjectDraggable(
         imageWrapper,
-        editor,
-        "image"
+        editor
       )
 
       update()
@@ -1694,6 +1330,16 @@ export default function CuraRichTextEditor({
 
     table.appendChild(tbody)
 
+    const editorForTable =
+      editorRef.current
+
+    if (editorForTable) {
+      makeObjectDraggable(
+        table,
+        editorForTable
+      )
+    }
+
     const tableWrapper =
       document.createElement("div")
 
@@ -1756,8 +1402,7 @@ export default function CuraRichTextEditor({
 
     makeObjectDraggable(
       tableWrapper,
-      editorRef.current as HTMLDivElement,
-      "table"
+      editorRef.current as HTMLDivElement
     )
 
     update()
