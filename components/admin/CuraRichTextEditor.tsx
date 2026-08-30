@@ -2318,6 +2318,89 @@ export default function CuraRichTextEditor({
     update()
   }
 
+  function colourTableCell(
+    event: React.MouseEvent<HTMLButtonElement>,
+    color: string
+  ) {
+    event.preventDefault()
+
+    const cell =
+      getCurrentCell()
+
+    if (!cell) {
+      window.alert(
+        "Place the cursor inside a table cell first."
+      )
+      return
+    }
+
+    cell.style.backgroundColor =
+      color
+
+    update()
+  }
+
+  function colourTableHeader(
+    event: React.MouseEvent<HTMLButtonElement>,
+    color: string
+  ) {
+    event.preventDefault()
+
+    const table =
+      getCurrentTable()
+
+    if (!table) {
+      window.alert(
+        "Place the cursor inside a table first."
+      )
+      return
+    }
+
+    const firstRow =
+      table.rows[0]
+
+    if (!firstRow) return
+
+    Array.from(
+      firstRow.cells
+    ).forEach((cell) => {
+      cell.style.backgroundColor =
+        color
+    })
+
+    update()
+  }
+
+  function clearTableColour(
+    event: React.MouseEvent<HTMLButtonElement>
+  ) {
+    event.preventDefault()
+
+    const cell =
+      getCurrentCell()
+
+    if (!cell) {
+      window.alert(
+        "Place the cursor inside a table cell first."
+      )
+      return
+    }
+
+    const row =
+      cell.parentElement as HTMLTableRowElement | null
+
+    if (!row) return
+
+    Array.from(
+      row.cells
+    ).forEach((currentCell) => {
+      currentCell.style.backgroundColor =
+        ""
+    })
+
+    update()
+  }
+
   function insertShape(
     event: React.MouseEvent<HTMLButtonElement>,
     shape:
@@ -2972,6 +3055,41 @@ export default function CuraRichTextEditor({
                 </button>
               </div>
 
+              {/* HEADER COLOUR */}
+
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Header colour
+                </div>
+
+                <div className="grid grid-cols-6 gap-2">
+                  {TABLE_COLOURS.map(
+                    (color) => (
+                      <button
+                        key={`header-${color}`}
+                        type="button"
+                        className="h-7 w-7 rounded border border-slate-300"
+                        style={{
+                          backgroundColor:
+                            color,
+                        }}
+                        title={`Header ${color}`}
+                        onMouseDown={(
+                          event
+                        ) =>
+                          colourTableHeader(
+                            event,
+                            color
+                          )
+                        }
+                      />
+                    )
+                  )}
+                </div>
+              </div>
+
+              {/* ROW COLOUR */}
+
               <div className="mt-3 border-t border-slate-100 pt-3">
                 <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                   Row colour
@@ -2981,13 +3099,14 @@ export default function CuraRichTextEditor({
                   {TABLE_COLOURS.map(
                     (color) => (
                       <button
-                        key={color}
+                        key={`row-${color}`}
                         type="button"
                         className="h-7 w-7 rounded border border-slate-300"
                         style={{
                           backgroundColor:
                             color,
                         }}
+                        title={`Row ${color}`}
                         onMouseDown={(
                           event
                         ) =>
@@ -3001,6 +3120,51 @@ export default function CuraRichTextEditor({
                   )}
                 </div>
               </div>
+
+              {/* CELL COLOUR */}
+
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Cell colour
+                </div>
+
+                <div className="grid grid-cols-6 gap-2">
+                  {TABLE_COLOURS.map(
+                    (color) => (
+                      <button
+                        key={`cell-${color}`}
+                        type="button"
+                        className="h-7 w-7 rounded border border-slate-300"
+                        style={{
+                          backgroundColor:
+                            color,
+                        }}
+                        title={`Cell ${color}`}
+                        onMouseDown={(
+                          event
+                        ) =>
+                          colourTableCell(
+                            event,
+                            color
+                          )
+                        }
+                      />
+                    )
+                  )}
+                </div>
+              </div>
+
+              {/* CLEAR COLOUR */}
+
+              <button
+                type="button"
+                className={`${buttonClass} mt-3 w-full`}
+                onMouseDown={
+                  clearTableColour
+                }
+              >
+                Clear cell/row colour
+              </button>
             </div>
           )}
         </div>
