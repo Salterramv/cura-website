@@ -181,33 +181,28 @@ export default function CuraRichTextEditor({
     type: "image" | "table"
   ) {
     /*
-     * Word-style object controls:
+     * CURA WORD-STYLE OBJECT CONTROL
      *
-     * - Click object = select object
-     * - Top-left handle = move object
-     * - Bottom-right handle = resize object
-     * - Table cells remain independently editable
+     * Resize is handled independently.
      *
-     * The object itself is NOT draggable. This is intentional.
-     * Dragging is only initiated from the move handle so that
-     * contentEditable table cells do not fight with object movement.
+     * Movement works as follows:
+     *   1. Grab the move handle.
+     *   2. Keep the real object in the document.
+     *   3. Create a visual clone which follows the pointer.
+     *   4. Show a thin insertion marker at the intended position.
+     *   5. On release, move the real object to that position.
+     *
+     * This avoids the previous caret/placeholder implementation,
+     * which caused the object itself to disappear while dragging.
      */
 
     const existingControls =
-      object.querySelectorAll(
-        "[data-cura-editor-ui]"
-      )
+      object.querySelectorAll("[data-cura-editor-ui]")
 
     existingControls.forEach((node) => node.remove())
 
-    object.removeAttribute(
-      "data-cura-pointer-ready"
-    )
-
     object.dataset.curaPointerReady = "true"
-
     object.draggable = false
-
     object.style.position = "relative"
 
     if (type === "table") {
@@ -245,8 +240,7 @@ export default function CuraRichTextEditor({
       "Move object"
     )
 
-    moveHandle.title =
-      "Drag to move"
+    moveHandle.title = "Drag to move"
 
     moveHandle.innerHTML = "✣"
 
@@ -281,14 +275,13 @@ export default function CuraRichTextEditor({
       "Resize object"
     )
 
-    resizeHandle.title =
-      "Drag to resize"
+    resizeHandle.title = "Drag to resize"
 
     object.appendChild(resizeHandle)
 
     /*
      * ----------------------------------------------------------
-     * OBJECT SELECTION
+     * SELECTION
      * ----------------------------------------------------------
      */
 
@@ -306,287 +299,169 @@ export default function CuraRichTextEditor({
           return
         }
 
+        event.preventDefault()
+        event.stopPropagation()
+
         selectEditorObject(object)
       }
     )
 
     /*
      * ----------------------------------------------------------
-     * MOVE OBJECT
+     * MOVEMENT
      * ----------------------------------------------------------
-     *
-     * Word-style positioning:
-     *
-     * 1. Drag from the move handle.
-     * 2. Remove the object from its old position and leave a
-     *    visible placeholder.
-     * 3. Track the actual text position underneath the pointer.
-     * 4. Insert the placeholder at the nearest valid text block.
-     * 5. On release, put the object into that position.
-     *
-     * This is deliberately based on the browser caret position
-     * rather than editor.children. This allows an object to move
-     * between paragraphs/text instead of only between existing
-     * top-level objects.
      */
 
     let moving = false
     let moved = false
 
-    let startX = 0
-    let startY = 0
+    let clone: HTMLElement | null = null
+    let insertionMarker: HTMLElement | null = null
 
-    let placeholder:
-      | HTMLElement
-      | null = null
+    let offsetX = 0
+    let offsetY = 0
 
-    function getCaretRange(
-      clientX: number,
-      clientY: number
-    ): Range | null {
-      const documentWithCaret =
-        document as Document & {
-          caretRangeFromPoint?: (
-            x: number,
-            y: number
-          ) => Range | null
-
-          caretPositionFromPoint?: (
-            x: number,
-            y: number
-          ) => {
-            offsetNode: Node
-            offset: number
-          } | null
-        }
-
-      if (
-        typeof documentWithCaret.caretRangeFromPoint ===
-        "function"
-      ) {
-        return documentWithCaret.caretRangeFromPoint(
-          clientX,
-          clientY
-        )
+    function removeDragUI() {
+      if (clone) {
+        clone.remove()
+        clone = null
       }
 
-      if (
-        typeof documentWithCaret.caretPositionFromPoint ===
-        "function"
-      ) {
-        const position =
-          documentWithCaret.caretPositionFromPoint(
-            clientX,
-            clientY
-          )
-
-        if (!position) {
-          return null
-        }
-
-        const range =
-          document.createRange()
-
-        range.setStart(
-          position.offsetNode,
-          position.offset
-        )
-
-        range.collapse(true)
-
-        return range
+      if (insertionMarker) {
+        insertionMarker.remove()
+        insertionMarker = null
       }
 
-      return null
+      object.style.visibility = ""
+      object.classList.remove(
+        "cura-image-dragging",
+        "cura-table-dragging"
+      )
     }
 
-    function getEditableBlock(
+    function createInsertionMarker() {
+      const marker =
+        document.createElement("div")
+
+      marker.setAttribute(
+        "data-cura-editor-ui",
+        "true"
+      )
+
+      marker.contentEditable = "false"
+
+      marker.style.height = "4px"
+      marker.style.width = "100%"
+      marker.style.margin = "8px 0"
+      marker.style.borderRadius = "4px"
+      marker.style.background =
+        "#18B8EE"
+      marker.style.pointerEvents = "none"
+      marker.style.boxSizing = "border-box"
+
+      return marker
+    }
+
+    function getTopLevelElement(
       node: Node | null
     ): HTMLElement | null {
       if (!node) return null
 
-      let element: HTMLElement | null =
+      let element =
         node instanceof HTMLElement
           ? node
           : node.parentElement
 
       while (
         element &&
+        element.parentElement &&
+        element.parentElement !== editor
+      ) {
+        element =
+          element.parentElement
+      }
+
+      if (
+        !element ||
+        element === editor ||
+        element === object ||
+        element === insertionMarker
+      ) {
+        return null
+      }
+
+      if (
+        element.hasAttribute(
+          "data-cura-editor-ui"
+        )
+      ) {
+        return null
+      }
+
+      return element
+    }
+
+    function findDropPosition(
+      clientX: number,
+      clientY: number
+    ) {
+      if (!insertionMarker) return
+
+      const previousPointerEvents =
+        insertionMarker.style.pointerEvents
+
+      insertionMarker.style.pointerEvents =
+        "none"
+
+      const target =
+        document.elementFromPoint(
+          clientX,
+          clientY
+        )
+
+      insertionMarker.style.pointerEvents =
+        previousPointerEvents
+
+      if (!target) return
+
+      let element =
+        target instanceof HTMLElement
+          ? target
+          : target.parentElement
+
+      /*
+       * First try to find a direct object.
+       */
+      let targetObject:
+        | HTMLElement
+        | null = null
+
+      while (
+        element &&
         element !== editor
       ) {
-        /*
-         * Never place an object inside another editor
-         * object, table cell, image, or editor UI.
-         */
         if (
-          element.hasAttribute(
-            "data-cura-editor-ui"
+          element !== object &&
+          (
+            element.classList.contains(
+              "cura-editor-image"
+            ) ||
+            element.classList.contains(
+              "cura-editor-table-object"
+            )
           )
         ) {
-          return null
-        }
-
-        if (
-          element.classList.contains(
-            "cura-editor-image"
-          ) ||
-          element.classList.contains(
-            "cura-editor-table-object"
-          ) ||
-          element.classList.contains(
-            "cura-editor-table"
-          )
-        ) {
-          return null
-        }
-
-        /*
-         * Paragraphs/headings/list items are the normal
-         * text containers in the Cura editor.
-         */
-        if (
-          element.tagName === "P" ||
-          element.tagName === "H1" ||
-          element.tagName === "H2" ||
-          element.tagName === "H3" ||
-          element.tagName === "H4" ||
-          element.tagName === "H5" ||
-          element.tagName === "H6" ||
-          element.tagName === "LI" ||
-          element.tagName === "BLOCKQUOTE"
-        ) {
-          return element
+          targetObject = element
+          break
         }
 
         element =
           element.parentElement
       }
 
-      return null
-    }
-
-    function placePlaceholderAtPointer(
-      clientX: number,
-      clientY: number
-    ) {
-      if (
-        !placeholder ||
-        !placeholder.parentNode
-      ) {
-        return
-      }
-
-      const range =
-        getCaretRange(
-          clientX,
-          clientY
-        )
-
-      if (!range) {
-        return
-      }
-
-      if (
-        !editor.contains(
-          range.commonAncestorContainer
-        )
-      ) {
-        return
-      }
-
-      const block =
-        getEditableBlock(
-          range.startContainer
-        )
-
-      /*
-       * If the pointer is over normal text, place the
-       * object before or after that paragraph according
-       * to the vertical midpoint.
-       */
-      if (block) {
+      if (targetObject) {
         const rect =
-          block.getBoundingClientRect()
-
-        const before =
-          clientY <
-          rect.top +
-            rect.height / 2
-
-        if (before) {
-          if (
-            placeholder.nextSibling !==
-            block
-          ) {
-            editor.insertBefore(
-              placeholder,
-              block
-            )
-          }
-        } else {
-          const next =
-            block.nextSibling
-
-          if (
-            next !== placeholder
-          ) {
-            if (next) {
-              editor.insertBefore(
-                placeholder,
-                next
-              )
-            } else {
-              editor.appendChild(
-                placeholder
-              )
-            }
-          }
-        }
-
-        return
-      }
-
-      /*
-       * If the pointer is over an existing object, place
-       * the dragged object before/after that object.
-       */
-      let objectElement:
-        | HTMLElement
-        | null = null
-
-      let candidate:
-        | HTMLElement
-        | null =
-        range.startContainer instanceof HTMLElement
-          ? range.startContainer
-          : range.startContainer.parentElement
-
-      while (
-        candidate &&
-        candidate !== editor
-      ) {
-        if (
-          candidate !== object &&
-          (
-            candidate.classList.contains(
-              "cura-editor-image"
-            ) ||
-            candidate.classList.contains(
-              "cura-editor-table-object"
-            )
-          )
-        ) {
-          objectElement = candidate
-          break
-        }
-
-        candidate =
-          candidate.parentElement
-      }
-
-      if (objectElement) {
-        const rect =
-          objectElement.getBoundingClientRect()
+          targetObject.getBoundingClientRect()
 
         const before =
           clientY <
@@ -595,21 +470,20 @@ export default function CuraRichTextEditor({
 
         if (before) {
           editor.insertBefore(
-            placeholder,
-            objectElement
+            insertionMarker,
+            targetObject
           )
         } else {
-          const next =
-            objectElement.nextSibling
-
-          if (next) {
+          if (
+            targetObject.nextSibling
+          ) {
             editor.insertBefore(
-              placeholder,
-              next
+              insertionMarker,
+              targetObject.nextSibling
             )
           } else {
             editor.appendChild(
-              placeholder
+              insertionMarker
             )
           }
         }
@@ -618,34 +492,79 @@ export default function CuraRichTextEditor({
       }
 
       /*
-       * If the pointer is over empty editor space, find the
-       * closest top-level editable/object element by Y.
+       * If the pointer is over text, find the
+       * top-level text block.
+       */
+      const topLevel =
+        getTopLevelElement(target)
+
+      if (
+        topLevel &&
+        topLevel !== object
+      ) {
+        const rect =
+          topLevel.getBoundingClientRect()
+
+        const before =
+          clientY <
+          rect.top +
+            rect.height / 2
+
+        if (before) {
+          editor.insertBefore(
+            insertionMarker,
+            topLevel
+          )
+        } else {
+          if (topLevel.nextSibling) {
+            editor.insertBefore(
+              insertionMarker,
+              topLevel.nextSibling
+            )
+          } else {
+            editor.appendChild(
+              insertionMarker
+            )
+          }
+        }
+
+        return
+      }
+
+      /*
+       * Empty editor space:
+       * determine the nearest top-level element
+       * vertically.
        */
       const candidates =
         Array.from(
           editor.children
         ).filter(
-          (node) =>
-            node !== object &&
-            node !== placeholder &&
-            node instanceof HTMLElement &&
-            !node.hasAttribute(
-              "data-cura-editor-ui"
+          (child) => {
+            const node =
+              child as HTMLElement
+
+            return (
+              node !== object &&
+              node !== insertionMarker &&
+              !node.hasAttribute(
+                "data-cura-editor-ui"
+              )
             )
+          }
         ) as HTMLElement[]
 
       if (
         candidates.length === 0
       ) {
         editor.appendChild(
-          placeholder
+          insertionMarker
         )
         return
       }
 
-      let closest:
-        | HTMLElement
-        | null = null
+      let closest =
+        candidates[0]
 
       let closestDistance =
         Number.POSITIVE_INFINITY
@@ -656,13 +575,13 @@ export default function CuraRichTextEditor({
         const rect =
           candidate.getBoundingClientRect()
 
-        const center =
-          rect.top +
-          rect.height / 2
-
         const distance =
           Math.abs(
-            clientY - center
+            clientY -
+              (
+                rect.top +
+                rect.height / 2
+              )
           )
 
         if (
@@ -677,256 +596,220 @@ export default function CuraRichTextEditor({
         }
       }
 
-      if (!closest) return
-
-      const rect =
+      const closestRect =
         closest.getBoundingClientRect()
 
       if (
         clientY <
-        rect.top +
-          rect.height / 2
+        closestRect.top +
+          closestRect.height / 2
       ) {
         editor.insertBefore(
-          placeholder,
+          insertionMarker,
           closest
         )
-      } else {
-        const next =
+      } else if (
+        closest.nextSibling
+      ) {
+        editor.insertBefore(
+          insertionMarker,
           closest.nextSibling
-
-        if (next) {
-          editor.insertBefore(
-            placeholder,
-            next
-          )
-        } else {
-          editor.appendChild(
-            placeholder
-          )
-        }
+        )
+      } else {
+        editor.appendChild(
+          insertionMarker
+        )
       }
     }
 
-    const movePointerDown =
+    function moveClone(
+      clientX: number,
+      clientY: number
+    ) {
+      if (!clone) return
+
+      clone.style.left =
+        `${clientX - offsetX}px`
+
+      clone.style.top =
+        `${clientY - offsetY}px`
+    }
+
+    const pointerDown =
       (event: PointerEvent) => {
         event.preventDefault()
         event.stopPropagation()
 
-        selectEditorObject(
-          object
-        )
+        selectEditorObject(object)
 
         moving = true
         moved = false
 
-        startX =
-          event.clientX
-
-        startY =
-          event.clientY
-
         const rect =
           object.getBoundingClientRect()
 
-        placeholder =
-          document.createElement(
-            "div"
+        offsetX =
+          event.clientX - rect.left
+
+        offsetY =
+          event.clientY - rect.top
+
+        /*
+         * Create a visual copy.
+         */
+        clone =
+          object.cloneNode(true) as HTMLElement
+
+        clone
+          .querySelectorAll(
+            "[data-cura-editor-ui]"
+          )
+          .forEach(
+            (node) => node.remove()
           )
 
-        placeholder.className =
-          "cura-editor-drag-placeholder"
-
-        placeholder.setAttribute(
-          "data-cura-editor-ui",
+        clone.setAttribute(
+          "data-cura-drag-clone",
           "true"
         )
 
-        placeholder.style.height =
-          `${rect.height}px`
+        clone.style.position =
+          "fixed"
 
-        placeholder.style.width =
+        clone.style.left =
+          `${rect.left}px`
+
+        clone.style.top =
+          `${rect.top}px`
+
+        clone.style.width =
           `${rect.width}px`
 
-        placeholder.style.margin =
-          getComputedStyle(
-            object
-          ).margin
+        clone.style.height =
+          `${rect.height}px`
 
-        placeholder.style.boxSizing =
+        clone.style.margin = "0"
+        clone.style.zIndex = "999999"
+        clone.style.pointerEvents =
+          "none"
+        clone.style.opacity = "0.88"
+        clone.style.boxSizing =
           "border-box"
+        clone.style.maxWidth =
+          "none"
 
-        placeholder.style.border =
-          "2px dashed #18B8EE"
+        document.body.appendChild(
+          clone
+        )
 
-        placeholder.style.borderRadius =
-          "8px"
-
-        const parent =
-          object.parentNode
-
-        if (parent) {
-          parent.insertBefore(
-            placeholder,
-            object
-          )
-
-          object.remove()
-        }
+        /*
+         * Keep the real object in the layout
+         * while dragging.
+         */
+        object.style.visibility =
+          "hidden"
 
         object.classList.add(
-          type === "table"
-            ? "cura-table-dragging"
-            : "cura-image-dragging"
+          type === "image"
+            ? "cura-image-dragging"
+            : "cura-table-dragging"
         )
 
-        moveHandle.setPointerCapture?.(
-          event.pointerId
+        insertionMarker =
+          createInsertionMarker()
+
+        /*
+         * Put the marker at the object's
+         * current location initially.
+         */
+        editor.insertBefore(
+          insertionMarker,
+          object
         )
-      }
 
-    const movePointerMove =
-      (event: PointerEvent) => {
-        if (!moving) return
+        event.currentTarget instanceof HTMLElement &&
+          event.currentTarget.setPointerCapture?.(
+            event.pointerId
+          )
 
-        const dx =
-          event.clientX -
-          startX
-
-        const dy =
-          event.clientY -
-          startY
-
-        if (
-          Math.abs(dx) > 4 ||
-          Math.abs(dy) > 4
-        ) {
-          moved = true
-        }
-
-        if (!moved) {
-          return
-        }
-
-        placePlaceholderAtPointer(
+        moveClone(
           event.clientX,
           event.clientY
         )
       }
 
-    const movePointerUp =
+    const pointerMove =
       (event: PointerEvent) => {
+        if (!moving) return
+
+        event.preventDefault()
+
+        moved = true
+
+        moveClone(
+          event.clientX,
+          event.clientY
+        )
+
+        findDropPosition(
+          event.clientX,
+          event.clientY
+        )
+      }
+
+    const pointerUp =
+      () => {
         if (!moving) return
 
         moving = false
 
-        moveHandle.releasePointerCapture?.(
-          event.pointerId
-        )
-
-        object.classList.remove(
-          "cura-table-dragging",
-          "cura-image-dragging"
-        )
-
-        const currentPlaceholder =
-          placeholder
-
         if (
-          moved &&
-          currentPlaceholder &&
-          currentPlaceholder.parentNode
+          insertionMarker &&
+          insertionMarker.parentNode
         ) {
-          currentPlaceholder.parentNode.insertBefore(
-            object,
-            currentPlaceholder
-          )
+          const marker =
+            insertionMarker
 
-          currentPlaceholder.remove()
+          const parent =
+            marker.parentNode
 
-          /*
-           * Create a normal editable paragraph after
-           * the moved object so the user can immediately
-           * continue typing.
-           */
-          const paragraph =
-            document.createElement(
-              "p"
-            )
-
-          paragraph.innerHTML =
-            "<br>"
-
-          if (
-            object.nextSibling
-          ) {
-            object.parentNode?.insertBefore(
-              paragraph,
-              object.nextSibling
-            )
-          } else {
-            editor.appendChild(
-              paragraph
-            )
-          }
-
-          const range =
-            document.createRange()
-
-          range.selectNodeContents(
-            paragraph
-          )
-
-          range.collapse(false)
-
-          const selection =
-            window.getSelection()
-
-          selection?.removeAllRanges()
-          selection?.addRange(
-            range
-          )
-
-          update()
-        } else {
-          /*
-           * Drag was too small to count as movement.
-           * Restore the object to its original position.
-           */
-          if (
-            currentPlaceholder &&
-            currentPlaceholder.parentNode
-          ) {
-            currentPlaceholder.parentNode.insertBefore(
+          if (parent) {
+            parent.insertBefore(
               object,
-              currentPlaceholder
+              marker
             )
-
-            currentPlaceholder.remove()
           }
+
+          marker.remove()
         }
 
-        placeholder = null
+        removeDragUI()
+
+        if (moved) {
+          update()
+        }
+
+        moved = false
       }
 
     moveHandle.addEventListener(
       "pointerdown",
-      movePointerDown
+      pointerDown
     )
 
     moveHandle.addEventListener(
       "pointermove",
-      movePointerMove
+      pointerMove
     )
 
     moveHandle.addEventListener(
       "pointerup",
-      movePointerUp
+      pointerUp
     )
 
     moveHandle.addEventListener(
       "pointercancel",
-      movePointerUp
+      pointerUp
     )
 
     /*
@@ -1027,33 +910,57 @@ export default function CuraRichTextEditor({
           if (image) {
             image.style.width =
               "100%"
+
             image.style.height =
               "auto"
           }
         }
 
         /*
-         * For tables, preserve the current height.
-         * For images, aspect ratio is maintained automatically.
+         * Keep height calculation predictable
+         * for the editor.
          */
         if (
-          type === "table" &&
+          type === "image" &&
           resizeStartHeight > 0
         ) {
+          const ratio =
+            resizeStartHeight /
+            resizeStartWidth
+
           object.style.height =
-            "auto"
+            `${Math.max(
+              120,
+              newWidth * ratio
+            )}px`
+
+          const image =
+            object.querySelector(
+              "img"
+            ) as HTMLImageElement | null
+
+          if (image) {
+            image.style.height =
+              "100%"
+            image.style.objectFit =
+              "contain"
+          }
         }
       }
 
     const resizePointerUp =
-      (event: PointerEvent) => {
+      () => {
         if (!resizing) return
 
         resizing = false
 
-        resizeHandle.releasePointerCapture?.(
-          event.pointerId
-        )
+        try {
+          resizeHandle.releasePointerCapture?.(
+            0
+          )
+        } catch {
+          // Pointer capture may already be released.
+        }
 
         update()
       }
