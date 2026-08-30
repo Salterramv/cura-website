@@ -134,6 +134,123 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  context: {
+    params: Promise<{
+      id: string
+    }>
+  }
+) {
+  try {
+    const { id } = await context.params
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          error: "Topic ID is required.",
+        },
+        { status: 400 }
+      )
+    }
+
+    const body = await request.json()
+
+    const supabase = await createClient()
+
+    const {
+      data: existingTopic,
+      error: existingError,
+    } = await supabase
+      .from("education_topics")
+      .select(
+        "id,is_published,status"
+      )
+      .eq("id", id)
+      .single()
+
+    if (existingError) {
+      throw existingError
+    }
+
+    if (!existingTopic) {
+      return NextResponse.json(
+        {
+          error: "Topic not found.",
+        },
+        { status: 404 }
+      )
+    }
+
+    const changes: Record<
+      string,
+      unknown
+    > = {}
+
+    if (
+      typeof body?.is_published ===
+      "boolean"
+    ) {
+      changes.is_published =
+        body.is_published
+
+      changes.status =
+        body.is_published
+          ? "published"
+          : "draft"
+    }
+
+    if (
+      Object.keys(changes).length === 0
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "No valid topic changes were supplied.",
+        },
+        { status: 400 }
+      )
+    }
+
+    const {
+      data: updatedTopic,
+      error: updateError,
+    } = await supabase
+      .from("education_topics")
+      .update(changes)
+      .eq("id", id)
+      .select(
+        "id,slug,title,category,display_order,is_published,status"
+      )
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
+
+    return NextResponse.json({
+      success: true,
+      topic: updatedTopic,
+    })
+  } catch (error) {
+    console.error(
+      "Education topic PATCH error:",
+      error
+    )
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to update topic.",
+      },
+      { status: 500 }
+    )
+  }
+}
+
+
 export async function DELETE(
   _request: Request,
   context: {

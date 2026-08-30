@@ -300,6 +300,46 @@ export default function SectionEditor({
         )
       }
 
+      /*
+       * Publish the parent topic as well.
+       *
+       * Newly-created topics start as draft.
+       * The public Education Area page only displays
+       * topics where education_topics.is_published = true.
+       *
+       * Publishing the section and its blocks alone is therefore
+       * not sufficient to make a newly-created topic visible.
+       */
+      const topicId =
+        section?.topic?.id
+
+      if (topicId) {
+        const topicResponse =
+          await fetch(
+            `/api/admin/education/topics/${topicId}`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                is_published: true,
+              }),
+            }
+          )
+
+        const topicData =
+          await topicResponse.json()
+
+        if (!topicResponse.ok) {
+          throw new Error(
+            topicData.error ||
+              "Unable to publish topic."
+          )
+        }
+      }
+
       setBlocks((current) =>
         current.map((block) => ({
           ...block,
