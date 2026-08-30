@@ -1761,19 +1761,49 @@ export default function CuraRichTextEditor({
     imageInputRef.current?.click()
   }
 
-  function insertImage(file: File) {
-    const reader = new FileReader()
+  async function insertImage(file: File) {
+    const editor = editorRef.current
 
-    reader.onload = () => {
-      const editor =
-        editorRef.current
+    if (!editor) {
+      return
+    }
 
-      if (
-        !editor ||
-        typeof reader.result !==
-          "string"
-      ) {
-        return
+    try {
+      /*
+       * Upload the image to CURA education media storage.
+       *
+       * Do NOT embed the image as base64 in block.content.
+       * This keeps the database content small and allows
+       * illustrations/images to be stored as actual files.
+       */
+      const formData = new FormData()
+
+      formData.append("file", file)
+
+      const response = await fetch(
+        "/api/admin/education/media",
+        {
+          method: "POST",
+          body: formData,
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to upload image."
+        )
+      }
+
+      const imageUrl =
+        data.url
+
+      if (!imageUrl) {
+        throw new Error(
+          "Image upload did not return a URL."
+        )
       }
 
       focusEditor()
@@ -1814,7 +1844,7 @@ export default function CuraRichTextEditor({
         )
 
       image.src =
-        reader.result
+        imageUrl
 
       image.alt =
         file.name
@@ -1890,9 +1920,13 @@ export default function CuraRichTextEditor({
       )
 
       update()
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to upload image."
+      )
     }
-
-    reader.readAsDataURL(file)
   }
 
   function getCurrentTable(): HTMLTableElement | null {
