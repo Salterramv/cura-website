@@ -1457,6 +1457,20 @@ export default function CuraRichTextEditor({
 
     if (!editor) return
 
+    /*
+     * Save only the document content.
+     *
+     * Editor controls are removed from a temporary clone so
+     * they never become part of the saved HTML.
+     *
+     * IMPORTANT:
+     * The live contenteditable DOM is NEVER replaced here.
+     *
+     * This is critical for table editing because replacing
+     * innerHTML while a cell is being edited destroys the
+     * browser caret and can cause the table/object to vanish.
+     */
+
     const clone =
       editor.cloneNode(
         true
@@ -1501,10 +1515,19 @@ export default function CuraRichTextEditor({
         node.remove()
       })
 
-    onChange(
+    const html =
       clone.innerHTML
-    )
 
+    /*
+     * Only notify the parent.
+     *
+     * Never assign editor.innerHTML here.
+     */
+    onChange(html)
+
+    /*
+     * Save the current caret after onChange.
+     */
     saveSelection()
   }
 
@@ -1916,6 +1939,10 @@ export default function CuraRichTextEditor({
 
         td.innerHTML = "<br>"
         td.contentEditable = "true"
+        td.setAttribute(
+          "data-cura-table-cell",
+          "true"
+        )
         td.style.border =
           "1px solid #CBD5E1"
         td.style.padding =
@@ -2039,6 +2066,10 @@ export default function CuraRichTextEditor({
 
       cell.innerHTML = "<br>"
       cell.contentEditable = "true"
+      cell.setAttribute(
+        "data-cura-table-cell",
+        "true"
+      )
       cell.style.border =
         "1px solid #CBD5E1"
       cell.style.padding =
