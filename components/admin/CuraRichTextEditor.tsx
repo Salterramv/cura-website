@@ -1373,24 +1373,45 @@ export default function CuraRichTextEditor({
 
     const deleteSelected =
       (event: KeyboardEvent) => {
-        const selected =
-          selectedObjectRef.current
-
-        if (!selected) return
-
+        /*
+         * NEVER delete an editor object when the user is
+         * typing inside a table cell.
+         *
+         * Backspace/Delete must behave normally inside
+         * td/th contenteditable cells.
+         */
         const target =
           event.target as HTMLElement | null
 
-        if (
-          selected.classList.contains(
-            "cura-editor-table-object"
-          ) &&
+        const cell =
           target?.closest(
+            "td, th"
+          )
+
+        if (cell) {
+          return
+        }
+
+        /*
+         * Also protect against cases where the active element
+         * is the table cell but the keyboard event target is
+         * reported differently by the browser.
+         */
+        const active =
+          document.activeElement as HTMLElement | null
+
+        if (
+          active?.closest(
             "td, th"
           )
         ) {
           return
         }
+
+        const selected =
+          selectedObjectRef.current
+
+        if (!selected) return
 
         if (
           event.key === "Delete" ||
