@@ -180,384 +180,117 @@ export default function CuraRichTextEditor({
     editor: HTMLDivElement,
     type: "image" | "table"
   ) {
-    if (
-      object.dataset.curaPointerReady ===
-      "true"
-    ) {
-      return
-    }
+    /*
+     * Word-style object controls:
+     *
+     * - Click object = select object
+     * - Top-left handle = move object
+     * - Bottom-right handle = resize object
+     * - Table cells remain independently editable
+     *
+     * The object itself is NOT draggable. This is intentional.
+     * Dragging is only initiated from the move handle so that
+     * contentEditable table cells do not fight with object movement.
+     */
 
-    object.dataset.curaPointerReady =
-      "true"
+    const existingControls =
+      object.querySelectorAll(
+        "[data-cura-editor-ui]"
+      )
+
+    existingControls.forEach((node) => node.remove())
+
+    object.removeAttribute(
+      "data-cura-pointer-ready"
+    )
+
+    object.dataset.curaPointerReady = "true"
 
     object.draggable = false
 
     object.style.position = "relative"
-    object.style.userSelect = "none"
 
-    if (type === "image") {
-      object.style.cursor = "move"
-
-      const image =
-        object.querySelector("img")
-
-      if (image) {
-        image.draggable = false
-        image.style.pointerEvents = "none"
-      }
+    if (type === "table") {
+      object.style.display = "block"
     }
+
+    /*
+     * ----------------------------------------------------------
+     * MOVE HANDLE
+     * ----------------------------------------------------------
+     */
+
+    const moveHandle =
+      document.createElement("button")
+
+    moveHandle.type = "button"
+
+    moveHandle.className =
+      type === "table"
+        ? "cura-table-move-handle"
+        : "cura-image-move-handle"
+
+    moveHandle.setAttribute(
+      "data-cura-editor-ui",
+      "true"
+    )
+
+    moveHandle.setAttribute(
+      "contenteditable",
+      "false"
+    )
+
+    moveHandle.setAttribute(
+      "aria-label",
+      "Move object"
+    )
+
+    moveHandle.title =
+      "Drag to move"
+
+    moveHandle.innerHTML = "✣"
+
+    object.appendChild(moveHandle)
+
+    /*
+     * ----------------------------------------------------------
+     * RESIZE HANDLE
+     * ----------------------------------------------------------
+     */
 
     const resizeHandle =
       document.createElement("span")
 
     resizeHandle.className =
-      type === "image"
-        ? "cura-image-resize-handle"
-        : "cura-table-resize-handle"
+      type === "table"
+        ? "cura-table-resize-handle"
+        : "cura-image-resize-handle"
 
     resizeHandle.setAttribute(
       "data-cura-editor-ui",
       "true"
     )
 
+    resizeHandle.setAttribute(
+      "contenteditable",
+      "false"
+    )
+
+    resizeHandle.setAttribute(
+      "aria-label",
+      "Resize object"
+    )
+
     resizeHandle.title =
       "Drag to resize"
 
-    object.appendChild(
-      resizeHandle
-    )
-
-    let dragging = false
-    let resizing = false
-    let moved = false
-
-    let startX = 0
-    let startY = 0
-    let startWidth = 0
-    let startHeight = 0
-
-    let placeholder:
-      | HTMLElement
-      | null = null
-
-    const pointerDown = (
-      event: PointerEvent
-    ) => {
-      const target =
-        event.target as HTMLElement | null
-
-      if (
-        target?.closest(
-          "[data-cura-editor-ui]"
-        )
-      ) {
-        return
-      }
-
-      if (
-        type === "table" &&
-        target?.closest("td, th")
-      ) {
-        selectEditorObject(object)
-        return
-      }
-
-      event.preventDefault()
-
-      selectEditorObject(object)
-
-      startX = event.clientX
-      startY = event.clientY
-
-      const rect =
-        object.getBoundingClientRect()
-
-      startWidth = rect.width
-      startHeight = rect.height
-
-      moved = false
-      dragging = true
-
-      placeholder =
-        document.createElement("div")
-
-      placeholder.className =
-        "cura-editor-drag-placeholder"
-
-      placeholder.style.height =
-        `${rect.height}px`
-
-      placeholder.style.margin =
-        getComputedStyle(
-          object
-        ).margin
-
-      placeholder.style.border =
-        "2px dashed #18B8EE"
-
-      placeholder.style.borderRadius =
-        "8px"
-
-      placeholder.style.boxSizing =
-        "border-box"
-
-      object.parentNode?.insertBefore(
-        placeholder,
-        object
-      )
-
-      object.style.position =
-        "relative"
-
-      object.setPointerCapture?.(
-        event.pointerId
-      )
-    }
-
-    const pointerMove = (
-      event: PointerEvent
-    ) => {
-      if (!dragging) return
-
-      const currentPlaceholder =
-        placeholder
-
-      if (!currentPlaceholder) {
-        return
-      }
-
-      const deltaX =
-        event.clientX - startX
-
-      const deltaY =
-        event.clientY - startY
-
-      if (
-        Math.abs(deltaX) > 4 ||
-        Math.abs(deltaY) > 4
-      ) {
-        moved = true
-      }
-
-      if (!moved) return
-
-      const elementUnder =
-        document.elementFromPoint(
-          event.clientX,
-          event.clientY
-        ) as HTMLElement | null
-
-      if (!elementUnder) return
-
-      let candidate:
-        | HTMLElement
-        | null =
-        elementUnder
-
-      while (
-        candidate &&
-        candidate.parentElement &&
-        candidate.parentElement !== editor
-      ) {
-        candidate =
-          candidate.parentElement
-      }
-
-      if (
-        !candidate ||
-        candidate === object ||
-        candidate === currentPlaceholder
-      ) {
-        return
-      }
-
-      if (
-        !editor.contains(candidate)
-      ) {
-        return
-      }
-
-      const rect =
-        candidate.getBoundingClientRect()
-
-      const before =
-        event.clientY <
-        rect.top + rect.height / 2
-
-      if (before) {
-        if (
-          currentPlaceholder.nextSibling !==
-          candidate
-        ) {
-          editor.insertBefore(
-            currentPlaceholder,
-            candidate
-          )
-        }
-      } else {
-        if (
-          candidate.nextSibling !==
-          currentPlaceholder
-        ) {
-          editor.insertBefore(
-            currentPlaceholder,
-            candidate.nextSibling
-          )
-        }
-      }
-    }
-
-    const pointerUp = (
-      event: PointerEvent
-    ) => {
-      if (!dragging) return
-
-      dragging = false
-
-      object.releasePointerCapture?.(
-        event.pointerId
-      )
-
-      const finalPlaceholder =
-        placeholder
-
-      if (
-        moved &&
-        finalPlaceholder !== null &&
-        finalPlaceholder.parentNode
-      ) {
-        finalPlaceholder.parentNode.insertBefore(
-          object,
-          finalPlaceholder
-        )
-
-        finalPlaceholder.remove()
-
-        update()
-      } else {
-        finalPlaceholder?.remove()
-      }
-
-      placeholder = null
-    }
-
-    object.addEventListener(
-      "pointerdown",
-      pointerDown
-    )
-
-    object.addEventListener(
-      "pointermove",
-      pointerMove
-    )
-
-    object.addEventListener(
-      "pointerup",
-      pointerUp
-    )
-
-    object.addEventListener(
-      "pointercancel",
-      pointerUp
-    )
-
-    resizeHandle.addEventListener(
-      "pointerdown",
-      (event) => {
-        event.preventDefault()
-        event.stopPropagation()
-
-        selectEditorObject(object)
-
-        resizing = true
-
-        startX = event.clientX
-        startY = event.clientY
-
-        const rect =
-          object.getBoundingClientRect()
-
-        startWidth = rect.width
-        startHeight = rect.height
-
-        resizeHandle.setPointerCapture?.(
-          event.pointerId
-        )
-      }
-    )
-
-    resizeHandle.addEventListener(
-      "pointermove",
-      (event) => {
-        if (!resizing) return
-
-        const deltaX =
-          event.clientX - startX
-
-        const deltaY =
-          event.clientY - startY
-
-        const editorRect =
-          editor.getBoundingClientRect()
-
-        const maxWidth =
-          Math.max(
-            120,
-            editorRect.width
-          )
-
-        const newWidth =
-          Math.max(
-            120,
-            Math.min(
-              maxWidth,
-              startWidth + deltaX
-            )
-          )
-
-        object.style.width =
-          `${newWidth}px`
-
-        if (type === "table") {
-          object.style.maxWidth =
-            "100%"
-        }
-
-        if (
-          type === "image"
-        ) {
-          const image =
-            object.querySelector(
-              "img"
-            )
-
-          if (image) {
-            image.style.width =
-              "100%"
-          }
-        }
-
-        void deltaY
-      }
-    )
-
-    const finishResize = () => {
-      if (!resizing) return
-
-      resizing = false
-
-      update()
-    }
-
-    resizeHandle.addEventListener(
-      "pointerup",
-      finishResize
-    )
-
-    resizeHandle.addEventListener(
-      "pointercancel",
-      finishResize
-    )
+    object.appendChild(resizeHandle)
+
+    /*
+     * ----------------------------------------------------------
+     * OBJECT SELECTION
+     * ----------------------------------------------------------
+     */
 
     object.addEventListener(
       "click",
@@ -573,19 +306,409 @@ export default function CuraRichTextEditor({
           return
         }
 
-        if (
-          type === "table" &&
-          target?.closest("td, th")
-        ) {
-          selectEditorObject(object)
-          return
-        }
+        selectEditorObject(object)
+      }
+    )
 
+    /*
+     * ----------------------------------------------------------
+     * MOVE OBJECT
+     * ----------------------------------------------------------
+     */
+
+    let moving = false
+    let moved = false
+
+    let startX = 0
+    let startY = 0
+
+    let placeholder:
+      | HTMLElement
+      | null = null
+
+    const movePointerDown =
+      (event: PointerEvent) => {
         event.preventDefault()
         event.stopPropagation()
 
         selectEditorObject(object)
+
+        moving = true
+        moved = false
+
+        startX = event.clientX
+        startY = event.clientY
+
+        const rect =
+          object.getBoundingClientRect()
+
+        placeholder =
+          document.createElement("div")
+
+        placeholder.className =
+          "cura-editor-drag-placeholder"
+
+        placeholder.setAttribute(
+          "data-cura-editor-ui",
+          "true"
+        )
+
+        placeholder.style.height =
+          `${rect.height}px`
+
+        placeholder.style.width =
+          `${rect.width}px`
+
+        placeholder.style.margin =
+          getComputedStyle(
+            object
+          ).margin
+
+        placeholder.style.boxSizing =
+          "border-box"
+
+        placeholder.style.border =
+          "2px dashed #18B8EE"
+
+        placeholder.style.borderRadius =
+          "8px"
+
+        const parent =
+          object.parentNode
+
+        if (parent) {
+          parent.insertBefore(
+            placeholder,
+            object
+          )
+        }
+
+        object.classList.add(
+          type === "table"
+            ? "cura-table-dragging"
+            : "cura-image-dragging"
+        )
+
+        moveHandle.setPointerCapture?.(
+          event.pointerId
+        )
       }
+
+    const movePointerMove =
+      (event: PointerEvent) => {
+        if (!moving) return
+
+        const dx =
+          event.clientX - startX
+
+        const dy =
+          event.clientY - startY
+
+        if (
+          Math.abs(dx) > 4 ||
+          Math.abs(dy) > 4
+        ) {
+          moved = true
+        }
+
+        if (!moved || !placeholder) {
+          return
+        }
+
+        const elements =
+          Array.from(
+            editor.children
+          ).filter(
+            (node) =>
+              node !== object &&
+              node !== placeholder &&
+              !(
+                node instanceof HTMLElement &&
+                node.hasAttribute(
+                  "data-cura-editor-ui"
+                )
+              )
+          )
+
+        let bestBefore:
+          HTMLElement | null = null
+
+        let bestDistance =
+          Number.POSITIVE_INFINITY
+
+        for (const candidate of elements) {
+          const element =
+            candidate as HTMLElement
+
+          const rect =
+            element.getBoundingClientRect()
+
+          const center =
+            rect.top +
+            rect.height / 2
+
+          const distance =
+            Math.abs(
+              event.clientY -
+                center
+            )
+
+          if (
+            distance <
+            bestDistance
+          ) {
+            bestDistance =
+              distance
+
+            bestBefore =
+              element
+          }
+        }
+
+        if (
+          !bestBefore ||
+          !placeholder.parentNode
+        ) {
+          return
+        }
+
+        const rect =
+          bestBefore.getBoundingClientRect()
+
+        if (
+          event.clientY <
+          rect.top +
+            rect.height / 2
+        ) {
+          if (
+            placeholder.nextSibling !==
+            bestBefore
+          ) {
+            editor.insertBefore(
+              placeholder,
+              bestBefore
+            )
+          }
+        } else {
+          const next =
+            bestBefore.nextSibling
+
+          if (
+            next !== placeholder
+          ) {
+            editor.insertBefore(
+              placeholder,
+              next
+            )
+          }
+        }
+      }
+
+    const movePointerUp =
+      (event: PointerEvent) => {
+        if (!moving) return
+
+        moving = false
+
+        moveHandle.releasePointerCapture?.(
+          event.pointerId
+        )
+
+        object.classList.remove(
+          "cura-table-dragging",
+          "cura-image-dragging"
+        )
+
+        const currentPlaceholder =
+          placeholder
+
+        if (
+          moved &&
+          currentPlaceholder &&
+          currentPlaceholder.parentNode
+        ) {
+          currentPlaceholder.parentNode.insertBefore(
+            object,
+            currentPlaceholder
+          )
+
+          currentPlaceholder.remove()
+
+          update()
+        } else {
+          currentPlaceholder?.remove()
+        }
+
+        placeholder = null
+      }
+
+    moveHandle.addEventListener(
+      "pointerdown",
+      movePointerDown
+    )
+
+    moveHandle.addEventListener(
+      "pointermove",
+      movePointerMove
+    )
+
+    moveHandle.addEventListener(
+      "pointerup",
+      movePointerUp
+    )
+
+    moveHandle.addEventListener(
+      "pointercancel",
+      movePointerUp
+    )
+
+    /*
+     * ----------------------------------------------------------
+     * RESIZE OBJECT
+     * ----------------------------------------------------------
+     */
+
+    let resizing = false
+
+    let resizeStartX = 0
+    let resizeStartY = 0
+
+    let resizeStartWidth = 0
+    let resizeStartHeight = 0
+
+    const resizePointerDown =
+      (event: PointerEvent) => {
+        event.preventDefault()
+        event.stopPropagation()
+
+        selectEditorObject(object)
+
+        resizing = true
+
+        resizeStartX =
+          event.clientX
+
+        resizeStartY =
+          event.clientY
+
+        const rect =
+          object.getBoundingClientRect()
+
+        resizeStartWidth =
+          rect.width
+
+        resizeStartHeight =
+          rect.height
+
+        resizeHandle.setPointerCapture?.(
+          event.pointerId
+        )
+      }
+
+    const resizePointerMove =
+      (event: PointerEvent) => {
+        if (!resizing) return
+
+        const dx =
+          event.clientX -
+          resizeStartX
+
+        const dy =
+          event.clientY -
+          resizeStartY
+
+        const editorRect =
+          editor.getBoundingClientRect()
+
+        const maxWidth =
+          Math.max(
+            160,
+            editorRect.width - 20
+          )
+
+        const newWidth =
+          Math.max(
+            160,
+            Math.min(
+              maxWidth,
+              resizeStartWidth + dx
+            )
+          )
+
+        if (type === "table") {
+          object.style.width =
+            `${newWidth}px`
+
+          const table =
+            object.querySelector(
+              "table"
+            ) as HTMLTableElement | null
+
+          if (table) {
+            table.style.width =
+              "100%"
+          }
+        } else {
+          object.style.width =
+            `${newWidth}px`
+
+          const image =
+            object.querySelector(
+              "img"
+            ) as HTMLImageElement | null
+
+          if (image) {
+            image.style.width =
+              "100%"
+            image.style.height =
+              "auto"
+          }
+        }
+
+        /*
+         * For tables, preserve the current height.
+         * For images, aspect ratio is maintained automatically.
+         */
+        if (
+          type === "table" &&
+          resizeStartHeight > 0
+        ) {
+          object.style.height =
+            "auto"
+        }
+      }
+
+    const resizePointerUp =
+      (event: PointerEvent) => {
+        if (!resizing) return
+
+        resizing = false
+
+        resizeHandle.releasePointerCapture?.(
+          event.pointerId
+        )
+
+        update()
+      }
+
+    resizeHandle.addEventListener(
+      "pointerdown",
+      resizePointerDown
+    )
+
+    resizeHandle.addEventListener(
+      "pointermove",
+      resizePointerMove
+    )
+
+    resizeHandle.addEventListener(
+      "pointerup",
+      resizePointerUp
+    )
+
+    resizeHandle.addEventListener(
+      "pointercancel",
+      resizePointerUp
     )
   }
 
@@ -2469,6 +2592,84 @@ export default function CuraRichTextEditor({
           color: #475569;
         }
 
+        .cura-rich-editor .cura-editor-image,
+        .cura-rich-editor .cura-editor-table-object {
+          position: relative;
+        }
+
+        .cura-rich-editor .cura-editor-image.cura-image-selected,
+        .cura-rich-editor .cura-editor-table-object.cura-table-selected {
+          outline: 2px solid #18B8EE;
+          outline-offset: 3px;
+        }
+
+        .cura-rich-editor .cura-table-selected table {
+          cursor: text;
+        }
+
+        .cura-rich-editor .cura-table-move-handle,
+        .cura-rich-editor .cura-image-move-handle {
+          position: absolute;
+          left: -18px;
+          top: -18px;
+          z-index: 100;
+          width: 22px;
+          height: 22px;
+          padding: 0;
+          margin: 0;
+          border: 1px solid #94A3B8;
+          border-radius: 3px;
+          background: white;
+          color: #475569;
+          font-size: 14px;
+          line-height: 20px;
+          text-align: center;
+          cursor: move;
+          user-select: none;
+          touch-action: none;
+          box-shadow: 0 1px 3px rgba(0,0,0,.12);
+        }
+
+        .cura-rich-editor .cura-table-move-handle:hover,
+        .cura-rich-editor .cura-image-move-handle:hover {
+          background: #F1F5F9;
+          color: #071B49;
+        }
+
+        .cura-rich-editor .cura-table-resize-handle,
+        .cura-rich-editor .cura-image-resize-handle {
+          position: absolute;
+          right: -7px;
+          bottom: -7px;
+          z-index: 100;
+          width: 12px;
+          height: 12px;
+          box-sizing: border-box;
+          border: 1px solid #64748B;
+          background: white;
+          cursor: nwse-resize;
+          user-select: none;
+          touch-action: none;
+        }
+
+        .cura-rich-editor .cura-table-resize-handle:hover,
+        .cura-rich-editor .cura-image-resize-handle:hover {
+          border-color: #159B78;
+          background: #E2E8F0;
+        }
+
+        .cura-rich-editor .cura-table-dragging,
+        .cura-rich-editor .cura-image-dragging {
+          opacity: 0.65;
+        }
+
+        .cura-rich-editor .cura-editor-drag-placeholder {
+          display: block;
+          pointer-events: none;
+          box-sizing: border-box;
+          background: rgba(24,184,238,.04);
+        }
+
         .cura-rich-editor .cura-editor-image {
           box-sizing: border-box;
           cursor: default;
@@ -2504,6 +2705,14 @@ export default function CuraRichTextEditor({
 
         .cura-rich-editor div {
           margin: 0;
+        }
+
+        .cura-rich-editor .cura-editor-table-object {
+          overflow: visible;
+        }
+
+        .cura-rich-editor .cura-editor-image {
+          overflow: visible;
         }
       ` }} />
     </div>
