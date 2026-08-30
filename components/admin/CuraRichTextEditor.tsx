@@ -314,6 +314,20 @@ export default function CuraRichTextEditor({
      * ----------------------------------------------------------
      * MOVE OBJECT
      * ----------------------------------------------------------
+     *
+     * Word-style positioning:
+     *
+     * 1. Drag from the move handle.
+     * 2. Remove the object from its old position and leave a
+     *    visible placeholder.
+     * 3. Track the actual text position underneath the pointer.
+     * 4. Insert the placeholder at the nearest valid text block.
+     * 5. On release, put the object into that position.
+     *
+     * This is deliberately based on the browser caret position
+     * rather than editor.children. This allows an object to move
+     * between paragraphs/text instead of only between existing
+     * top-level objects.
      */
 
     let moving = false
@@ -326,24 +340,399 @@ export default function CuraRichTextEditor({
       | HTMLElement
       | null = null
 
+    function getCaretRange(
+      clientX: number,
+      clientY: number
+    ): Range | null {
+      const documentWithCaret =
+        document as Document & {
+          caretRangeFromPoint?: (
+            x: number,
+            y: number
+          ) => Range | null
+
+          caretPositionFromPoint?: (
+            x: number,
+            y: number
+          ) => {
+            offsetNode: Node
+            offset: number
+          } | null
+        }
+
+      if (
+        typeof documentWithCaret.caretRangeFromPoint ===
+        "function"
+      ) {
+        return documentWithCaret.caretRangeFromPoint(
+          clientX,
+          clientY
+        )
+      }
+
+      if (
+        typeof documentWithCaret.caretPositionFromPoint ===
+        "function"
+      ) {
+        const position =
+          documentWithCaret.caretPositionFromPoint(
+            clientX,
+            clientY
+          )
+
+        if (!position) {
+          return null
+        }
+
+        const range =
+          document.createRange()
+
+        range.setStart(
+          position.offsetNode,
+          position.offset
+        )
+
+        range.collapse(true)
+
+        return range
+      }
+
+      return null
+    }
+
+    function getEditableBlock(
+      node: Node | null
+    ): HTMLElement | null {
+      if (!node) return null
+
+      let element: HTMLElement | null =
+        node instanceof HTMLElement
+          ? node
+          : node.parentElement
+
+      while (
+        element &&
+        element !== editor
+      ) {
+        /*
+         * Never place an object inside another editor
+         * object, table cell, image, or editor UI.
+         */
+        if (
+          element.hasAttribute(
+            "data-cura-editor-ui"
+          )
+        ) {
+          return null
+        }
+
+        if (
+          element.classList.contains(
+            "cura-editor-image"
+          ) ||
+          element.classList.contains(
+            "cura-editor-table-object"
+          ) ||
+          element.classList.contains(
+            "cura-editor-table"
+          )
+        ) {
+          return null
+        }
+
+        /*
+         * Paragraphs/headings/list items are the normal
+         * text containers in the Cura editor.
+         */
+        if (
+          element.tagName === "P" ||
+          element.tagName === "H1" ||
+          element.tagName === "H2" ||
+          element.tagName === "H3" ||
+          element.tagName === "H4" ||
+          element.tagName === "H5" ||
+          element.tagName === "H6" ||
+          element.tagName === "LI" ||
+          element.tagName === "BLOCKQUOTE"
+        ) {
+          return element
+        }
+
+        element =
+          element.parentElement
+      }
+
+      return null
+    }
+
+    function placePlaceholderAtPointer(
+      clientX: number,
+      clientY: number
+    ) {
+      if (
+        !placeholder ||
+        !placeholder.parentNode
+      ) {
+        return
+      }
+
+      const range =
+        getCaretRange(
+          clientX,
+          clientY
+        )
+
+      if (!range) {
+        return
+      }
+
+      if (
+        !editor.contains(
+          range.commonAncestorContainer
+        )
+      ) {
+        return
+      }
+
+      const block =
+        getEditableBlock(
+          range.startContainer
+        )
+
+      /*
+       * If the pointer is over normal text, place the
+       * object before or after that paragraph according
+       * to the vertical midpoint.
+       */
+      if (block) {
+        const rect =
+          block.getBoundingClientRect()
+
+        const before =
+          clientY <
+          rect.top +
+            rect.height / 2
+
+        if (before) {
+          if (
+            placeholder.nextSibling !==
+            block
+          ) {
+            editor.insertBefore(
+              placeholder,
+              block
+            )
+          }
+        } else {
+          const next =
+            block.nextSibling
+
+          if (
+            next !== placeholder
+          ) {
+            if (next) {
+              editor.insertBefore(
+                placeholder,
+                next
+              )
+            } else {
+              editor.appendChild(
+                placeholder
+              )
+            }
+          }
+        }
+
+        return
+      }
+
+      /*
+       * If the pointer is over an existing object, place
+       * the dragged object before/after that object.
+       */
+      let objectElement:
+        | HTMLElement
+        | null = null
+
+      let candidate:
+        | HTMLElement
+        | null =
+        range.startContainer instanceof HTMLElement
+          ? range.startContainer
+          : range.startContainer.parentElement
+
+      while (
+        candidate &&
+        candidate !== editor
+      ) {
+        if (
+          candidate !== object &&
+          (
+            candidate.classList.contains(
+              "cura-editor-image"
+            ) ||
+            candidate.classList.contains(
+              "cura-editor-table-object"
+            )
+          )
+        ) {
+          objectElement = candidate
+          break
+        }
+
+        candidate =
+          candidate.parentElement
+      }
+
+      if (objectElement) {
+        const rect =
+          objectElement.getBoundingClientRect()
+
+        const before =
+          clientY <
+          rect.top +
+            rect.height / 2
+
+        if (before) {
+          editor.insertBefore(
+            placeholder,
+            objectElement
+          )
+        } else {
+          const next =
+            objectElement.nextSibling
+
+          if (next) {
+            editor.insertBefore(
+              placeholder,
+              next
+            )
+          } else {
+            editor.appendChild(
+              placeholder
+            )
+          }
+        }
+
+        return
+      }
+
+      /*
+       * If the pointer is over empty editor space, find the
+       * closest top-level editable/object element by Y.
+       */
+      const candidates =
+        Array.from(
+          editor.children
+        ).filter(
+          (node) =>
+            node !== object &&
+            node !== placeholder &&
+            node instanceof HTMLElement &&
+            !node.hasAttribute(
+              "data-cura-editor-ui"
+            )
+        ) as HTMLElement[]
+
+      if (
+        candidates.length === 0
+      ) {
+        editor.appendChild(
+          placeholder
+        )
+        return
+      }
+
+      let closest:
+        | HTMLElement
+        | null = null
+
+      let closestDistance =
+        Number.POSITIVE_INFINITY
+
+      for (
+        const candidate of candidates
+      ) {
+        const rect =
+          candidate.getBoundingClientRect()
+
+        const center =
+          rect.top +
+          rect.height / 2
+
+        const distance =
+          Math.abs(
+            clientY - center
+          )
+
+        if (
+          distance <
+          closestDistance
+        ) {
+          closestDistance =
+            distance
+
+          closest =
+            candidate
+        }
+      }
+
+      if (!closest) return
+
+      const rect =
+        closest.getBoundingClientRect()
+
+      if (
+        clientY <
+        rect.top +
+          rect.height / 2
+      ) {
+        editor.insertBefore(
+          placeholder,
+          closest
+        )
+      } else {
+        const next =
+          closest.nextSibling
+
+        if (next) {
+          editor.insertBefore(
+            placeholder,
+            next
+          )
+        } else {
+          editor.appendChild(
+            placeholder
+          )
+        }
+      }
+    }
+
     const movePointerDown =
       (event: PointerEvent) => {
         event.preventDefault()
         event.stopPropagation()
 
-        selectEditorObject(object)
+        selectEditorObject(
+          object
+        )
 
         moving = true
         moved = false
 
-        startX = event.clientX
-        startY = event.clientY
+        startX =
+          event.clientX
+
+        startY =
+          event.clientY
 
         const rect =
           object.getBoundingClientRect()
 
         placeholder =
-          document.createElement("div")
+          document.createElement(
+            "div"
+          )
 
         placeholder.className =
           "cura-editor-drag-placeholder"
@@ -381,6 +770,8 @@ export default function CuraRichTextEditor({
             placeholder,
             object
           )
+
+          object.remove()
         }
 
         object.classList.add(
@@ -399,10 +790,12 @@ export default function CuraRichTextEditor({
         if (!moving) return
 
         const dx =
-          event.clientX - startX
+          event.clientX -
+          startX
 
         const dy =
-          event.clientY - startY
+          event.clientY -
+          startY
 
         if (
           Math.abs(dx) > 4 ||
@@ -411,97 +804,14 @@ export default function CuraRichTextEditor({
           moved = true
         }
 
-        if (!moved || !placeholder) {
+        if (!moved) {
           return
         }
 
-        const elements =
-          Array.from(
-            editor.children
-          ).filter(
-            (node) =>
-              node !== object &&
-              node !== placeholder &&
-              !(
-                node instanceof HTMLElement &&
-                node.hasAttribute(
-                  "data-cura-editor-ui"
-                )
-              )
-          )
-
-        let bestBefore:
-          HTMLElement | null = null
-
-        let bestDistance =
-          Number.POSITIVE_INFINITY
-
-        for (const candidate of elements) {
-          const element =
-            candidate as HTMLElement
-
-          const rect =
-            element.getBoundingClientRect()
-
-          const center =
-            rect.top +
-            rect.height / 2
-
-          const distance =
-            Math.abs(
-              event.clientY -
-                center
-            )
-
-          if (
-            distance <
-            bestDistance
-          ) {
-            bestDistance =
-              distance
-
-            bestBefore =
-              element
-          }
-        }
-
-        if (
-          !bestBefore ||
-          !placeholder.parentNode
-        ) {
-          return
-        }
-
-        const rect =
-          bestBefore.getBoundingClientRect()
-
-        if (
-          event.clientY <
-          rect.top +
-            rect.height / 2
-        ) {
-          if (
-            placeholder.nextSibling !==
-            bestBefore
-          ) {
-            editor.insertBefore(
-              placeholder,
-              bestBefore
-            )
-          }
-        } else {
-          const next =
-            bestBefore.nextSibling
-
-          if (
-            next !== placeholder
-          ) {
-            editor.insertBefore(
-              placeholder,
-              next
-            )
-          }
-        }
+        placePlaceholderAtPointer(
+          event.clientX,
+          event.clientY
+        )
       }
 
     const movePointerUp =
@@ -534,9 +844,66 @@ export default function CuraRichTextEditor({
 
           currentPlaceholder.remove()
 
+          /*
+           * Create a normal editable paragraph after
+           * the moved object so the user can immediately
+           * continue typing.
+           */
+          const paragraph =
+            document.createElement(
+              "p"
+            )
+
+          paragraph.innerHTML =
+            "<br>"
+
+          if (
+            object.nextSibling
+          ) {
+            object.parentNode?.insertBefore(
+              paragraph,
+              object.nextSibling
+            )
+          } else {
+            editor.appendChild(
+              paragraph
+            )
+          }
+
+          const range =
+            document.createRange()
+
+          range.selectNodeContents(
+            paragraph
+          )
+
+          range.collapse(false)
+
+          const selection =
+            window.getSelection()
+
+          selection?.removeAllRanges()
+          selection?.addRange(
+            range
+          )
+
           update()
         } else {
-          currentPlaceholder?.remove()
+          /*
+           * Drag was too small to count as movement.
+           * Restore the object to its original position.
+           */
+          if (
+            currentPlaceholder &&
+            currentPlaceholder.parentNode
+          ) {
+            currentPlaceholder.parentNode.insertBefore(
+              object,
+              currentPlaceholder
+            )
+
+            currentPlaceholder.remove()
+          }
         }
 
         placeholder = null
