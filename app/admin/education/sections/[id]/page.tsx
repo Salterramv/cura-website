@@ -665,8 +665,17 @@ export default function SectionEditor({
             </div>
 
             <div className="mt-2 text-xs text-[#71827C]">
-              Add a content block above.
+              Start building this section by adding a content block.
             </div>
+
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => addBlock("paragraph")}
+              className="mt-6 inline-flex items-center rounded-xl bg-[#071B49] px-5 py-3 text-sm font-bold !text-white shadow-sm transition hover:bg-[#0B285E] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? "Adding…" : "+ Add Text Block"}
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
