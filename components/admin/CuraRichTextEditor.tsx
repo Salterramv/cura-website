@@ -74,14 +74,38 @@ export default function CuraRichTextEditor({
   const [showShapeTools, setShowShapeTools] = useState(false)
 
   useEffect(() => {
-    if (!editorRef.current) return
+    const editor = editorRef.current
 
-    if (editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || ""
+    if (!editor) return
+
+    /*
+     * IMPORTANT:
+     *
+     * Do not rebuild the contenteditable DOM while the user
+     * is typing inside it.
+     *
+     * Replacing innerHTML on every keystroke destroys the
+     * browser's current caret/selection, which caused the
+     * table-cell cursor to jump to the top after one letter.
+     *
+     * External value changes are still synchronized when the
+     * editor is not currently focused.
+     */
+    const editorIsFocused =
+      document.activeElement === editor ||
+      editor.contains(
+        document.activeElement
+      )
+
+    if (
+      !editorIsFocused &&
+      editor.innerHTML !== value
+    ) {
+      editor.innerHTML = value || ""
     }
 
-    hydrateImages(editorRef.current)
-    hydrateTables(editorRef.current)
+    hydrateImages(editor)
+    hydrateTables(editor)
   }, [value])
 
   function saveSelection() {
