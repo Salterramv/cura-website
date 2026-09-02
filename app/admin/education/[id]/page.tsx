@@ -169,6 +169,75 @@ export default function EducationTopicAdmin({
     }
   }
 
+  async function toggleSectionPublish(
+    section: Section
+  ) {
+    const currentlyPublished =
+      Boolean(section.is_published)
+
+    const action =
+      currentlyPublished
+        ? "unpublish"
+        : "publish"
+
+    const confirmed =
+      window.confirm(
+        `${action === "publish" ? "Publish" : "Unpublish"} "${section.title}"?`
+      )
+
+    if (!confirmed) return
+
+    try {
+      setSaving(true)
+      setError("")
+
+      const response = await fetch(
+        `/api/admin/education/sections/${section.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            is_published:
+              !currentlyPublished,
+          }),
+        }
+      )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            `Unable to ${action} section.`
+        )
+      }
+
+      setSections((current) =>
+        current.map((item) =>
+          item.id === section.id
+            ? {
+                ...item,
+                is_published:
+                  !currentlyPublished,
+              }
+            : item
+        )
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : `Unable to ${action} section.`
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function removeSection(
     section: Section
   ) {
@@ -491,8 +560,22 @@ export default function EducationTopicAdmin({
                           {section.title}
                         </div>
 
-                        <div className="mt-1 text-xs text-[#7A8984]">
-                          Section {index + 1}
+                        <div className="mt-1 flex items-center gap-2 text-xs">
+                          <span className="text-[#7A8984]">
+                            Section {index + 1}
+                          </span>
+
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
+                              section.is_published
+                                ? "bg-[#E8F6F1] text-[#159B78]"
+                                : "bg-[#F2F3F4] text-[#7A858A]"
+                            }`}
+                          >
+                            {section.is_published
+                              ? "Published"
+                              : "Draft"}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -504,6 +587,25 @@ export default function EducationTopicAdmin({
                       >
                         Edit Content
                       </Link>
+
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          toggleSectionPublish(
+                            section
+                          )
+                        }
+                        className={`rounded-lg border px-4 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 ${
+                          section.is_published
+                            ? "border-amber-200 text-amber-700"
+                            : "border-[#BDE5D7] bg-[#ECF9F4] text-[#159B78]"
+                        }`}
+                      >
+                        {section.is_published
+                          ? "Unpublish"
+                          : "Publish"}
+                      </button>
 
                       <Link
                         href={`/education/materials/${(topic?.category || "accounting").toLowerCase()}/${topic?.slug}`}
