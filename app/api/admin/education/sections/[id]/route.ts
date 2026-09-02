@@ -89,8 +89,48 @@ export async function PATCH(
 
     const body = await request.json()
 
+    if (
+      typeof body?.is_published !== "boolean" &&
+      typeof body?.title !== "string"
+    ) {
+      return NextResponse.json(
+        {
+          error: "No valid section changes were supplied.",
+        },
+        { status: 400 }
+      )
+    }
+
     const supabase = await createClient()
 
+    /*
+     * First confirm that the section exists.
+     */
+    const {
+      data: existingSection,
+      error: existingError,
+    } = await supabase
+      .from("education_sections")
+      .select("id,is_published,title")
+      .eq("id", id)
+      .single()
+
+    if (existingError) {
+      throw existingError
+    }
+
+    if (!existingSection) {
+      return NextResponse.json(
+        {
+          error: "Section not found.",
+        },
+        { status: 404 }
+      )
+    }
+
+    /*
+     * Build the section update.
+     */
     const update: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
@@ -110,23 +150,19 @@ export async function PATCH(
       update.title = title
     }
 
+    let publicationChange: boolean | null = null
+
     if (typeof body?.is_published === "boolean") {
+      publicationChange = body.is_published
       update.is_published = body.is_published
     }
 
-    if (Object.keys(update).length === 1) {
-      return NextResponse.json(
-        {
-          error:
-            "No valid section changes were supplied.",
-        },
-        { status: 400 }
-      )
-    }
-
+    /*
+     * Update the section itself.
+     */
     const {
-      data,
-      error,
+      data: updatedSection,
+      error: updateError,
     } = await supabase
       .from("education_sections")
       .update(update)
@@ -134,22 +170,65 @@ export async function PATCH(
       .select()
       .single()
 
-    if (error) {
-      throw error
+    if (updateError) {
+      throw updateError
     }
 
-    if (!data) {
+    if (!updatedSection) {
       return NextResponse.json(
         {
-          error: "Section not found.",
+          error: "Section could not be updated.",
         },
-        { status: 404 }
+        { status: 500 }
       )
     }
 
+    /*
+     * IMPORTANT:
+     *
+     * Section publication controls the visibility of
+     * everything inside that section.
+     *
+     * Therefore publishing/unpublishing a section also
+     * updates every content block belonging to it.
+     */
+    if (publicationChange !== null) {
+      const {
+        error: blockUpdateError,
+      } = await supabase
+        .from("education_content_blocks")
+        .update({
+          is_published: publicationChange,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("section_id", id)
+
+      if (blockUpdateError) {
+        /*
+         * Roll the section back if its blocks could not
+         * be updated. This prevents the UI from showing
+         * a misleading publication state.
+         */
+        await supabase
+          .from("education_sections")
+          .update({
+            is_published: existingSection.is_published,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+
+        throw blockUpdateError
+      }
+    }
+
+    /*
+     * Return the final section state.
+     */
     return NextResponse.json({
       success: true,
-      section: data,
+      section: updatedSection,
+      publication_cascaded:
+        publicationChange !== null,
     })
   } catch (error) {
     console.error(
@@ -168,3 +247,4 @@ export async function PATCH(
     )
   }
 }
+
