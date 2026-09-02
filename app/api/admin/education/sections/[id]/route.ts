@@ -1,27 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-function db() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL
-
-  const key =
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error(
-      "Supabase server credentials are not configured."
-    )
-  }
-
-  return createClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
+import { createClient } from "@/lib/supabase/server"
 
 export async function DELETE(
   _request: Request,
@@ -41,22 +19,32 @@ export async function DELETE(
       )
     }
 
-    const supabase = db()
+    const supabase = await createClient()
 
-    const { data, error } =
-      await supabase
-        .from("education_sections")
-        .update({
-          is_published: false,
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .single()
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("education_sections")
+      .update({
+        is_published: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single()
 
     if (error) {
       throw error
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        {
+          error: "Section not found.",
+        },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json({
@@ -101,28 +89,19 @@ export async function PATCH(
 
     const body = await request.json()
 
-    const supabase = db()
+    const supabase = await createClient()
 
-    const update: Record<
-      string,
-      unknown
-    > = {
-      updated_at:
-        new Date().toISOString(),
+    const update: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
     }
 
-    if (
-      typeof body?.title ===
-      "string"
-    ) {
-      const title =
-        body.title.trim()
+    if (typeof body?.title === "string") {
+      const title = body.title.trim()
 
       if (!title) {
         return NextResponse.json(
           {
-            error:
-              "Section title cannot be empty.",
+            error: "Section title cannot be empty.",
           },
           { status: 400 }
         )
@@ -131,18 +110,11 @@ export async function PATCH(
       update.title = title
     }
 
-    if (
-      typeof body?.is_published ===
-      "boolean"
-    ) {
-      update.is_published =
-        body.is_published
+    if (typeof body?.is_published === "boolean") {
+      update.is_published = body.is_published
     }
 
-    if (
-      Object.keys(update).length ===
-      1
-    ) {
+    if (Object.keys(update).length === 1) {
       return NextResponse.json(
         {
           error:
@@ -169,8 +141,7 @@ export async function PATCH(
     if (!data) {
       return NextResponse.json(
         {
-          error:
-            "Section not found.",
+          error: "Section not found.",
         },
         { status: 404 }
       )

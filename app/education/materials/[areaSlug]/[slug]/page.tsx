@@ -1975,7 +1975,6 @@ export default function AccountingTopicPage() {
           "id,slug,title,standard,description,source_reference"
         )
         .eq("slug", slug)
-        .eq("category", "Accounting")
         .eq("is_published", true)
         .maybeSingle()
 
