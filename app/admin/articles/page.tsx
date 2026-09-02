@@ -7,6 +7,7 @@ import {
   useState,
 } from "react"
 import { createClient } from "@/lib/supabase/client"
+import CuraRichTextEditor from "@/components/admin/CuraRichTextEditor"
 
 type Article = {
   id: string
@@ -64,62 +65,8 @@ function formatDate(date: string | null) {
 }
 
 
-function formatArticleText(
-  command: string,
-  value?: string
-) {
-  document.execCommand(
-    command,
-    false,
-    value
-  )
-}
 
-function formatArticleColor() {
-  const color = window.prompt(
-    "Enter text colour (for example #071B49 or #18B8EE):",
-    "#071B49"
-  )
 
-  if (!color) return
-
-  formatArticleText("foreColor", color)
-}
-
-function formatArticleFontSize(size: string) {
-  if (!size) return
-
-  document.execCommand(
-    "fontSize",
-    false,
-    "7"
-  )
-
-  const editor =
-    document.querySelector(
-      '[contenteditable="true"]'
-    )
-
-  if (!editor) return
-
-  const fonts =
-    editor.querySelectorAll(
-      'font[size="7"]'
-    )
-
-  fonts.forEach((font) => {
-    const span =
-      document.createElement("span")
-
-    span.style.fontSize =
-      `${size}px`
-
-    span.innerHTML =
-      font.innerHTML
-
-    font.replaceWith(span)
-  })
-}
 
 export default function AdminArticlesPage() {
   const supabase = createClient()
@@ -234,14 +181,6 @@ export default function AdminArticlesPage() {
     }))
   }
 
-  function executeFormat(
-    command: string,
-    value?: string,
-  ) {
-    editorRef.current?.focus()
-    document.execCommand(command, false, value)
-    updateEditorContent()
-  }
 
   function updateEditorContent() {
     if (!editorRef.current) return
@@ -283,52 +222,7 @@ export default function AdminArticlesPage() {
     updateEditorContent()
   }
 
-  function insertCallout() {
-    editorRef.current?.focus()
 
-    const html = `
-      <blockquote style="border-left: 4px solid #18b8ee; background: #eaf7fc; padding: 16px 20px; margin: 20px 0; border-radius: 8px;">
-        <strong>Important:</strong> Enter your highlighted information here.
-      </blockquote>
-    `
-
-    document.execCommand(
-      "insertHTML",
-      false,
-      html,
-    )
-
-    updateEditorContent()
-  }
-
-  function insertTable() {
-    editorRef.current?.focus()
-
-    const html = `
-      <table style="width:100%; border-collapse:collapse; margin:20px 0;">
-        <thead>
-          <tr>
-            <th style="border:1px solid #cbd5e1; padding:10px; text-align:left; background:#f1f5f9;">Heading 1</th>
-            <th style="border:1px solid #cbd5e1; padding:10px; text-align:left; background:#f1f5f9;">Heading 2</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="border:1px solid #cbd5e1; padding:10px;">Value</td>
-            <td style="border:1px solid #cbd5e1; padding:10px;">Value</td>
-          </tr>
-        </tbody>
-      </table>
-    `
-
-    document.execCommand(
-      "insertHTML",
-      false,
-      html,
-    )
-
-    updateEditorContent()
-  }
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -808,260 +702,19 @@ export default function AdminArticlesPage() {
 
               </div>
 
-              {/* TOOLBAR */}
-
-              <div className="flex flex-wrap gap-2 rounded-t-lg border border-slate-300 bg-slate-50 p-3">
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    executeFormat("bold")
-                  }
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
-                >
-                  B
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    executeFormat("italic")
-                  }
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm italic text-slate-700 hover:bg-slate-100"
-                >
-                  I
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    executeFormat("underline")
-                  }
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm underline text-slate-700 hover:bg-slate-100"
-                >
-                  U
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    insertHeading("h2")
-                  }
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                >
-                  H2
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    insertHeading("h3")
-                  }
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                >
-                  H3
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    executeFormat(
-                      "insertUnorderedList",
-                    )
-                  }
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  • List
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    executeFormat(
-                      "insertOrderedList",
-                    )
-                  }
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  1. List
-                </button>
-
-                <button
-                  type="button"
-                  onClick={insertLink}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  Link
-                </button>
-
-                <button
-                  type="button"
-                  onClick={insertCallout}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  Callout
-                </button>
-
-                <button
-                  type="button"
-                  onClick={insertTable}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  Table
-                </button>
-
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 border border-slate-300 bg-slate-50 p-3">
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => formatArticleText("bold")}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
-                >
-                  B
-                </button>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => formatArticleText("italic")}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm italic text-slate-700 hover:bg-slate-100"
-                >
-                  I
-                </button>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => formatArticleText("underline")}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm underline text-slate-700 hover:bg-slate-100"
-                >
-                  U
-                </button>
-
-                <select
-                  defaultValue=""
-                  aria-label="Article font size"
-                  onChange={(e) => {
-                    formatArticleFontSize(e.target.value)
-                    e.target.value = ""
-                    updateEditorContent()
-                  }}
-                  className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700"
-                >
-                  <option value="">Font size</option>
-                  <option value="12">12px</option>
-                  <option value="14">14px</option>
-                  <option value="16">16px</option>
-                  <option value="18">18px</option>
-                  <option value="20">20px</option>
-                  <option value="24">24px</option>
-                  <option value="28">28px</option>
-                  <option value="32">32px</option>
-                  <option value="36">36px</option>
-                </select>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    formatArticleColor()
-                    updateEditorContent()
-                  }}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  A <span className="text-[#18B8EE]">Colour</span>
-                </button>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    formatArticleText("formatBlock", "h2")
-                    updateEditorContent()
-                  }}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  H2
-                </button>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    formatArticleText("formatBlock", "h3")
-                    updateEditorContent()
-                  }}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  H3
-                </button>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    formatArticleText("insertUnorderedList")
-                    updateEditorContent()
-                  }}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  • List
-                </button>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    formatArticleText("insertOrderedList")
-                    updateEditorContent()
-                  }}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  1. List
-                </button>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    const url = window.prompt("Enter URL:")
-                    if (url) {
-                      formatArticleText("createLink", url)
-                      updateEditorContent()
-                    }
-                  }}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  Link
-                </button>
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    formatArticleText("removeFormat")
-                    updateEditorContent()
-                  }}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  Clear
-                </button>
-
-              </div>
-
-              <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={updateEditorContent}
-                className="min-h-[500px] w-full rounded-b-lg border border-t-0 border-slate-300 bg-white px-6 py-6 text-sm leading-7 outline-none focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20 [&_h2]:mb-4 [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-[#071B49] [&_h3]:mb-3 [&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-[#071B49] [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6"
+              <CuraRichTextEditor
+                value={form.content}
+                onChange={(value) =>
+                  setForm((current) => ({
+                    ...current,
+                    content: value,
+                  }))
+                }
+                placeholder="Write your article content..."
+                minHeight="500px"
               />
 
-            </div>
-
+              </div>
             {/* PUBLISH */}
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
