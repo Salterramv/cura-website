@@ -1,21 +1,8 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 
-function db() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL
-
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY
-
-  if (!url || !key) {
-    throw new Error(
-      "Supabase service-role environment variables are missing."
-    )
-  }
-
-  return createClient(url, key)
+async function db() {
+  return await createClient()
 }
 
 export async function POST(
@@ -27,6 +14,15 @@ export async function POST(
   try {
     const { id } = await context.params
     const body = await request.json()
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          error: "Section ID is required.",
+        },
+        { status: 400 }
+      )
+    }
 
     const allowed = [
       "paragraph",
@@ -41,75 +37,124 @@ export async function POST(
     ]
 
     const blockType =
-      typeof body.block_type ===
-      "string"
+      typeof body?.block_type === "string"
         ? body.block_type
         : "paragraph"
 
     if (!allowed.includes(blockType)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid content block type.",
+          error: "Invalid content block type.",
         },
         { status: 400 }
       )
     }
 
-    const supabase = db()
+    const supabase = await db()
 
-    const { data: maxRow } =
-      await supabase
-        .from("education_content_blocks")
-        .select("display_order")
-        .eq("section_id", id)
-        .order("display_order", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle()
+    /*
+     * Make sure the section exists before creating
+     * a content block.
+     */
+    const {
+      data: section,
+      error: sectionError,
+    } = await supabase
+      .from("education_sections")
+      .select("id")
+      .eq("id", id)
+      .single()
+
+    if (sectionError) {
+      throw sectionError
+    }
+
+    if (!section) {
+      return NextResponse.json(
+        {
+          error: "Section not found.",
+        },
+        { status: 404 }
+      )
+    }
+
+    /*
+     * Determine the next display order.
+     */
+    const {
+      data: maxRow,
+      error: maxError,
+    } = await supabase
+      .from("education_content_blocks")
+      .select("display_order")
+      .eq("section_id", id)
+      .order("display_order", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle()
+
+    if (maxError) {
+      throw maxError
+    }
 
     const nextOrder =
-      Number(
-        maxRow?.display_order ?? 0
-      ) + 1
+      Number(maxRow?.display_order ?? 0) + 1
 
     const initialContent =
       blockType === "heading"
         ? "New heading"
         : ""
 
-    const { data: block, error } =
-      await supabase
-        .from("education_content_blocks")
-        .insert({
-          section_id: id,
-          block_type: blockType,
-          content: initialContent,
-          display_order: nextOrder,
-          is_published: true,
-          version: 1,
-          presentation: {
-            font: "Geist Sans",
-            theme: "cura-professional",
-            colors: {
-              blue: "#145D8F",
-              cyan: "#24B8ED",
-              navy: "#071B3A",
-            },
-            layout: "reading-card",
+    const {
+      data: block,
+      error: blockError,
+    } = await supabase
+      .from("education_content_blocks")
+      .insert({
+        section_id: id,
+        block_type: blockType,
+        content: initialContent,
+        display_order: nextOrder,
+
+        /*
+         * New blocks are immediately available to the
+         * editor and can be published through Save &
+         * Publish.
+         */
+        is_published: true,
+
+        version: 1,
+
+        presentation: {
+          font: "Geist Sans",
+          theme: "cura-professional",
+          colors: {
+            blue: "#145D8F",
+            cyan: "#24B8ED",
+            navy: "#071B3A",
           },
-        })
-        .select()
-        .single()
+          layout: "reading-card",
+        },
+      })
+      .select()
+      .single()
 
-    if (error) throw error
+    if (blockError) {
+      throw blockError
+    }
 
+    /*
+     * List blocks need an initial item so the editor
+     * has something to edit.
+     */
     if (
       blockType === "bullet_list" ||
       blockType === "numbered_list"
     ) {
-      await supabase
+      const {
+        error: itemError,
+      } = await supabase
         .from("education_block_items")
         .insert({
           block_id: block.id,
@@ -117,12 +162,22 @@ export async function POST(
           item_type: "item",
           display_order: 0,
         })
+
+      if (itemError) {
+        throw itemError
+      }
     }
 
     return NextResponse.json({
+      success: true,
       block,
     })
   } catch (error) {
+    console.error(
+      "Education content block POST error:",
+      error
+    )
+
     return NextResponse.json(
       {
         error:
