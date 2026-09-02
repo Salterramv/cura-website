@@ -27,6 +27,7 @@ type Section = {
   title: string
   section_type: string
   display_order: number
+  is_published: boolean
   presentation: Record<string, unknown> | null
 }
 
@@ -562,6 +563,24 @@ function renderStyleRuns(
   const color = safeColor(
     paragraph.color
   )
+
+  /*
+   * A published section is independently visible on the
+   * public topic page.
+   *
+   * Previously the page treated the existence of content
+   * blocks as the only indication that a section existed.
+   * This meant:
+   *
+   *   published section + zero blocks
+   *
+   * appeared exactly the same as:
+   *
+   *   no published content at all.
+   *
+   * Section publication must therefore be evaluated
+   * independently from block publication.
+   */
 
   return (
     <span
@@ -2016,7 +2035,7 @@ export default function AccountingTopicPage() {
       } = await supabase
         .from("education_sections")
         .select(
-          "id,title,section_type,display_order,presentation"
+          "id,title,section_type,display_order,is_published,presentation"
         )
         .eq(
           "topic_id",
@@ -3054,11 +3073,10 @@ export default function AccountingTopicPage() {
               ==================================================== */}
 
           <div className="order-1 min-w-0 lg:order-2">
-            {processedSections.length ===
-            0 ? (
+            {processedSections.length === 0 ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-10">
                 <p className="text-sm leading-6 text-slate-500">
-                  No published CURA learning content is currently available for this topic.
+                  No published CURA learning sections are currently available for this topic.
                 </p>
               </div>
             ) : (
