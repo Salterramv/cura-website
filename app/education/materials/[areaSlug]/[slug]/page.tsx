@@ -1920,6 +1920,13 @@ function getSectionTitle(
 export default function AccountingTopicPage() {
   const params = useParams()
 
+  const areaSlug =
+    typeof params.areaSlug === "string"
+      ? params.areaSlug
+      : Array.isArray(params.areaSlug)
+        ? params.areaSlug[0]
+        : ""
+
   const slug =
     typeof params.slug === "string"
       ? params.slug
@@ -1934,6 +1941,9 @@ export default function AccountingTopicPage() {
 
   const [topic, setTopic] =
     useState<Topic | null>(null)
+
+  const [areaName, setAreaName] =
+    useState<string>("Education Materials")
 
   const [sections, setSections] =
     useState<Section[]>([])
@@ -1980,6 +1990,31 @@ export default function AccountingTopicPage() {
     async function loadTopic() {
       setLoading(true)
       setError(null)
+
+      /* --------------------------------------------------------
+         EDUCATION AREA
+         -------------------------------------------------------- */
+
+      const {
+        data: areaData,
+        error: areaError,
+      } = await supabase
+        .from("education_areas")
+        .select("area_key,name")
+        .eq("area_key", areaSlug)
+        .eq("is_active", true)
+        .maybeSingle()
+
+      if (areaError) {
+        console.error(
+          "Education area loading error:",
+          areaError
+        )
+      }
+
+      if (!cancelled && areaData?.name) {
+        setAreaName(areaData.name)
+      }
 
       /* --------------------------------------------------------
          TOPIC
@@ -2384,7 +2419,7 @@ export default function AccountingTopicPage() {
     return () => {
       cancelled = true
     }
-  }, [slug, supabase])
+  }, [areaSlug, slug, supabase])
 
   /* ==========================================================
      LOADING
@@ -2441,7 +2476,7 @@ export default function AccountingTopicPage() {
           </p>
 
           <Link
-            href="/education/materials/accounting"
+            href={`/education/materials/${areaSlug}`}
             className="
               mt-8
               inline-flex
@@ -2456,7 +2491,7 @@ export default function AccountingTopicPage() {
               hover:bg-[#102A5F]
             "
           >
-            Back to Accounting
+            Back to {areaName}
           </Link>
         </section>
 
@@ -2920,7 +2955,7 @@ export default function AccountingTopicPage() {
 
         <div className="relative mx-auto max-w-7xl px-6 py-14 lg:px-8 lg:py-20">
           <Link
-            href="/education/materials/accounting"
+            href={`/education/materials/${areaSlug}`}
             className="
               inline-flex
               items-center
@@ -2931,7 +2966,7 @@ export default function AccountingTopicPage() {
               hover:text-[#35B5E5]
             "
           >
-            ← Accounting
+            ← {areaName}
           </Link>
 
           <div className="mt-8 max-w-5xl">
