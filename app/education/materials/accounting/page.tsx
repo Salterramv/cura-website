@@ -105,6 +105,7 @@ export default function AccountingMaterialsPage() {
             "id,slug,title,standard,description,category,display_order,visual_theme"
           )
           .eq("category", "Accounting")
+          .eq("is_published", true)
           .order("display_order", { ascending: true }),
 
         supabase
