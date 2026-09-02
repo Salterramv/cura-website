@@ -15,6 +15,7 @@ type Topic = {
   title: string
   slug: string
   category?: string
+  is_published?: boolean
 }
 
 export default function EducationTopicAdmin({
@@ -119,6 +120,71 @@ export default function EducationTopicAdmin({
         err instanceof Error
           ? err.message
           : "Unable to rename topic."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function toggleTopicPublish() {
+    if (!topicId || !topic) return
+
+    const currentlyPublished =
+      Boolean(topic.is_published)
+
+    const action =
+      currentlyPublished
+        ? "unpublish"
+        : "publish"
+
+    const confirmed =
+      window.confirm(
+        `${action === "publish" ? "Publish" : "Unpublish"} "${topic.title}"?`
+      )
+
+    if (!confirmed) return
+
+    try {
+      setSaving(true)
+      setError("")
+
+      const response = await fetch(
+        `/api/admin/education/topics/${topicId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            is_published:
+              !currentlyPublished,
+          }),
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            `Unable to ${action} topic.`
+        )
+      }
+
+      setTopic((current) =>
+        current
+          ? {
+              ...current,
+              is_published:
+                !currentlyPublished,
+            }
+          : current
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : `Unable to ${action} topic.`
       )
     } finally {
       setSaving(false)
@@ -442,34 +508,89 @@ export default function EducationTopicAdmin({
                   </h1>
 
                   {topic && (
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => {
-                        setTopicTitleDraft(
-                          topic.title
-                        )
-                        setEditingTopic(true)
-                      }}
-                      className="
-                        w-fit
-                        rounded-lg
-                        border
-                        border-[#D6E3DE]
-                        bg-white
-                        px-4
-                        py-2
-                        text-xs
-                        font-bold
-                        text-[#355B50]
-                        transition
-                        hover:border-[#159B78]
-                        hover:text-[#159B78]
-                        disabled:opacity-50
-                      "
-                    >
-                      Rename / Edit
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => {
+                          setTopicTitleDraft(
+                            topic.title
+                          )
+                          setEditingTopic(true)
+                        }}
+                        className="
+                          w-fit
+                          rounded-lg
+                          border
+                          border-[#D6E3DE]
+                          bg-white
+                          px-4
+                          py-2
+                          text-xs
+                          font-bold
+                          text-[#355B50]
+                          transition
+                          hover:border-[#159B78]
+                          hover:text-[#159B78]
+                          disabled:opacity-50
+                        "
+                      >
+                        Rename / Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={toggleTopicPublish}
+                        className={
+                          topic.is_published
+                            ? `
+                              rounded-lg
+                              border
+                              border-[#F2C94C]
+                              bg-white
+                              px-4
+                              py-2
+                              text-xs
+                              font-bold
+                              text-[#B77900]
+                              transition
+                              hover:bg-[#FFF9E6]
+                              disabled:opacity-50
+                            `
+                            : `
+                              rounded-lg
+                              border
+                              border-[#159B78]
+                              bg-[#E8F6F1]
+                              px-4
+                              py-2
+                              text-xs
+                              font-bold
+                              text-[#159B78]
+                              transition
+                              hover:bg-[#DDF3EA]
+                              disabled:opacity-50
+                            `
+                        }
+                      >
+                        {topic.is_published
+                          ? "Unpublish Topic"
+                          : "Publish Topic"}
+                      </button>
+
+                      <span
+                        className={
+                          topic.is_published
+                            ? "rounded-full bg-[#E8F6F1] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#159B78]"
+                            : "rounded-full bg-[#F2F3F4] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#7A858A]"
+                        }
+                      >
+                        {topic.is_published
+                          ? "Published"
+                          : "Draft"}
+                      </span>
+                    </div>
                   )}
                 </>
               )}
