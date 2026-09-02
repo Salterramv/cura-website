@@ -241,6 +241,95 @@ export default function EducationMaterialsClient() {
     }
   }
 
+  async function toggleTopicPublish(
+    topic: Topic
+  ) {
+    const currentlyPublished =
+      Boolean(
+        topic.is_published ||
+        topic.status === "published"
+      )
+
+    const action =
+      currentlyPublished
+        ? "unpublish"
+        : "publish"
+
+    const confirmed =
+      window.confirm(
+        `${action === "publish" ? "Publish" : "Unpublish"} "${topic.title}"?`
+      )
+
+    if (!confirmed) return
+
+    try {
+      setSaving(true)
+      setError("")
+      setSuccess("")
+
+      const response =
+        await fetch(
+          `/api/admin/education/topics/${topic.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              is_published:
+                !currentlyPublished,
+            }),
+          }
+        )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            `Unable to ${action} topic.`
+        )
+      }
+
+      const updatedTopic =
+        data.topic
+
+      setTopics((current) =>
+        current.map((item) =>
+          item.id === topic.id
+            ? {
+                ...item,
+                ...(updatedTopic ||
+                  {}),
+                is_published:
+                  !currentlyPublished,
+                status:
+                  !currentlyPublished
+                    ? "published"
+                    : "draft",
+              }
+            : item
+        )
+      )
+
+      setSuccess(
+        !currentlyPublished
+          ? "Topic published successfully."
+          : "Topic unpublished successfully."
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : `Unable to ${action} topic.`
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function removeTopic(
     topic: Topic
   ) {
@@ -1064,6 +1153,29 @@ export default function EducationMaterialsClient() {
                         >
                           Manage Content
                         </Link>
+
+                        <button
+                          type="button"
+                          disabled={
+                            saving
+                          }
+                          onClick={() =>
+                            toggleTopicPublish(
+                              topic
+                            )
+                          }
+                          className={`rounded-lg border px-4 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 ${
+                            topic.is_published ||
+                            topic.status === "published"
+                              ? "border-amber-200 text-amber-700"
+                              : "border-[#BDE5D7] bg-[#ECF9F4] text-[#159B78]"
+                          }`}
+                        >
+                          {topic.is_published ||
+                          topic.status === "published"
+                            ? "Unpublish"
+                            : "Publish"}
+                        </button>
 
                         <button
                           type="button"
