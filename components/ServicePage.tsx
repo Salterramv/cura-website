@@ -45,7 +45,8 @@ export default function ServicePage({ service }: Props) {
     const formData = new FormData(form)
 
     const payload = {
-      service: service.eyebrow,
+      service_category: service.eyebrow.toLowerCase(),
+      service: service.title,
       full_name: formData.get("full_name"),
       email: formData.get("email"),
       phone: formData.get("phone"),
@@ -53,10 +54,10 @@ export default function ServicePage({ service }: Props) {
       business_type: formData.get("business_type"),
       business_location: formData.get("business_location"),
       website: formData.get("website"),
-      current_circumstances: formData.get("current_circumstances"),
+      current_circumstance: formData.get("current_circumstances"),
       assistance_required: formData.get("assistance_required"),
       urgency: formData.get("urgency"),
-      preferred_contact: formData.get("preferred_contact"),
+      preferred_contact_method: formData.get("preferred_contact"),
     }
 
     try {

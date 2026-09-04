@@ -21,6 +21,18 @@ const services = {
   payroll: "Payroll",
 } as const
 
+type ServiceCategory = keyof typeof services
+
+function normalizeServiceCategory(value: unknown): ServiceCategory | null {
+  const normalized = clean(value, 100).toLowerCase()
+
+  if (normalized in services) {
+    return normalized as ServiceCategory
+  }
+
+  return null
+}
+
 function clean(value: unknown, max = 10000) {
   return String(value ?? "").trim().slice(0, max)
 }
@@ -132,7 +144,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const service = clean(body.service, 20) as keyof typeof services
+    const requestedService = clean(body.service, 200)
+
+    // New forms send service_category explicitly.
+    // For backward compatibility, older category-only forms can still
+    // send service as audit/tax/advisory/legal/bookkeeping/payroll.
+    const serviceCategory =
+      normalizeServiceCategory(body.service_category) ||
+      normalizeServiceCategory(body.service)
+
+    const service = serviceCategory
+
+    const serviceName =
+      requestedService &&
+      !services[requestedService.toLowerCase() as ServiceCategory]
+        ? requestedService
+        : serviceCategory
+          ? services[serviceCategory]
+          : requestedService
+
     const fullName = clean(body.full_name, 150)
     const email = clean(body.email, 320)
     const phone = clean(body.phone, 50)
@@ -146,7 +176,7 @@ export async function POST(request: NextRequest) {
     const preferredContactMethod =
       clean(body.preferred_contact_method, 50) || "Email"
 
-    if (!services[service]) {
+    if (!serviceCategory) {
       return NextResponse.json(
         { error: "Invalid service." },
         { status: 400 }
@@ -197,7 +227,7 @@ export async function POST(request: NextRequest) {
     const { data: inquiry, error: insertError } = await supabase
       .from("service_inquiries")
       .insert({
-        service,
+        service: serviceCategory,
         full_name: fullName,
         email,
         phone,
@@ -228,19 +258,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const serviceLabel = services[service]
+    const serviceLabel = services[serviceCategory]
 
     // ---------------------------------------------------------
     // 2. Email to CURA
     // ---------------------------------------------------------
 
     const internalSubject =
-      `CURA ${serviceLabel} enquiry — ${businessName}`
+      `CURA ${serviceName} enquiry — ${businessName}`
 
     const internalHtml = emailLayout(`
       <h2 style="margin:0 0 6px;color:#071B49">
-        New ${escapeHtml(serviceLabel)} enquiry
+        New ${escapeHtml(serviceName)} enquiry
       </h2>
+
+      <p>
+        <strong>Service category:</strong>
+        ${escapeHtml(serviceLabel)}
+      </p>
 
       <p style="margin-top:0;color:#64748b">
         Submitted through cura.mv
@@ -319,7 +354,7 @@ export async function POST(request: NextRequest) {
     // ---------------------------------------------------------
 
     const customerSubject =
-      `CURA — We received your ${serviceLabel.toLowerCase()} enquiry`
+      `CURA — We received your ${serviceName.toLowerCase()} enquiry`
 
     const customerHtml = emailLayout(`
       <h2 style="margin:0 0 12px;color:#071B49">

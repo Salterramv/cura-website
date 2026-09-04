@@ -275,7 +275,11 @@ function InquiryForm({ service }: { service: ServiceType }) {
     const formData = new FormData(form)
 
     const payload = {
-      service,
+      service_category: service,
+      service:
+        service === "bookkeeping"
+          ? "Bookkeeping Service"
+          : "Payroll Service",
       full_name: formData.get("full_name"),
       email: formData.get("email"),
       phone: formData.get("phone"),

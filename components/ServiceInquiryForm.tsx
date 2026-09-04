@@ -26,7 +26,8 @@ export default function ServiceInquiryForm({
     const formData = new FormData(form)
 
     const payload = {
-      service: service.toLowerCase(),
+      service_category: category.toLowerCase(),
+      service,
       full_name: formData.get("name"),
       email: formData.get("email"),
       phone: formData.get("phone"),
