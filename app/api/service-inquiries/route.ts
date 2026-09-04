@@ -4,9 +4,13 @@ import { createClient } from "@supabase/supabase-js"
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SECRET_KEY =
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY
+
 const RESEND_FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL || "CURA <info@cura.mv>"
+
+const INTERNAL_EMAIL = "info@cura.mv"
 
 const services = {
   audit: "Audit",
@@ -30,17 +34,100 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;")
 }
 
+function emailLayout(content: string) {
+  return `
+    <div style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#071B49">
+      <div style="max-width:680px;margin:0 auto;padding:32px 18px">
+        <div style="background:#071B49;padding:22px 28px;border-radius:12px 12px 0 0">
+          <div style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:0.5px">
+            CURA
+          </div>
+          <div style="font-size:12px;color:#cbd5e1;margin-top:4px">
+            Audit · Tax · Advisory · Legal
+          </div>
+        </div>
+
+        <div style="background:#ffffff;padding:32px 28px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0">
+          ${content}
+
+          <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:13px;color:#64748b">
+            <strong style="color:#071B49">CURA</strong><br>
+            Maldives<br>
+            <a href="mailto:info@cura.mv" style="color:#087dcc;text-decoration:none">
+              info@cura.mv
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+async function sendEmail({
+  to,
+  subject,
+  html,
+  replyTo,
+}: {
+  to: string[]
+  subject: string
+  html: string
+  replyTo?: string
+}) {
+  if (!RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY is not configured.")
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM_EMAIL,
+      to,
+      subject,
+      reply_to: replyTo,
+      html,
+    }),
+  })
+
+  const result = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    console.error("Resend error:", result)
+
+    throw new Error(
+      result?.message ||
+        result?.error?.message ||
+        "Unable to send email through Resend."
+    )
+  }
+
+  return result?.id ?? null
+}
+
 export async function POST(request: NextRequest) {
   try {
-    if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || !RESEND_API_KEY) {
+      console.error("CURA enquiry service configuration is incomplete.", {
+        supabaseConfigured: Boolean(SUPABASE_URL && SUPABASE_SECRET_KEY),
+        resendConfigured: Boolean(RESEND_API_KEY),
+      })
+
       return NextResponse.json(
-        { error: "CURA enquiry service is not configured." },
-        { status: 500 },
+        {
+          error:
+            "CURA enquiry service is temporarily unavailable. Please try again later.",
+        },
+        { status: 500 }
       )
     }
 
     const body = await request.json()
 
+    // Honeypot anti-spam field
     if (clean(body.website_url, 100).length > 0) {
       return NextResponse.json({ ok: true })
     }
@@ -60,7 +147,10 @@ export async function POST(request: NextRequest) {
       clean(body.preferred_contact_method, 50) || "Email"
 
     if (!services[service]) {
-      return NextResponse.json({ error: "Invalid service." }, { status: 400 })
+      return NextResponse.json(
+        { error: "Invalid service." },
+        { status: 400 }
+      )
     }
 
     if (
@@ -73,27 +163,37 @@ export async function POST(request: NextRequest) {
       assistanceRequired.length < 10
     ) {
       return NextResponse.json(
-        { error: "Please complete all required fields with sufficient detail." },
-        { status: 400 },
+        {
+          error:
+            "Please complete all required fields with sufficient detail.",
+        },
+        { status: 400 }
       )
     }
 
-    const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    const emailLooksValid =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+
     if (!emailLooksValid) {
       return NextResponse.json(
         { error: "Please enter a valid email address." },
-        { status: 400 },
+        { status: 400 }
       )
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    })
+    const supabase = createClient(
+      SUPABASE_URL,
+      SUPABASE_SECRET_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      }
+    )
 
+    // 1. Save enquiry first
     const { data: inquiry, error: insertError } = await supabase
       .from("service_inquiries")
       .insert({
@@ -114,94 +214,195 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError || !inquiry) {
-      console.error("Unable to save service inquiry:", insertError)
+      console.error(
+        "Unable to save service inquiry:",
+        insertError
+      )
+
       return NextResponse.json(
-        { error: "Unable to save your enquiry. Please try again." },
-        { status: 500 },
+        {
+          error:
+            "Unable to save your enquiry. Please try again.",
+        },
+        { status: 500 }
       )
     }
 
-    let emailSent = false
-    let emailMessageId: string | null = null
+    const serviceLabel = services[service]
 
-    if (RESEND_API_KEY) {
-      const serviceLabel = services[service]
-      const subject = `CURA ${serviceLabel} enquiry — ${businessName}`
+    // ---------------------------------------------------------
+    // 2. Email to CURA
+    // ---------------------------------------------------------
 
-      const html = `
-        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#071B49">
-          <h2 style="margin-bottom:4px">New CURA ${escapeHtml(serviceLabel)} enquiry</h2>
-          <p style="color:#64748b;margin-top:0">Submitted through cura.mv</p>
+    const internalSubject =
+      `CURA ${serviceLabel} enquiry — ${businessName}`
 
-          <h3>Contact</h3>
-          <p><strong>Name:</strong> ${escapeHtml(fullName)}<br>
-          <strong>Email:</strong> ${escapeHtml(email)}<br>
+    const internalHtml = emailLayout(`
+      <h2 style="margin:0 0 6px;color:#071B49">
+        New ${escapeHtml(serviceLabel)} enquiry
+      </h2>
+
+      <p style="margin-top:0;color:#64748b">
+        Submitted through cura.mv
+      </p>
+
+      <div style="margin-top:28px">
+        <h3 style="color:#071B49">Contact</h3>
+
+        <p>
+          <strong>Name:</strong> ${escapeHtml(fullName)}<br>
+          <strong>Email:</strong>
+          <a href="mailto:${escapeHtml(email)}"
+             style="color:#087dcc">
+            ${escapeHtml(email)}
+          </a><br>
           <strong>Phone / WhatsApp:</strong> ${escapeHtml(phone)}<br>
-          <strong>Preferred contact:</strong> ${escapeHtml(preferredContactMethod)}</p>
+          <strong>Preferred contact:</strong>
+          ${escapeHtml(preferredContactMethod)}
+        </p>
+      </div>
 
-          <h3>Business</h3>
-          <p><strong>Business:</strong> ${escapeHtml(businessName)}<br>
+      <div>
+        <h3 style="color:#071B49">Business</h3>
+
+        <p>
+          <strong>Business:</strong> ${escapeHtml(businessName)}<br>
           <strong>Industry:</strong> ${escapeHtml(businessType)}<br>
-          <strong>Location:</strong> ${escapeHtml(businessLocation || "Not provided")}<br>
-          <strong>Website:</strong> ${escapeHtml(website || "Not provided")}</p>
+          <strong>Location:</strong>
+          ${escapeHtml(businessLocation || "Not provided")}<br>
+          <strong>Website:</strong>
+          ${escapeHtml(website || "Not provided")}
+        </p>
+      </div>
 
-          <h3>Current circumstance</h3>
-          <p>${escapeHtml(currentCircumstance).replaceAll("\n", "<br>")}</p>
+      <div>
+        <h3 style="color:#071B49">Current circumstances</h3>
 
-          <h3>Assistance requested</h3>
-          <p>${escapeHtml(assistanceRequired).replaceAll("\n", "<br>")}</p>
+        <p style="white-space:pre-wrap">
+          ${escapeHtml(currentCircumstance)}
+        </p>
+      </div>
 
-          <p><strong>Urgency:</strong> ${escapeHtml(urgency)}</p>
-          <p><strong>Internal reference:</strong> ${escapeHtml(inquiry.id)}</p>
-        </div>
-      `
+      <div>
+        <h3 style="color:#071B49">Assistance requested</h3>
 
-      try {
-        const resendResponse = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: RESEND_FROM_EMAIL,
-            to: ["info@cura.mv"],
-            reply_to: email,
-            subject,
-            html,
-          }),
-        })
+        <p style="white-space:pre-wrap">
+          ${escapeHtml(assistanceRequired)}
+        </p>
+      </div>
 
-        const resendResult = await resendResponse.json()
+      <div style="margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px">
+        <strong>Urgency:</strong> ${escapeHtml(urgency)}<br>
+        <strong>Reference:</strong> ${escapeHtml(inquiry.id)}
+      </div>
+    `)
 
-        if (resendResponse.ok) {
-          emailSent = true
-          emailMessageId = resendResult?.id ?? null
-        } else {
-          console.error("Resend error:", resendResult)
-        }
-      } catch (emailError) {
-        console.error("Unable to send enquiry email:", emailError)
-      }
+    let internalMessageId: string | null = null
+    let customerMessageId: string | null = null
+
+    try {
+      internalMessageId = await sendEmail({
+        to: [INTERNAL_EMAIL],
+        subject: internalSubject,
+        html: internalHtml,
+        replyTo: email,
+      })
+    } catch (error) {
+      console.error(
+        "Unable to send internal enquiry email:",
+        error
+      )
     }
+
+    // ---------------------------------------------------------
+    // 3. Confirmation email to customer
+    // ---------------------------------------------------------
+
+    const customerSubject =
+      `CURA — We received your ${serviceLabel.toLowerCase()} enquiry`
+
+    const customerHtml = emailLayout(`
+      <h2 style="margin:0 0 12px;color:#071B49">
+        Thank you for contacting CURA
+      </h2>
+
+      <p>
+        Dear ${escapeHtml(fullName)},
+      </p>
+
+      <p>
+        Thank you for submitting your enquiry regarding
+        <strong>${escapeHtml(serviceLabel)}</strong>.
+      </p>
+
+      <p>
+        We have received your enquiry and a member of the CURA
+        team will review the information you provided.
+      </p>
+
+      <div style="margin:24px 0;padding:18px;background:#f8fafc;border-left:4px solid #087dcc;border-radius:6px">
+        <strong>Enquiry reference</strong><br>
+        ${escapeHtml(inquiry.id)}
+      </div>
+
+      <p>
+        If we need any additional information, we will contact you
+        using the details provided in your enquiry.
+      </p>
+
+      <p style="margin-top:28px">
+        Kind regards,<br>
+        <strong>CURA</strong>
+      </p>
+    `)
+
+    try {
+      customerMessageId = await sendEmail({
+        to: [email],
+        subject: customerSubject,
+        html: customerHtml,
+        replyTo: INTERNAL_EMAIL,
+      })
+    } catch (error) {
+      console.error(
+        "Unable to send customer confirmation email:",
+        error
+      )
+    }
+
+    // ---------------------------------------------------------
+    // 4. Update enquiry email status
+    // ---------------------------------------------------------
+
+    const emailSent = Boolean(internalMessageId)
 
     await supabase
       .from("service_inquiries")
       .update({
         email_sent: emailSent,
-        email_message_id: emailMessageId,
+        email_message_id: internalMessageId,
       })
       .eq("id", inquiry.id)
+
+    // ---------------------------------------------------------
+    // 5. Return result
+    // ---------------------------------------------------------
 
     return NextResponse.json({
       ok: true,
       emailSent,
+      customerEmailSent: Boolean(customerMessageId),
+      reference: inquiry.id,
     })
   } catch (error) {
     console.error("Service inquiry error:", error)
+
     return NextResponse.json(
-      { error: "Unable to process your enquiry. Please try again." },
-      { status: 500 },
+      {
+        error:
+          "Unable to process your enquiry. Please try again.",
+      },
+      { status: 500 }
     )
   }
 }
