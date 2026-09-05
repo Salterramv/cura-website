@@ -22,6 +22,7 @@ type Article = {
   category: string
   description: string | null
   content: string
+  image_url: string | null
   published_date: string | null
   published: boolean
   author_name: string | null
@@ -387,6 +388,7 @@ export default async function ArticlePage({
       category,
       description,
       content,
+      image_url,
       published_date,
       published,
       author_name
@@ -424,6 +426,10 @@ export default async function ArticlePage({
     typedArticle.slug,
   )
 
+  const articleImage =
+    typedArticle.image_url ||
+    visual.image
+
   const prepared =
     prepareArticleContent(
       typedArticle.content,
@@ -440,7 +446,7 @@ export default async function ArticlePage({
 
         <div className="absolute inset-0">
           <img
-            src={visual.image}
+            src={articleImage}
             alt=""
             className="h-full w-full object-cover opacity-30"
           />
@@ -502,7 +508,7 @@ export default async function ArticlePage({
               <div className="overflow-hidden rounded-3xl border border-white/20 bg-white/10 shadow-2xl">
 
                 <img
-                  src={visual.image}
+                  src={articleImage}
                   alt=""
                   className="aspect-[4/3] w-full object-cover"
                 />

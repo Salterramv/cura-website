@@ -24,7 +24,7 @@ const options = [
     title: "Technical Articles",
     description:
       "Explore CURA's technical articles covering tax developments, interpretation, practical issues and professional insights.",
-    href: "/articles",
+    href: "/education/articles",
     accent: "text-[#168BC4]",
   },
   {
