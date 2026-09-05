@@ -23,13 +23,15 @@ const categories = [
   "Tax Compliance",
   "Tax Law",
   "Tax Updates",
-  "Maldives Economy",
-  "Global Economy",
   "Accounting",
   "Audit",
   "Advisory",
   "Other",
 ]
+
+const technicalCategories = categories.filter(
+  (category) => category !== "All",
+)
 
 function formatDate(date: string | null) {
   if (!date) return ""
@@ -64,6 +66,7 @@ export default function ArticlesPage() {
           published_date
         `)
         .eq("published", true)
+        .in("category", technicalCategories)
         .order("published_date", {
           ascending: false,
           nullsFirst: false,
@@ -123,12 +126,12 @@ export default function ArticlesPage() {
           </p>
 
           <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white md:text-6xl">
-            Maldives Tax Knowledge
+            Technical Articles
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-            Practical articles, guides and insights covering taxation,
-            compliance and tax law in the Maldives.
+            Practical technical articles, guides and professional insights
+            covering taxation, compliance, accounting, audit and advisory.
           </p>
 
         </div>
@@ -151,7 +154,7 @@ export default function ArticlesPage() {
               onChange={(e) =>
                 setSearch(e.target.value)
               }
-              placeholder="Search tax articles..."
+              placeholder="Search technical articles..."
               className="w-full rounded-xl border border-slate-300 bg-white px-5 py-4 text-sm outline-none focus:border-[#168BC4] focus:ring-2 focus:ring-[#168BC4]/20"
             />
 

@@ -321,7 +321,7 @@ export default function CuraHeader() {
                   </Link>
 
                   <Link
-                    href="/articles"
+                    href="/education/articles"
                     onClick={() => setEducationOpen(false)}
                     className="block rounded-lg px-4 py-3 text-sm text-[#071B49] transition hover:bg-[#F1F7FB]"
                   >
