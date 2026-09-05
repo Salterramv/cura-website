@@ -30,7 +30,7 @@ const sections = [
     title: "Maldives Economy",
     description:
       "Manage articles covering economic growth, tourism, inflation, government finance, the external sector and the financial sector.",
-    href: "/admin/articles?category=Maldives%20Economy",
+    href: "/admin/insights/maldives-economy",
     label: "Manage Maldives Economy",
     status: "Available",
     icon: "◉",
@@ -41,7 +41,7 @@ const sections = [
     title: "Global Economy",
     description:
       "Manage articles covering global growth, inflation, interest rates, trade, commodities and the international economic outlook.",
-    href: "/admin/articles?category=Global%20Economy",
+    href: "/admin/insights/global-economy",
     label: "Manage Global Economy",
     status: "Available",
     icon: "◎",

@@ -70,12 +70,20 @@ function formatDate(date: string | null) {
 
 
 
-export default function AdminArticlesPage() {
+type AdminArticlesPageProps = {
+  fixedCategory?: "Maldives Economy" | "Global Economy"
+}
+
+export default function AdminArticlesPage({
+  fixedCategory,
+}: AdminArticlesPageProps) {
   const supabase = createClient()
   const editorRef = useRef<HTMLDivElement>(null)
 
   const [articles, setArticles] = useState<Article[]>([])
-  const [categoryFilter, setCategoryFilter] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState(
+    fixedCategory ?? "",
+  )
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -113,17 +121,20 @@ export default function AdminArticlesPage() {
     const urlCategory =
       new URLSearchParams(window.location.search).get("category") ?? ""
 
-    setCategoryFilter(urlCategory)
+    const activeCategory = fixedCategory ?? urlCategory
 
-    await loadArticles(urlCategory)
+    setCategoryFilter(activeCategory)
+
+    await loadArticles(activeCategory)
     setLoading(false)
   }
 
   async function loadArticles(categoryOverride?: string) {
     const activeCategory =
-      categoryOverride !== undefined
+      fixedCategory ??
+      (categoryOverride !== undefined
         ? categoryOverride
-        : categoryFilter
+        : categoryFilter)
 
     let query = supabase
       .from("articles")
@@ -151,7 +162,10 @@ export default function AdminArticlesPage() {
   }
 
   function resetForm() {
-    setForm(emptyForm)
+    setForm({
+      ...emptyForm,
+      category: fixedCategory ?? "",
+    })
     setEditingId(null)
 
     if (editorRef.current) {
@@ -285,7 +299,7 @@ export default function AdminArticlesPage() {
     const payload = {
       slug,
       title: form.title.trim(),
-      category: form.category.trim(),
+      category: (fixedCategory ?? form.category).trim(),
       author_name:
         form.author_name.trim() || null,
       description:
@@ -545,47 +559,53 @@ export default function AdminArticlesPage() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {!fixedCategory ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
 
-              <select
-                value={categoryFilter}
-                onChange={(e) => {
-                  const value = e.target.value
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => {
+                    const value = e.target.value
 
-                  setCategoryFilter(value)
+                    setCategoryFilter(value)
 
-                  const url = value
-                    ? `/admin/articles?category=${encodeURIComponent(value)}`
-                    : "/admin/articles"
+                    const url = value
+                      ? `/admin/articles?category=${encodeURIComponent(value)}`
+                      : "/admin/articles"
 
-                  window.history.replaceState({}, "", url)
+                    window.history.replaceState({}, "", url)
 
-                  loadArticles(value)
-                }}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
-              >
-                <option value="">All Articles</option>
-
-                {categories.map((category) => (
-                  <option
-                    key={category}
-                    value={category}
-                  >
-                    {category}
-                  </option>
-                ))}
-              </select>
-
-              {categoryFilter && (
-                <a
-                  href="/admin/articles"
-                  className="rounded-lg border border-slate-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                    loadArticles(value)
+                  }}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
                 >
-                  Show All
-                </a>
-              )}
+                  <option value="">All Articles</option>
 
-            </div>
+                  {categories.map((category) => (
+                    <option
+                      key={category}
+                      value={category}
+                    >
+                      {category}
+                    </option>
+                  ))}
+                </select>
+
+                {categoryFilter && (
+                  <a
+                    href="/admin/articles"
+                    className="rounded-lg border border-slate-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    Show All
+                  </a>
+                )}
+
+              </div>
+            ) : (
+              <div className="rounded-lg border border-[#b9e8f7] bg-[#effbff] px-4 py-2.5 text-sm font-semibold text-[#071d41]">
+                Managing only: {fixedCategory}
+              </div>
+            )}
 
           </div>
 
@@ -670,33 +690,42 @@ export default function AdminArticlesPage() {
                     Category *
                   </label>
 
-                  <select
-                    value={form.category}
-                    onChange={(e) =>
-                      updateField(
-                        "category",
-                        e.target.value,
-                      )
-                    }
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
-                    required
-                  >
-                    <option value="">
-                      Select category
-                    </option>
+                  {fixedCategory ? (
+                    <div className="flex min-h-[46px] items-center rounded-lg border border-[#b9e8f7] bg-[#effbff] px-4 py-3 text-sm font-semibold text-[#071d41]">
+                      {fixedCategory}
+                      <span className="ml-auto text-xs font-bold uppercase tracking-[0.12em] text-[#087dcc]">
+                        Locked
+                      </span>
+                    </div>
+                  ) : (
+                    <select
+                      value={form.category}
+                      onChange={(e) =>
+                        updateField(
+                          "category",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
+                      required
+                    >
+                      <option value="">
+                        Select category
+                      </option>
 
-                    {categories.map(
-                      (category) => (
-                        <option
-                          key={category}
-                          value={category}
-                        >
-                          {category}
-                        </option>
-                      ),
-                    )}
+                      {categories.map(
+                        (category) => (
+                          <option
+                            key={category}
+                            value={category}
+                          >
+                            {category}
+                          </option>
+                        ),
+                      )}
 
-                  </select>
+                    </select>
+                  )}
 
                 </div>
 
