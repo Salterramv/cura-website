@@ -75,6 +75,7 @@ export default function AdminArticlesPage() {
   const editorRef = useRef<HTMLDivElement>(null)
 
   const [articles, setArticles] = useState<Article[]>([])
+  const [categoryFilter, setCategoryFilter] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -109,14 +110,30 @@ export default function AdminArticlesPage() {
       return
     }
 
-    await loadArticles()
+    const urlCategory =
+      new URLSearchParams(window.location.search).get("category") ?? ""
+
+    setCategoryFilter(urlCategory)
+
+    await loadArticles(urlCategory)
     setLoading(false)
   }
 
-  async function loadArticles() {
-    const { data, error } = await supabase
+  async function loadArticles(categoryOverride?: string) {
+    const activeCategory =
+      categoryOverride !== undefined
+        ? categoryOverride
+        : categoryFilter
+
+    let query = supabase
       .from("articles")
       .select("*")
+
+    if (activeCategory) {
+      query = query.eq("category", activeCategory)
+    }
+
+    const { data, error } = await query
       .order("published_date", {
         ascending: false,
         nullsFirst: false,
@@ -505,6 +522,74 @@ export default function AdminArticlesPage() {
             {success}
           </div>
         )}
+
+        {/* CATEGORY FILTER */}
+
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#18b8ee]">
+                Article Collection
+              </p>
+
+              <h3 className="mt-1 text-lg font-bold">
+                {categoryFilter
+                  ? `${categoryFilter} Articles`
+                  : "All Articles"}
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Use the category filter to manage a specific CURA knowledge area.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+
+              <select
+                value={categoryFilter}
+                onChange={(e) => {
+                  const value = e.target.value
+
+                  setCategoryFilter(value)
+
+                  const url = value
+                    ? `/admin/articles?category=${encodeURIComponent(value)}`
+                    : "/admin/articles"
+
+                  window.history.replaceState({}, "", url)
+
+                  loadArticles(value)
+                }}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium outline-none transition focus:border-[#18b8ee] focus:ring-2 focus:ring-[#18b8ee]/20"
+              >
+                <option value="">All Articles</option>
+
+                {categories.map((category) => (
+                  <option
+                    key={category}
+                    value={category}
+                  >
+                    {category}
+                  </option>
+                ))}
+              </select>
+
+              {categoryFilter && (
+                <a
+                  href="/admin/articles"
+                  className="rounded-lg border border-slate-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Show All
+                </a>
+              )}
+
+            </div>
+
+          </div>
+
+        </section>
 
         {/* EDITOR */}
 

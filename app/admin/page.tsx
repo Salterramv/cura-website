@@ -27,6 +27,28 @@ const sections = [
     icon: "✦",
   },
   {
+    title: "Maldives Economy",
+    description:
+      "Manage articles covering economic growth, tourism, inflation, government finance, the external sector and the financial sector.",
+    href: "/admin/articles?category=Maldives%20Economy",
+    label: "Manage Maldives Economy",
+    status: "Available",
+    icon: "◉",
+    viewHref: "/insights/maldives-economy",
+    viewLabel: "View Page",
+  },
+  {
+    title: "Global Economy",
+    description:
+      "Manage articles covering global growth, inflation, interest rates, trade, commodities and the international economic outlook.",
+    href: "/admin/articles?category=Global%20Economy",
+    label: "Manage Global Economy",
+    status: "Available",
+    icon: "◎",
+    viewHref: "/insights/global-economy",
+    viewLabel: "View Page",
+  },
+  {
     title: "Legal Cases",
     description:
       "Manage legal cases, proceedings, issues, timelines and official source documents.",
@@ -379,13 +401,24 @@ export default function AdminDashboard() {
                   <div className="mt-6">
 
                     {available ? (
-                      <a
-                        href={section.href}
-                        className="inline-flex items-center rounded-lg bg-[#061b3d] px-5 py-2.5 text-sm font-semibold !text-white transition hover:bg-[#0b2a55]"
-                      >
-                        {section.label}
-                        <span className="ml-2">→</span>
-                      </a>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <a
+                          href={section.href}
+                          className="inline-flex items-center rounded-lg bg-[#061b3d] px-5 py-2.5 text-sm font-semibold !text-white transition hover:bg-[#0b2a55]"
+                        >
+                          {section.label}
+                          <span className="ml-2">→</span>
+                        </a>
+
+                        {"viewHref" in section && section.viewHref ? (
+                          <a
+                            href={section.viewHref}
+                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#071d41] transition hover:border-[#087dcc] hover:text-[#087dcc]"
+                          >
+                            {section.viewLabel ?? "View Page"}
+                          </a>
+                        ) : null}
+                      </div>
                     ) : (
                       <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-semibold text-slate-400">
                         Coming Soon
