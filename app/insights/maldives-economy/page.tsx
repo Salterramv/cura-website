@@ -1,6 +1,7 @@
 import Link from "next/link"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
+import InsightArticles from "@/components/insights/InsightArticles"
 
 const maldivesAreas = [
   {
@@ -189,6 +190,8 @@ export default function MaldivesEconomyPage() {
         </div>
 
       </section>
+
+      <InsightArticles category="Maldives Economy" />
 
       {/* MALDIVES DATA */}
       <section className="mx-auto max-w-7xl px-6 py-16 md:px-10 md:py-20 lg:px-12">

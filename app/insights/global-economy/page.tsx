@@ -1,6 +1,7 @@
 import Link from "next/link"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
+import InsightArticles from "@/components/insights/InsightArticles"
 
 const topics = [
   {
@@ -182,64 +183,7 @@ export default function GlobalEconomyPage() {
         </div>
       </section>
 
-      {/* ARTICLES PLACEHOLDER */}
-      <section className="mx-auto max-w-7xl px-6 py-16 md:px-10 md:py-20 lg:px-12">
-
-        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#168BC4]">
-              Insights
-            </p>
-
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#071B49] md:text-4xl">
-              Global economy articles
-            </h2>
-
-            <p className="mt-4 text-base leading-7 text-slate-600">
-              CURA articles and analysis on important developments affecting
-              the global economy will appear here.
-            </p>
-          </div>
-
-        </div>
-
-        <div className="mt-10 rounded-2xl border border-dashed border-[#cbd8e5] bg-[#F7FAFC] px-6 py-14 text-center">
-
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#18b8ee]/10">
-            <svg
-              className="h-6 w-6 text-[#168BC4]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h8l6 6v8a2 2 0 01-2 2z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13 4v6h6M7 14h10M7 17h7"
-              />
-            </svg>
-          </div>
-
-          <h3 className="mt-5 text-lg font-semibold text-[#071B49]">
-            Global economy insights coming soon
-          </h3>
-
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-7 text-slate-500">
-            This section will feature CURA articles and analysis covering
-            important global economic developments.
-          </p>
-
-        </div>
-
-      </section>
+      <InsightArticles category="Global Economy" />
 
       {/* CTA */}
       <section className="mx-auto max-w-7xl px-6 pb-16 md:px-10 md:pb-20 lg:px-12">

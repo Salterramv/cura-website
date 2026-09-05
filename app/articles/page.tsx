@@ -23,6 +23,8 @@ const categories = [
   "Tax Compliance",
   "Tax Law",
   "Tax Updates",
+  "Maldives Economy",
+  "Global Economy",
   "Accounting",
   "Audit",
   "Advisory",
