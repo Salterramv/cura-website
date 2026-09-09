@@ -40,6 +40,7 @@ export default function ServiceInquiriesAdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [filter, setFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
   const [expanded, setExpanded] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
 
@@ -118,10 +119,15 @@ export default function ServiceInquiriesAdminPage() {
     window.location.href = "/admin/login"
   }
 
-  const filtered =
-    filter === "all"
-      ? inquiries
-      : inquiries.filter((item) => item.service === filter)
+  const filtered = inquiries.filter((item) => {
+    const matchesService =
+      filter === "all" || item.service === filter
+
+    const matchesStatus =
+      statusFilter === "all" || item.status === statusFilter
+
+    return matchesService && matchesStatus
+  })
 
   if (loading) {
     return (
@@ -173,19 +179,33 @@ export default function ServiceInquiriesAdminPage() {
             </p>
           </div>
 
-          <select
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
-          >
-            <option value="all">All services</option>
-            <option value="audit">Audit</option>
-            <option value="tax">Tax</option>
-            <option value="advisory">Advisory</option>
-            <option value="legal">Legal</option>
-            <option value="bookkeeping">Bookkeeping</option>
-            <option value="payroll">Payroll</option>
-          </select>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <select
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+            >
+              <option value="all">All services</option>
+              <option value="audit">Audit</option>
+              <option value="tax">Tax</option>
+              <option value="advisory">Advisory</option>
+              <option value="legal">Legal</option>
+              <option value="bookkeeping">Bookkeeping</option>
+              <option value="payroll">Payroll</option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+            >
+              <option value="all">All statuses</option>
+              <option value="New">New</option>
+              <option value="Contacted">Contacted</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
         </div>
 
         {error && (
