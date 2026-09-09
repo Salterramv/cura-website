@@ -10,6 +10,15 @@ type AdminUser = {
 
 const sections = [
   {
+    title: "Client Enquiries",
+    description:
+      "View and manage enquiries submitted through CURA service pages, with service categories, client details, status and internal notes.",
+    href: "/admin/service-inquiries",
+    label: "View Client Enquiries",
+    status: "Available",
+    icon: "✉",
+  },
+  {
     title: "Education Materials",
     description:
       "Manage educational topics, sections and learning content",
