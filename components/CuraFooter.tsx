@@ -215,47 +215,75 @@ export default function CuraFooter() {
       "© {year} CURA. All rights reserved."
     );
 
-    const columns = visible
-      .filter(
+    const columns = (() => {
+      const result: {
+        key: string;
+        heading: string;
+        sort: number;
+        links: FooterItem[];
+      }[] = [];
+
+      // Existing CURA Explore column
+      const exploreHeading = visible.find(
         (item) =>
-          item.item_type === "footer_column" ||
-          item.section_key.startsWith("column_")
-      )
-      .reduce<
-        {
-          key: string;
-          heading: string;
-          sort: number;
-          links: FooterItem[];
-        }[]
-      >((result, item) => {
-        const columnKey =
-          item.item_type === "footer_column"
-            ? item.item_key
-            : item.section_key;
+          item.section_key === "explore" &&
+          item.item_key === "heading"
+      );
 
-        let column = result.find((entry) => entry.key === columnKey);
+      const exploreLinks = visible
+        .filter(
+          (item) =>
+            item.section_key === "explore" &&
+            item.item_key !== "heading" &&
+            item.url
+        )
+        .sort((a, b) => a.sort_order - b.sort_order);
 
-        if (!column) {
-          column = {
-            key: columnKey,
-            heading: item.label || item.value || "",
-            sort: item.sort_order,
-            links: [],
-          };
-          result.push(column);
-        }
+      if (exploreHeading || exploreLinks.length > 0) {
+        result.push({
+          key: "explore",
+          heading:
+            exploreHeading?.value ||
+            exploreHeading?.label ||
+            "Explore",
+          sort: exploreHeading?.sort_order ?? 100,
+          links: exploreLinks,
+        });
+      }
 
-        if (
-          item.item_type !== "footer_column" &&
-          item.url
-        ) {
-          column.links.push(item);
-        }
+      // Flexible CMS footer columns
+      const customColumns = visible
+        .filter(
+          (item) =>
+            item.item_type === "footer_column" ||
+            (item.settings?.footer_role === "column")
+        )
+        .sort((a, b) => a.sort_order - b.sort_order);
 
-        return result;
-      }, [])
-      .sort((a, b) => a.sort - b.sort);
+      for (const columnItem of customColumns) {
+        const columnKey = columnItem.item_key;
+
+        const links = visible
+          .filter(
+            (item) =>
+              item.section_key === `column_${columnKey}` &&
+              item.url
+          )
+          .sort((a, b) => a.sort_order - b.sort_order);
+
+        result.push({
+          key: columnKey,
+          heading:
+            columnItem.label ||
+            columnItem.value ||
+            "",
+          sort: columnItem.sort_order,
+          links,
+        });
+      }
+
+      return result.sort((a, b) => a.sort - b.sort);
+    })();
 
     const socialItems = visible
       .filter(
@@ -277,8 +305,8 @@ export default function CuraFooter() {
 
   if (!cms) {
     return (
-      <footer className="bg-[#101820] text-white">
-        <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
+      <footer className="bg-[#071B49] text-white">
+        <div className="mx-auto max-w-7xl px-6 py-12 md:px-10 lg:px-12">
           <div className="grid gap-12 lg:grid-cols-3">
             <div>
               <Link href="/" className="inline-block">
@@ -310,11 +338,11 @@ export default function CuraFooter() {
 
             {FALLBACK_COLUMNS.map((column) => (
               <div key={column.key}>
-                <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
                   {column.heading}
                 </h3>
 
-                <div className="mt-5 flex flex-col gap-3">
+                <div className="mt-4 flex flex-col gap-3">
                   {column.links.map((link) => (
                     <FooterLink
                       key={link.key}
@@ -327,11 +355,11 @@ export default function CuraFooter() {
             ))}
 
             <div>
-              <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
                 Get in touch with CURA
               </h3>
 
-              <div className="mt-5 flex flex-col gap-3">
+              <div className="mt-4 flex flex-col gap-3">
                 <Link
                   href="/#contact"
                   className="text-sm text-white/65 transition hover:text-white"
@@ -359,7 +387,7 @@ export default function CuraFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-[#101820] text-white">
+    <footer className="bg-[#071B49] text-white">
       <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
         <div
           className="grid gap-12"
@@ -372,9 +400,11 @@ export default function CuraFooter() {
         >
           <div>
             <Link href="/" className="inline-block">
-              <span className="text-2xl font-semibold tracking-[0.2em]">
-                CURA
-              </span>
+              <img
+                src="/cura-logo.png"
+                alt="CURA"
+                className="h-14 w-auto object-contain brightness-0 invert"
+              />
             </Link>
 
             <p className="mt-5 max-w-sm text-sm leading-7 text-white/60">
@@ -409,12 +439,12 @@ export default function CuraFooter() {
           {cms.columns.map((column) => (
             <div key={column.key}>
               {column.heading && (
-                <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
                   {column.heading}
                 </h3>
               )}
 
-              <div className="mt-5 flex flex-col gap-3">
+              <div className="mt-4 flex flex-col gap-3">
                 {column.links.map((link) => (
                   <FooterLink
                     key={link.id}
@@ -427,11 +457,11 @@ export default function CuraFooter() {
           ))}
 
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
               {cms.contactHeading}
             </h3>
 
-            <div className="mt-5 flex flex-col gap-3">
+            <div className="mt-4 flex flex-col gap-3">
               <Link
                 href="/#contact"
                 className="text-sm text-white/65 transition hover:text-white"

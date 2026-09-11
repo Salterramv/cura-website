@@ -436,13 +436,7 @@ export default function CuraHeader() {
           onClick={close}
           className="block rounded-lg px-4 py-3 transition hover:bg-[#F1F7FB]"
         >
-          <span
-            className={`font-semibold ${
-              item.item_key === "legal"
-                ? "text-[#D71920]"
-                : "text-[#071B49]"
-            }`}
-          >
+          <span className="text-sm font-medium text-[#071B49]">
             {item.label || item.value}
           </span>
         </Link>
@@ -526,10 +520,10 @@ export default function CuraHeader() {
                       <div
                         className={`absolute left-1/2 top-full z-50 mt-4 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-2 shadow-xl ${
                           key === "cura_insights"
-                            ? "w-80"
+                            ? "w-64"
                             : key === "services"
-                              ? "w-72"
-                              : "w-64"
+                              ? "w-56"
+                              : "w-56"
                         }`}
                       >
                         {renderDropdownItems(
