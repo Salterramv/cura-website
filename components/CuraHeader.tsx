@@ -443,14 +443,8 @@ export default function CuraHeader() {
                 : "text-[#071B49]"
             }`}
           >
-            {item.value || item.label}
+            {item.label || item.value}
           </span>
-
-          {item.value && item.value !== item.label && (
-            <span className="mt-0.5 block text-xs text-slate-500">
-              {item.value}
-            </span>
-          )}
         </Link>
       ))
   }
