@@ -386,82 +386,63 @@ export default function CuraFooter() {
 
   const year = new Date().getFullYear();
 
+  const exploreColumn =
+    cms.columns.find((column) => column.key === "explore") ?? {
+      key: "explore",
+      heading: "Explore",
+      sort: 0,
+      links: [],
+    };
+
+  const additionalColumns = cms.columns.filter(
+    (column) => column.key !== "explore"
+  );
+
   return (
     <footer className="bg-[#071B49] text-white">
-      <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
-        <div
-          className="grid gap-12"
-          style={{
-            gridTemplateColumns:
-              cms.columns.length >= 4
-                ? `repeat(${Math.min(cms.columns.length + 2, 6)}, minmax(0, 1fr))`
-                : undefined,
-          }}
-        >
+      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10 lg:px-12">
+
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4 lg:gap-12">
+
+          {/* BRAND */}
           <div>
             <Link href="/" className="inline-block">
               <img
                 src="/cura-logo.png"
                 alt="CURA"
-                className="h-14 w-auto object-contain brightness-0 invert"
+                className="h-12 w-auto object-contain brightness-0 invert"
               />
             </Link>
 
-            <p className="mt-5 max-w-sm text-sm leading-7 text-white/60">
+            <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">
               {cms.brandDescription}
             </p>
-
-            {cms.socialItems.length > 0 && (
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                {cms.socialItems.map((social) => (
-                  <a
-                    key={social.id}
-                    href={social.url || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={social.label || social.item_key}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white/70 transition hover:border-white/40 hover:text-white"
-                  >
-                    <SocialIcon
-                      type={
-                        String(
-                          social.settings?.icon ||
-                            social.item_key
-                        ).toLowerCase()
-                      }
-                    />
-                  </a>
-                ))}
-              </div>
-            )}
           </div>
 
-          {cms.columns.map((column) => (
-            <div key={column.key}>
-              {column.heading && (
-                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
-                  {column.heading}
-                </h3>
-              )}
-
-              <div className="mt-4 flex flex-col gap-3">
-                {column.links.map((link) => (
-                  <FooterLink
-                    key={link.id}
-                    label={link.label || link.value || link.item_key}
-                    url={link.url || "#"}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-
+          {/* EXPLORE */}
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
-              {cms.contactHeading}
+              {exploreColumn.heading || "Explore"}
             </h3>
 
-            <div className="mt-4 flex flex-col gap-3">
+            <div className="mt-4 flex flex-col gap-2.5">
+              {exploreColumn.links.map((link) => (
+                <FooterLink
+                  key={link.id}
+                  label={link.label || link.value || link.item_key}
+                  url={link.url || "#"}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* CONTACT */}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
+              Contact
+            </h3>
+
+            <div className="mt-4 flex flex-col gap-2.5">
               <Link
                 href="/#contact"
                 className="text-sm text-white/65 transition hover:text-white"
@@ -474,13 +455,93 @@ export default function CuraFooter() {
               </span>
             </div>
           </div>
+
+          {/* FOLLOW US */}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
+              Follow Us
+            </h3>
+
+            <div className="mt-4 flex items-center gap-3">
+              {cms.socialItems.map((social) => (
+                <a
+                  key={social.id}
+                  href={social.url || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={social.label || social.item_key}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/75 transition hover:border-[#18B8EE] hover:text-[#18B8EE]"
+                >
+                  <SocialIcon
+                    type={String(
+                      social.settings?.icon || social.item_key
+                    ).toLowerCase()}
+                  />
+                </a>
+              ))}
+
+              {cms.socialItems.length === 0 && (
+                <>
+                  <span
+                    aria-label="Facebook"
+                    title="Facebook"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/75"
+                  >
+                    <SocialIcon type="facebook" />
+                  </span>
+
+                  <span
+                    aria-label="Instagram"
+                    title="Instagram"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/75"
+                  >
+                    <SocialIcon type="instagram" />
+                  </span>
+
+                  <span
+                    aria-label="LinkedIn"
+                    title="LinkedIn"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/75"
+                  >
+                    <SocialIcon type="linkedin" />
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
         </div>
 
-        <div className="mt-14 border-t border-white/10 pt-6">
+        {/* ADDITIONAL CMS COLUMNS */}
+        {additionalColumns.length > 0 && (
+          <div className="mt-8 grid gap-8 border-t border-white/10 pt-8 sm:grid-cols-2 lg:grid-cols-4">
+            {additionalColumns.map((column) => (
+              <div key={column.key}>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#18B8EE]">
+                  {column.heading}
+                </h3>
+
+                <div className="mt-4 flex flex-col gap-2.5">
+                  {column.links.map((link) => (
+                    <FooterLink
+                      key={link.id}
+                      label={link.label || link.value || link.item_key}
+                      url={link.url || "#"}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* COPYRIGHT */}
+        <div className="mt-8 border-t border-white/10 pt-5">
           <p className="text-xs text-white/45">
             {cms.copyright.replace("{year}", String(year))}
           </p>
         </div>
+
       </div>
     </footer>
   );
