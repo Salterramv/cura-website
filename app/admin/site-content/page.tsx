@@ -1011,6 +1011,109 @@ export default function SiteContentAdmin() {
 
     let loaded = (data ?? []) as ContentItem[]
 
+    if (activeArea === "footer") {
+      const defaultSocials: ContentItem[] = [
+        {
+          area: "footer",
+          section_key: "social",
+          item_key: "facebook",
+          item_type: "link",
+          label: "Facebook",
+          value: "Facebook",
+          url: null,
+          image_url: null,
+          visible: true,
+          sort_order: 1,
+          settings: {
+            footer_role: "social",
+            icon: "facebook",
+          },
+          default_value: "Facebook",
+          default_url: null,
+          default_image_url: null,
+          default_visible: true,
+          default_sort_order: 1,
+          is_custom: false,
+        },
+        {
+          area: "footer",
+          section_key: "social",
+          item_key: "instagram",
+          item_type: "link",
+          label: "Instagram",
+          value: "Instagram",
+          url: null,
+          image_url: null,
+          visible: true,
+          sort_order: 2,
+          settings: {
+            footer_role: "social",
+            icon: "instagram",
+          },
+          default_value: "Instagram",
+          default_url: null,
+          default_image_url: null,
+          default_visible: true,
+          default_sort_order: 2,
+          is_custom: false,
+        },
+        {
+          area: "footer",
+          section_key: "social",
+          item_key: "linkedin",
+          item_type: "link",
+          label: "LinkedIn",
+          value: "LinkedIn",
+          url: null,
+          image_url: null,
+          visible: true,
+          sort_order: 3,
+          settings: {
+            footer_role: "social",
+            icon: "linkedin",
+          },
+          default_value: "LinkedIn",
+          default_url: null,
+          default_image_url: null,
+          default_visible: true,
+          default_sort_order: 3,
+          is_custom: false,
+        },
+      ]
+
+      const existingSocialKeys = new Set(
+        loaded
+          .filter(
+            (item) =>
+              item.section_key === "social" &&
+              item.settings?.footer_role === "social"
+          )
+          .map((item) => item.item_key)
+      )
+
+      const missingSocials = defaultSocials.filter(
+        (item) => !existingSocialKeys.has(item.item_key)
+      )
+
+      if (missingSocials.length > 0) {
+        const { data: insertedSocials, error: socialInsertError } =
+          await supabase
+            .from("site_content")
+            .upsert(missingSocials, {
+              onConflict: "area,section_key,item_key",
+            })
+            .select("*")
+
+        if (socialInsertError) {
+          setError(socialInsertError.message)
+          setLoading(false)
+          return
+        }
+
+        loaded = [...loaded, ...((insertedSocials ?? []) as ContentItem[])]
+      }
+    }
+
     if (loaded.length === 0) {
       const defaults = DEFAULT_CONTENT.filter(
         (item) => item.area === activeArea
@@ -1948,8 +2051,8 @@ export default function SiteContentAdmin() {
                           Social Media
                         </h3>
                         <p className="mt-1 text-sm text-slate-500">
-                          Add Facebook, Instagram, LinkedIn, YouTube, X or any
-                          other external platform.
+                          Manage the links used by the existing Follow Us buttons
+                          in the CURA footer.
                         </p>
                       </div>
 
@@ -1972,76 +2075,147 @@ export default function SiteContentAdmin() {
                           item.settings?.footer_role === "social"
                       )
                       .sort((a, b) => a.sort_order - b.sort_order)
-                      .map((social) => (
-                        <div
-                          key={social.id}
-                          className="p-5"
-                        >
-                          <div className="grid gap-4 lg:grid-cols-[1fr_2fr_auto]">
-                            <input
-                              type="text"
-                              value={social.label}
-                              onChange={(event) =>
-                                updateItem(
-                                  social.id,
-                                  "label",
-                                  event.target.value
-                                )
-                              }
-                              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none focus:border-[#18b8ee]"
-                            />
+                      .map((social) => {
+                        const icon = String(
+                          social.settings?.icon ?? social.item_key
+                        ).toLowerCase()
 
-                            <input
-                              type="text"
-                              value={social.url ?? ""}
-                              onChange={(event) =>
-                                updateItem(
-                                  social.id,
-                                  "url",
-                                  event.target.value
-                                )
-                              }
-                              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#18b8ee]"
-                            />
+                        return (
+                          <div key={social.id} className="p-5">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                              <div className="flex min-w-[210px] items-center gap-3">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#effbff] text-[#087dcc]">
+                                  {icon === "facebook" && (
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="h-6 w-6 fill-current"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M13.5 8H16V4h-2.5C10.46 4 8 6.24 8 10v2H5v4h3v4h4v-4h3.5l.5-4H12v-2c0-1.12.38-2 1.5-2Z" />
+                                    </svg>
+                                  )}
 
-                            <div className="flex items-center gap-2">
-                              <label className="flex items-center gap-2 text-xs text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={social.visible}
-                                  onChange={(event) =>
-                                    updateItem(
-                                      social.id,
-                                      "visible",
-                                      event.target.checked
-                                    )
-                                  }
-                                  className="h-4 w-4 rounded border-slate-300 text-[#087dcc]"
-                                />
-                                Show
-                              </label>
+                                  {icon === "instagram" && (
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="h-6 w-6 fill-none stroke-current"
+                                      strokeWidth="2"
+                                      aria-hidden="true"
+                                    >
+                                      <rect
+                                        x="3"
+                                        y="3"
+                                        width="18"
+                                        height="18"
+                                        rx="5"
+                                      />
+                                      <circle cx="12" cy="12" r="4" />
+                                      <circle
+                                        cx="17.5"
+                                        cy="6.5"
+                                        r="1"
+                                        className="fill-current stroke-none"
+                                      />
+                                    </svg>
+                                  )}
 
-                              <button
-                                type="button"
-                                onClick={() => saveItem(social)}
-                                disabled={saving}
-                                className="rounded-lg bg-[#087dcc] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                              >
-                                Save
-                              </button>
+                                  {icon === "linkedin" && (
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="h-6 w-6 fill-current"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M5 8H2V21H5V8ZM3.5 3A2 2 0 1 0 3.5 7A2 2 0 0 0 3.5 3ZM22 13.5C22 9.91 20.09 8 17.14 8C15.58 8 14.54 8.86 14 9.68V8H11V21H14V14.37C14 12.63 14.33 11 16.18 11C18 11 18 12.8 18 14.49V21H21V13.5H22Z" />
+                                    </svg>
+                                  )}
 
-                              <button
-                                type="button"
-                                onClick={() => deleteFooterItem(social)}
-                                disabled={saving}
-                                className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                              >
-                                Delete
-                              </button>
+                                  {!["facebook", "instagram", "linkedin"].includes(
+                                    icon
+                                  ) && (
+                                    <span className="text-lg font-bold">
+                                      {social.label?.slice(0, 1).toUpperCase() || "S"}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <p className="font-semibold text-[#071d41]">
+                                    {social.label}
+                                  </p>
+                                  <p className="text-xs text-slate-500">
+                                    {social.is_custom
+                                      ? "Custom social link"
+                                      : "Default social button"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <input
+                                type="text"
+                                value={social.url ?? ""}
+                                onChange={(event) =>
+                                  updateItem(
+                                    social.id,
+                                    "url",
+                                    event.target.value
+                                  )
+                                }
+                                placeholder="Enter social media URL"
+                                className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#18b8ee]"
+                              />
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                <label className="flex items-center gap-2 px-1 text-xs text-slate-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={social.visible}
+                                    onChange={(event) =>
+                                      updateItem(
+                                        social.id,
+                                        "visible",
+                                        event.target.checked
+                                      )
+                                    }
+                                    className="h-4 w-4 rounded border-slate-300 text-[#087dcc]"
+                                  />
+                                  Show
+                                </label>
+
+                                <button
+                                  type="button"
+                                  onClick={() => saveItem(social)}
+                                  disabled={saving}
+                                  className="rounded-lg bg-[#087dcc] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b8cda] disabled:opacity-50"
+                                >
+                                  Save
+                                </button>
+
+                                {!social.is_custom && (
+                                  <button
+                                    type="button"
+                                    onClick={() => revertFooterItem(social)}
+                                    disabled={saving}
+                                    className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-[#18b8ee] disabled:opacity-50"
+                                  >
+                                    Revert
+                                  </button>
+                                )}
+
+                                {social.is_custom && (
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteFooterItem(social)}
+                                    disabled={saving}
+                                    className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
 
                     {items.filter(
                       (item) =>
@@ -2049,7 +2223,7 @@ export default function SiteContentAdmin() {
                         item.settings?.footer_role === "social"
                     ).length === 0 && (
                       <div className="p-10 text-center text-sm text-slate-500">
-                        No custom social media links yet.
+                        No social media buttons configured yet.
                       </div>
                     )}
                   </div>
