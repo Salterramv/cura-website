@@ -3,6 +3,22 @@
 import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 
+type EducationEntry = {
+  qualification?: string
+  institute?: string
+  startYear?: string
+  graduatedYear?: string
+}
+
+type ExperienceEntry = {
+  designation?: string
+  employer?: string
+  startYear?: string
+  endYear?: string
+  currentlyWorking?: boolean
+  reasonForLeaving?: string
+}
+
 type CareerApplication = {
   id: string
   career_id: string
@@ -14,14 +30,14 @@ type CareerApplication = {
   address: string | null
   cover_letter: string | null
   education: string | null
+  education_details: EducationEntry[] | null
+  experience_details: ExperienceEntry[] | null
   professional_qualifications: string | null
   years_of_experience: number | null
   current_employer: string | null
   current_position: string | null
   expected_salary: string | null
   notice_period: string | null
-  linkedin_url: string | null
-  portfolio_url: string | null
   additional_information: string | null
   status: string
   admin_notes: string | null
@@ -77,6 +93,14 @@ function formatFileSize(value: number | null) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function educationItems(value: EducationEntry[] | null | undefined) {
+  return Array.isArray(value) ? value : []
+}
+
+function experienceItems(value: ExperienceEntry[] | null | undefined) {
+  return Array.isArray(value) ? value : []
+}
+
 export default function CareerApplicationsPanel() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
@@ -103,34 +127,12 @@ export default function CareerApplicationsPanel() {
     const { data, error: loadError } = await supabase
       .from("career_applications")
       .select(`
-        id,
-        career_id,
-        full_name,
-        email,
-        phone,
-        id_number,
-        date_of_birth,
-        address,
-        cover_letter,
-        education,
-        professional_qualifications,
-        years_of_experience,
-        current_employer,
-        current_position,
-        expected_salary,
-        notice_period,
-        linkedin_url,
-        portfolio_url,
-        additional_information,
-        status,
-        admin_notes,
-        applicant_email_sent,
-        internal_email_sent,
-        created_at,
-        updated_at,
-        career:careers (
-          title
-        )
+        id, career_id, full_name, email, phone, id_number, date_of_birth, address,
+        cover_letter, education, education_details, experience_details,
+        professional_qualifications, years_of_experience, current_employer,
+        current_position, expected_salary, notice_period, additional_information,
+        status, admin_notes, applicant_email_sent, internal_email_sent,
+        created_at, updated_at, career:careers(title)
       `)
       .order("created_at", { ascending: false })
 
@@ -156,24 +158,14 @@ export default function CareerApplicationsPanel() {
     const { data, error: documentError } = await supabase
       .from("career_application_documents")
       .select(`
-        id,
-        application_id,
-        document_type,
-        original_file_name,
-        storage_path,
-        mime_type,
-        file_size,
-        description,
-        created_at
+        id, application_id, document_type, original_file_name,
+        storage_path, mime_type, file_size, description, created_at
       `)
       .eq("application_id", application.id)
       .order("created_at", { ascending: true })
 
-    if (documentError) {
-      setError(documentError.message)
-    } else {
-      setDocuments((data ?? []) as ApplicationDocument[])
-    }
+    if (documentError) setError(documentError.message)
+    else setDocuments((data ?? []) as ApplicationDocument[])
 
     setDocumentsLoading(false)
   }
@@ -194,34 +186,12 @@ export default function CareerApplicationsPanel() {
       })
       .eq("id", selected.id)
       .select(`
-        id,
-        career_id,
-        full_name,
-        email,
-        phone,
-        id_number,
-        date_of_birth,
-        address,
-        cover_letter,
-        education,
-        professional_qualifications,
-        years_of_experience,
-        current_employer,
-        current_position,
-        expected_salary,
-        notice_period,
-        linkedin_url,
-        portfolio_url,
-        additional_information,
-        status,
-        admin_notes,
-        applicant_email_sent,
-        internal_email_sent,
-        created_at,
-        updated_at,
-        career:careers (
-          title
-        )
+        id, career_id, full_name, email, phone, id_number, date_of_birth, address,
+        cover_letter, education, education_details, experience_details,
+        professional_qualifications, years_of_experience, current_employer,
+        current_position, expected_salary, notice_period, additional_information,
+        status, admin_notes, applicant_email_sent, internal_email_sent,
+        created_at, updated_at, career:careers(title)
       `)
       .single()
 
@@ -231,7 +201,7 @@ export default function CareerApplicationsPanel() {
       const updated = data as CareerApplication
       setSelected(updated)
       setApplications((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item))
+        current.map((item) => (item.id === updated.id ? updated : item)),
       )
       setSuccess("Application updated successfully.")
     }
@@ -241,7 +211,6 @@ export default function CareerApplicationsPanel() {
 
   async function openDocument(document: ApplicationDocument) {
     setError("")
-
     const { data, error: signedUrlError } = await supabase.storage
       .from("career-applications")
       .createSignedUrl(document.storage_path, 300)
@@ -267,7 +236,6 @@ export default function CareerApplicationsPanel() {
     return applications.filter((application) => {
       const matchesStatus =
         statusFilter === "all" || application.status === statusFilter
-
       const matchesSearch =
         !term ||
         application.full_name.toLowerCase().includes(term) ||
@@ -279,6 +247,15 @@ export default function CareerApplicationsPanel() {
   }, [applications, search, statusFilter])
 
   if (selected) {
+    const education = educationItems(selected.education_details)
+    const experience = experienceItems(selected.experience_details)
+    const profilePicture = documents.find(
+      (document) => document.document_type === "profile_picture",
+    )
+    const supportingDocuments = documents.filter(
+      (document) => document.document_type !== "profile_picture",
+    )
+
     return (
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-6 py-5">
@@ -302,7 +279,6 @@ export default function CareerApplicationsPanel() {
                 {vacancyTitle(selected)} · Applied {formatDate(selected.created_at)}
               </p>
             </div>
-
             <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold capitalize text-slate-700">
               {status.replace("_", " ")}
             </span>
@@ -312,24 +288,97 @@ export default function CareerApplicationsPanel() {
         <div className="grid gap-6 px-6 py-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             <div className="rounded-xl border border-slate-200 p-5">
-              <h3 className="text-lg font-semibold text-slate-900">Applicant Details</h3>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <Info label="Full name" value={selected.full_name} />
-                <Info label="Email" value={selected.email} />
-                <Info label="Phone" value={selected.phone} />
-                <Info label="ID number" value={selected.id_number} />
-                <Info label="Date of birth" value={formatDate(selected.date_of_birth)} />
-                <Info label="Address" value={selected.address} />
-                <Info label="Current position" value={selected.current_position} />
-                <Info label="Current employer" value={selected.current_employer} />
-                <Info label="Years of experience" value={selected.years_of_experience} />
-                <Info label="Notice period" value={selected.notice_period} />
-                <Info label="Expected salary" value={selected.expected_salary} />
-                <Info label="Professional qualifications" value={selected.professional_qualifications} />
-                <Info label="Education" value={selected.education} />
-                <Info label="LinkedIn" value={selected.linkedin_url} />
-                <Info label="Portfolio" value={selected.portfolio_url} />
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold text-slate-900">Applicant Details</h3>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <Info label="Full name" value={selected.full_name} />
+                    <Info label="Email" value={selected.email} />
+                    <Info label="Phone" value={selected.phone} />
+                    <Info label="ID number" value={selected.id_number} />
+                    <Info label="Date of birth" value={formatDate(selected.date_of_birth)} />
+                    <Info label="Address" value={selected.address} />
+                    <Info label="Notice period" value={selected.notice_period} />
+                    <Info label="Expected salary" value={selected.expected_salary} />
+                    <Info label="Professional qualifications" value={selected.professional_qualifications} />
+                  </div>
+                </div>
+
+                {profilePicture && (
+                  <button
+                    type="button"
+                    onClick={() => openDocument(profilePicture)}
+                    className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-2 text-left hover:bg-slate-100"
+                  >
+                    <p className="mb-2 text-xs font-semibold text-slate-600">Profile picture</p>
+                    <div className="flex h-32 w-24 items-center justify-center overflow-hidden rounded-lg bg-white text-center text-xs font-semibold text-slate-500">
+                      View profile picture
+                    </div>
+                  </button>
+                )}
               </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-5">
+              <h3 className="text-lg font-semibold text-slate-900">Education</h3>
+              {education.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500">{display(selected.education)}</p>
+              ) : (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[650px] text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                        <th className="px-3 py-2">Qualification</th>
+                        <th className="px-3 py-2">Institute</th>
+                        <th className="px-3 py-2">Start Year</th>
+                        <th className="px-3 py-2">Graduated Year</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {education.map((item, index) => (
+                        <tr key={index} className="border-b border-slate-100">
+                          <td className="px-3 py-3">{display(item.qualification)}</td>
+                          <td className="px-3 py-3">{display(item.institute)}</td>
+                          <td className="px-3 py-3">{display(item.startYear)}</td>
+                          <td className="px-3 py-3">{display(item.graduatedYear)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-5">
+              <h3 className="text-lg font-semibold text-slate-900">Experience</h3>
+              {experience.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500">No structured experience provided.</p>
+              ) : (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[900px] text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                        <th className="px-3 py-2">Designation</th>
+                        <th className="px-3 py-2">Employer</th>
+                        <th className="px-3 py-2">Start Year</th>
+                        <th className="px-3 py-2">End Year</th>
+                        <th className="px-3 py-2">Reason for leaving</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {experience.map((item, index) => (
+                        <tr key={index} className="border-b border-slate-100 align-top">
+                          <td className="px-3 py-3">{display(item.designation)}</td>
+                          <td className="px-3 py-3">{display(item.employer)}</td>
+                          <td className="px-3 py-3">{display(item.startYear)}</td>
+                          <td className="px-3 py-3">{item.currentlyWorking ? "Currently working here" : display(item.endYear)}</td>
+                          <td className="px-3 py-3">{display(item.reasonForLeaving)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <TextSection title="Cover Letter" value={selected.cover_letter} />
@@ -337,20 +386,15 @@ export default function CareerApplicationsPanel() {
 
             <div className="rounded-xl border border-slate-200 p-5">
               <h3 className="text-lg font-semibold text-slate-900">Supporting Documents</h3>
-
               {documentsLoading && (
                 <p className="mt-3 text-sm text-slate-500">Loading documents...</p>
               )}
-
-              {!documentsLoading && documents.length === 0 && (
-                <p className="mt-3 text-sm text-slate-500">
-                  No supporting documents were submitted.
-                </p>
+              {!documentsLoading && supportingDocuments.length === 0 && (
+                <p className="mt-3 text-sm text-slate-500">No supporting documents were submitted.</p>
               )}
-
-              {!documentsLoading && documents.length > 0 && (
+              {!documentsLoading && supportingDocuments.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  {documents.map((document) => (
+                  {supportingDocuments.map((document) => (
                     <div
                       key={document.id}
                       className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -360,19 +404,15 @@ export default function CareerApplicationsPanel() {
                           {document.original_file_name}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {document.document_type} · {formatFileSize(document.file_size)}
+                          {formatFileSize(document.file_size)}
                         </p>
-
                         {document.description && (
                           <p className="mt-2 text-sm leading-5 text-slate-600">
-                            <span className="font-medium text-slate-700">
-                              Description:
-                            </span>{" "}
+                            <span className="font-medium text-slate-700">Description:</span>{" "}
                             {document.description}
                           </p>
                         )}
                       </div>
-
                       <button
                         type="button"
                         onClick={() => openDocument(document)}
@@ -390,7 +430,6 @@ export default function CareerApplicationsPanel() {
           <aside className="space-y-5">
             <div className="rounded-xl border border-slate-200 p-5">
               <h3 className="text-lg font-semibold text-slate-900">Manage Application</h3>
-
               <label className="mt-4 block text-sm font-medium text-slate-700">
                 Recruitment status
               </label>
@@ -400,9 +439,7 @@ export default function CareerApplicationsPanel() {
                 className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-sky-500"
               >
                 {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
 
@@ -426,17 +463,8 @@ export default function CareerApplicationsPanel() {
                 {saving ? "Saving..." : "Save Changes"}
               </button>
 
-              {success && (
-                <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                  {success}
-                </p>
-              )}
-
-              {error && (
-                <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
-                </p>
-              )}
+              {success && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p>}
+              {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
             </div>
 
             <div className="rounded-xl border border-slate-200 p-5">
@@ -457,29 +485,23 @@ export default function CareerApplicationsPanel() {
       <div className="px-6 py-5">
         <h2 className="text-xl font-semibold text-slate-900">Job Application Management</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Review applications, supporting documents, recruitment status and internal notes.
+          Review applications, education, experience, profile pictures, supporting documents and recruitment status.
         </p>
 
-        {loading && (
-          <p className="mt-4 text-sm text-slate-500">Loading applications...</p>
-        )}
-
+        {loading && <p className="mt-4 text-sm text-slate-500">Loading applications...</p>}
         {!loading && error && !selected && (
-          <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </p>
+          <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
         )}
 
         {!loading && (
           <>
-            <div className="mt-5 flex flex-col gap-3 md:flex-row">
+            <div className="mt-5 grid gap-3 md:grid-cols-[1fr_200px]">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search applicant, email or vacancy..."
-                className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-sky-500"
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-sky-500"
               />
-
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
@@ -487,57 +509,42 @@ export default function CareerApplicationsPanel() {
               >
                 <option value="all">All statuses</option>
                 {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </div>
 
-            <p className="mt-4 text-sm text-slate-600">
-              {filteredApplications.length} of {applications.length} application
-              {applications.length === 1 ? "" : "s"} shown.
-            </p>
-
-            {filteredApplications.length === 0 && (
-              <div className="mt-6 rounded-xl border border-dashed border-slate-300 px-5 py-10 text-center text-sm text-slate-500">
-                No applications match your search or filter.
-              </div>
-            )}
-
-            {filteredApplications.length > 0 && (
-              <div className="mt-6 space-y-3">
-                {filteredApplications.map((application) => (
-                  <button
-                    key={application.id}
-                    type="button"
-                    onClick={() => openApplication(application)}
-                    className="flex w-full flex-col gap-3 rounded-xl border border-slate-200 p-4 text-left transition hover:border-sky-400 hover:bg-sky-50/40 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900">
-                        {application.full_name}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {application.email}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        {vacancyTitle(application)} · {formatDate(application.created_at)}
-                      </p>
-                    </div>
-
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium capitalize text-slate-700">
-                        {application.status.replace("_", " ")}
-                      </span>
-                      <span className="text-sm font-medium text-sky-600">
-                        Review →
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
+              {filteredApplications.length === 0 ? (
+                <p className="px-5 py-8 text-center text-sm text-slate-500">No applications found.</p>
+              ) : (
+                <div className="divide-y divide-slate-200">
+                  {filteredApplications.map((application) => (
+                    <button
+                      key={application.id}
+                      type="button"
+                      onClick={() => openApplication(application)}
+                      className="block w-full px-5 py-4 text-left transition hover:bg-slate-50"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900">{application.full_name}</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {application.email} · {vacancyTitle(application)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold capitalize text-slate-700">
+                            {application.status.replace("_", " ")}
+                          </span>
+                          <span className="text-xs text-slate-400">{formatDate(application.created_at)}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -545,55 +552,31 @@ export default function CareerApplicationsPanel() {
   )
 }
 
-function Info({
-  label,
-  value,
-}: {
-  label: string
-  value: string | number | null | undefined
-}) {
+function Info({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 break-words text-sm text-slate-800">{display(value)}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{display(value)}</p>
     </div>
   )
 }
 
-function TextSection({
-  title,
-  value,
-}: {
-  title: string
-  value: string | null
-}) {
+function TextSection({ title, value }: { title: string; value: string | null }) {
   return (
     <div className="rounded-xl border border-slate-200 p-5">
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
         {display(value)}
       </p>
     </div>
   )
 }
 
-function StatusRow({
-  label,
-  sent,
-}: {
-  label: string
-  sent: boolean
-}) {
+function StatusRow({ label, sent }: { label: string; sent: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-slate-600">{label}</span>
-      <span
-        className={
-          sent
-            ? "rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
-            : "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500"
-        }
-      >
+      <span className={sent ? "font-semibold text-emerald-600" : "font-semibold text-slate-400"}>
         {sent ? "Sent" : "Not sent"}
       </span>
     </div>
