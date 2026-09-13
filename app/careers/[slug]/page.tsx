@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
+import CareerApplicationForm from "@/components/CareerApplicationForm"
 import { createClient } from "@/lib/supabase/server"
 
 type PageProps = {
@@ -156,6 +157,12 @@ export default async function CareerDetailPage({
             <ContentSection
               title="How to apply"
               content={job.application_instructions}
+            />
+
+            <CareerApplicationForm
+              careerId={job.id}
+              careerTitle={job.title}
+              closingDate={job.closing_date}
             />
 
           </div>
