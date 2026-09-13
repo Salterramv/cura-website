@@ -44,10 +44,6 @@ export default function CareerApplicationForm({
 
     formData.set("career_id", careerId)
 
-    files.forEach((file) => {
-      formData.append("documents", file)
-    })
-
     try {
       const response = await fetch("/api/careers/apply", {
         method: "POST",
