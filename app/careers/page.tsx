@@ -1,6 +1,6 @@
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/server"
 
 type Career = {
   id: string
@@ -24,7 +24,7 @@ function formatDate(date: string | null) {
 }
 
 export default async function CareersPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: careers, error } = await supabase
     .from("careers")

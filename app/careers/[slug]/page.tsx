@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import CuraHeader from "@/components/CuraHeader"
 import CuraFooter from "@/components/CuraFooter"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/server"
 
 type PageProps = {
   params: Promise<{
@@ -61,7 +61,7 @@ export default async function CareerDetailPage({
 }: PageProps) {
   const { slug } = await params
 
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: career, error } = await supabase
     .from("careers")
