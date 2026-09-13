@@ -87,14 +87,22 @@ function emailLayout(title: string, content: string) {
   `;
 }
 
-function field(label: string, value: string) {
+function field(
+  label: string,
+  value: string | number | null | undefined,
+) {
+  const displayValue =
+    value === null || value === undefined || value === ""
+      ? "—"
+      : String(value);
+
   return `
     <tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;width:220px;vertical-align:top;">
         ${escapeHtml(label)}
       </td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">
-        ${escapeHtml(value || "—").replace(/\n/g, "<br />")}
+        ${escapeHtml(displayValue).replace(/\n/g, "<br />")}
       </td>
     </tr>
   `;
