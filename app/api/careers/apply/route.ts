@@ -161,10 +161,27 @@ export async function POST(request: NextRequest) {
     const fullName = clean(formData.get("full_name"));
     const email = clean(formData.get("email")).toLowerCase();
     const phone = clean(formData.get("phone"));
+    const yearsOfExperienceRaw = clean(formData.get("years_of_experience"));
+    const yearsOfExperience = yearsOfExperienceRaw
+      ? Number.parseFloat(yearsOfExperienceRaw)
+      : null;
 
     if (!fullName || !email || !phone) {
       return NextResponse.json(
         { error: "Please complete all required fields." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      yearsOfExperienceRaw &&
+      (yearsOfExperience === null || Number.isNaN(yearsOfExperience))
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Please enter years of experience as a number, for example 3 or 3.5.",
+        },
         { status: 400 },
       );
     }
@@ -176,10 +193,10 @@ export async function POST(request: NextRequest) {
       phone,
       id_number: clean(formData.get("id_number")),
       address: clean(formData.get("address")),
-      date_of_birth: clean(formData.get("date_of_birth")),
+      date_of_birth: clean(formData.get("date_of_birth")) || null,
       current_position: clean(formData.get("current_position")),
       current_employer: clean(formData.get("current_employer")),
-      years_of_experience: clean(formData.get("years_of_experience")),
+      years_of_experience: yearsOfExperience,
       professional_qualifications: clean(
         formData.get("professional_qualifications"),
       ),
