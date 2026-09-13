@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useRef, useState } from "react"
 
 type CareerApplicationFormProps = {
   careerId: string
@@ -24,23 +24,43 @@ export default function CareerApplicationForm({
   const [success, setSuccess] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [fileDescriptions, setFileDescriptions] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const applicationClosed =
     !!closingDate &&
     new Date(`${closingDate}T23:59:59+05:00`).getTime() < Date.now()
 
   function handleFiles(selected: FileList | null) {
-    const selectedFiles = selected ? Array.from(selected) : []
+    if (!selected || selected.length === 0) return
 
-    if (selectedFiles.length > 10) {
-      setError("You can upload a maximum of 10 documents.")
-      setFiles(selectedFiles.slice(0, 10))
+    const incomingFiles = Array.from(selected)
+
+    if (files.length + incomingFiles.length > 10) {
+      setError(
+        `You can upload a maximum of 10 documents. You currently have ${files.length} document${files.length === 1 ? "" : "s"}.`,
+      )
       return
     }
 
+    const newFiles = [...files, ...incomingFiles]
+
+    setFiles(newFiles)
+    setFileDescriptions((current) => [
+      ...current,
+      ...incomingFiles.map(() => ""),
+    ])
     setError("")
-    setFiles(selectedFiles)
-    setFileDescriptions(selectedFiles.map(() => ""))
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  function removeFile(index: number) {
+    setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))
+    setFileDescriptions((current) =>
+      current.filter((_, descriptionIndex) => descriptionIndex !== index),
+    )
   }
 
   function updateFileDescription(index: number, description: string) {
@@ -418,32 +438,59 @@ export default function CareerApplicationForm({
                 your application.
               </p>
 
-              <input
-                name="documents"
-                type="file"
-                multiple
-                onChange={(event) => handleFiles(event.target.files)}
-                className="mt-4 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm"
-              />
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#071B49]">
+                    Documents added: {files.length}/10
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Add up to 10 documents. You can add them one at a time.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={files.length >= 10}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex w-fit items-center rounded-lg bg-[#35B5E5] px-5 py-2.5 text-sm font-semibold text-[#071B49] transition hover:bg-[#071B49] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  + Add Document
+                </button>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={(event) => handleFiles(event.target.files)}
+                  className="hidden"
+                />
+              </div>
 
               {files.length > 0 && (
-                <div className="mt-4 space-y-4">
-                  <p className="text-sm font-semibold text-[#071B49]">
-                    Selected documents ({files.length}/10)
-                  </p>
-
+                <div className="mt-5 space-y-4">
                   {files.map((file, index) => (
                     <div
                       key={`${file.name}-${file.size}-${index}`}
                       className="rounded-xl border border-slate-200 bg-slate-50 p-4"
                     >
-                      <p className="text-sm font-semibold text-[#071B49]">
-                        {index + 1}. {file.name}
-                      </p>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-[#071B49]">
+                            {index + 1}. {file.name}
+                          </p>
 
-                      <p className="mt-1 text-xs text-slate-500">
-                        {Math.round(file.size / 1024)} KB
-                      </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {Math.round(file.size / 1024)} KB
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="shrink-0 text-sm font-medium text-red-600 hover:text-red-700"
+                        >
+                          Remove
+                        </button>
+                      </div>
 
                       <label className="mt-3 block text-xs font-semibold text-[#071B49]">
                         Description of this document
