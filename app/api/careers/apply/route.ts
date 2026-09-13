@@ -243,6 +243,32 @@ export async function POST(request: NextRequest) {
       .getAll("documents")
       .filter((entry): entry is File => entry instanceof File && entry.size > 0);
 
+    if (files.length > 10) {
+      return NextResponse.json(
+        { error: "You can upload a maximum of 10 documents." },
+        { status: 400 },
+      );
+    }
+
+    let documentDescriptions: string[] = [];
+
+    const rawDocumentDescriptions = clean(
+      formData.get("document_descriptions"),
+    );
+
+    if (rawDocumentDescriptions) {
+      try {
+        const parsed = JSON.parse(rawDocumentDescriptions);
+        if (Array.isArray(parsed)) {
+          documentDescriptions = parsed.map((value) =>
+            typeof value === "string" ? value.trim() : "",
+          );
+        }
+      } catch {
+        documentDescriptions = [];
+      }
+    }
+
     const documentRows: Array<{
       application_id: string;
       document_type: string;
@@ -250,6 +276,7 @@ export async function POST(request: NextRequest) {
       storage_path: string;
       mime_type: string;
       file_size: number;
+      description: string;
     }> = [];
 
     for (const file of files) {
@@ -289,6 +316,7 @@ export async function POST(request: NextRequest) {
         storage_path: path,
         mime_type: file.type || "application/octet-stream",
         file_size: file.size,
+        description: documentDescriptions[documentRows.length] || "",
       });
     }
 

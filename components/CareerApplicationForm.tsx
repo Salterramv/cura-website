@@ -23,13 +23,32 @@ export default function CareerApplicationForm({
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [files, setFiles] = useState<File[]>([])
+  const [fileDescriptions, setFileDescriptions] = useState<string[]>([])
 
   const applicationClosed =
     !!closingDate &&
     new Date(`${closingDate}T23:59:59+05:00`).getTime() < Date.now()
 
   function handleFiles(selected: FileList | null) {
-    setFiles(selected ? Array.from(selected) : [])
+    const selectedFiles = selected ? Array.from(selected) : []
+
+    if (selectedFiles.length > 10) {
+      setError("You can upload a maximum of 10 documents.")
+      setFiles(selectedFiles.slice(0, 10))
+      return
+    }
+
+    setError("")
+    setFiles(selectedFiles)
+    setFileDescriptions(selectedFiles.map(() => ""))
+  }
+
+  function updateFileDescription(index: number, description: string) {
+    setFileDescriptions((current) => {
+      const next = [...current]
+      next[index] = description
+      return next
+    })
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -43,6 +62,24 @@ export default function CareerApplicationForm({
     const formData = new FormData(form)
 
     formData.set("career_id", careerId)
+
+    // Replace the browser's automatic file entries with the
+    // controlled file list so every selected document is submitted once.
+    formData.delete("documents")
+    formData.delete("document_descriptions")
+
+    if (files.length > 10) {
+      throw new Error("You can upload a maximum of 10 documents.")
+    }
+
+    files.forEach((file) => {
+      formData.append("documents", file)
+    })
+
+    formData.append(
+      "document_descriptions",
+      JSON.stringify(fileDescriptions),
+    )
 
     try {
       const response = await fetch("/api/careers/apply", {
@@ -66,6 +103,7 @@ export default function CareerApplicationForm({
 
       form.reset()
       setFiles([])
+      setFileDescriptions([])
     } catch (submissionError) {
       setError(
         submissionError instanceof Error
@@ -389,18 +427,39 @@ export default function CareerApplicationForm({
               />
 
               {files.length > 0 && (
-                <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-                  <p className="font-semibold text-[#071B49]">
-                    Selected documents
+                <div className="mt-4 space-y-4">
+                  <p className="text-sm font-semibold text-[#071B49]">
+                    Selected documents ({files.length}/10)
                   </p>
 
-                  <ul className="mt-2 list-disc pl-5">
-                    {files.map((file) => (
-                      <li key={`${file.name}-${file.size}`}>
-                        {file.name}
-                      </li>
-                    ))}
-                  </ul>
+                  {files.map((file, index) => (
+                    <div
+                      key={`${file.name}-${file.size}-${index}`}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <p className="text-sm font-semibold text-[#071B49]">
+                        {index + 1}. {file.name}
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        {Math.round(file.size / 1024)} KB
+                      </p>
+
+                      <label className="mt-3 block text-xs font-semibold text-[#071B49]">
+                        Description of this document
+                      </label>
+
+                      <textarea
+                        value={fileDescriptions[index] || ""}
+                        onChange={(event) =>
+                          updateFileDescription(index, event.target.value)
+                        }
+                        rows={2}
+                        className={`${inputClass} mt-2`}
+                        placeholder="Briefly describe this document, e.g. Bachelor's degree certificate"
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

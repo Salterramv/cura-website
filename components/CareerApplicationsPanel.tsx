@@ -40,6 +40,7 @@ type ApplicationDocument = {
   storage_path: string
   mime_type: string | null
   file_size: number | null
+  description: string | null
   created_at: string
 }
 
@@ -162,6 +163,7 @@ export default function CareerApplicationsPanel() {
         storage_path,
         mime_type,
         file_size,
+        description,
         created_at
       `)
       .eq("application_id", application.id)
@@ -360,6 +362,15 @@ export default function CareerApplicationsPanel() {
                         <p className="mt-1 text-xs text-slate-500">
                           {document.document_type} · {formatFileSize(document.file_size)}
                         </p>
+
+                        {document.description && (
+                          <p className="mt-2 text-sm leading-5 text-slate-600">
+                            <span className="font-medium text-slate-700">
+                              Description:
+                            </span>{" "}
+                            {document.description}
+                          </p>
+                        )}
                       </div>
 
                       <button
