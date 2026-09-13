@@ -2,8 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import CareerApplicationsPanel from "@/components/CareerApplicationsPanel"
-
 
 type Career = {
   id: string
@@ -67,10 +65,6 @@ export default function AdminCareersPage() {
 
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-
-  const [activeSection, setActiveSection] = useState<"applications" | "posts">(
-    "applications"
-  )
 
   useEffect(() => {
     checkAdmin()
@@ -394,54 +388,10 @@ export default function AdminCareersPage() {
           </h2>
 
           <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-            Manage job applications and career opportunities published on
-            the CURA website.
+            Create and manage career opportunities published on the CURA
+            website.
           </p>
 
-        </div>
-
-        {/* CAREERS MANAGEMENT SECTIONS */}
-        <div className="mb-8 grid gap-4 md:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => setActiveSection("applications")}
-            className={`rounded-2xl border p-5 text-left shadow-sm transition ${
-              activeSection === "applications"
-                ? "border-[#18b8ee] bg-[#eafaff] ring-2 ring-[#18b8ee]/20"
-                : "border-slate-200 bg-white hover:border-[#18b8ee]/50 hover:bg-slate-50"
-            }`}
-          >
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#18b8ee]">
-              Recruitment
-            </p>
-            <h3 className="mt-2 text-xl font-bold text-[#071d41]">
-              Job Application Management
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Review applications, supporting documents, recruitment status and
-              internal notes.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSection("posts")}
-            className={`rounded-2xl border p-5 text-left shadow-sm transition ${
-              activeSection === "posts"
-                ? "border-[#18b8ee] bg-[#eafaff] ring-2 ring-[#18b8ee]/20"
-                : "border-slate-200 bg-white hover:border-[#18b8ee]/50 hover:bg-slate-50"
-            }`}
-          >
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#18b8ee]">
-              Careers
-            </p>
-            <h3 className="mt-2 text-xl font-bold text-[#071d41]">
-              Job Post Management
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Create, edit, publish, unpublish and delete career opportunities.
-            </p>
-          </button>
         </div>
 
         {/* MESSAGES */}
@@ -458,10 +408,6 @@ export default function AdminCareersPage() {
           </div>
         )}
 
-        {activeSection === "applications" ? (
-          <CareerApplicationsPanel />
-        ) : (
-          <>
         {/* EDITOR */}
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -916,8 +862,6 @@ export default function AdminCareersPage() {
           )}
 
         </section>
-          </>
-        )}
 
       </div>
 
