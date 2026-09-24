@@ -9,6 +9,7 @@ type LegalCase = {
   slug: string
   title: string
   category: string | null
+  tax_type: string | null
   description: string | null
   status: string | null
   outcome: string | null
@@ -71,6 +72,7 @@ export default function AdminCasesPage() {
   const [title, setTitle] = useState("")
   const [slug, setSlug] = useState("")
   const [category, setCategory] = useState("Tax Legal Case")
+  const [taxType, setTaxType] = useState("")
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState("")
   const [outcome, setOutcome] = useState("")
@@ -204,6 +206,7 @@ export default function AdminCasesPage() {
     setTitle("")
     setSlug("")
     setCategory("Tax Legal Case")
+    setTaxType("")
     setDescription("")
     setStatus("")
     setOutcome("")
@@ -231,6 +234,7 @@ export default function AdminCasesPage() {
     setTitle(item.title || "")
     setSlug(item.slug || "")
     setCategory(item.category || "Tax Legal Case")
+    setTaxType(item.tax_type || "")
     setDescription(item.description || "")
     setStatus(item.status || "")
     setOutcome(item.outcome || "")
@@ -1134,6 +1138,31 @@ export default function AdminCasesPage() {
                     onChange={(e) => setCategory(e.target.value)}
                     className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 text-sm"
                   />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold">
+                    Tax Type
+                  </label>
+
+                  <select
+                    value={taxType}
+                    onChange={(e) => setTaxType(e.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm"
+                  >
+                    <option value="">Select tax type</option>
+                    <option value="GST">GST</option>
+                    <option value="Business Profit Tax">
+                      Business Profit Tax
+                    </option>
+                    <option value="Withholding Tax">
+                      Withholding Tax
+                    </option>
+                    <option value="Income Tax">
+                      Income Tax
+                    </option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
 
                 <div>

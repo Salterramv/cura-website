@@ -9,6 +9,7 @@ type LegalCase = {
   slug: string
   title: string
   category: string | null
+  tax_type: string | null
   description: string | null
   published: boolean
 }
@@ -143,7 +144,7 @@ export default function CasesPage() {
       } = await supabase
         .from("legal_cases")
         .select(
-          "id, slug, title, category, description, published"
+          "id, slug, title, category, tax_type, description, published"
         )
 
       console.log("LEGAL CASES:", legalCases)
@@ -439,6 +440,9 @@ export default function CasesPage() {
         (item.description || "")
           .toLowerCase()
           .includes(term) ||
+        (item.tax_type || "")
+          .toLowerCase()
+          .includes(term) ||
         item.courts.some((court) =>
           court
             .toLowerCase()
@@ -699,10 +703,16 @@ export default function CasesPage() {
                     className="group rounded-xl border border-slate-200 bg-white p-8 transition hover:-translate-y-1 hover:shadow-xl"
                   >
 
-                    {/* COURT TAGS + DATE */}
+                    {/* TAX TYPE + COURT TAGS + DATE */}
                     <div className="flex flex-wrap items-start justify-between gap-4">
 
                       <div className="flex flex-wrap gap-2">
+
+                        {item.tax_type && (
+                          <span className="rounded-full bg-[#E8F6FC] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#0876A8]">
+                            {item.tax_type}
+                          </span>
+                        )}
 
                         {item.isCivilCourt && (
                           <button
