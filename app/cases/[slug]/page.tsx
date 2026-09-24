@@ -1228,7 +1228,7 @@ export default async function CasePage({
               </h2>
 
               {aiSummary && (
-                <p className="mt-4 text-base leading-8 text-slate-600 whitespace-pre-line">
+                <p className="mt-4 text-base leading-8 text-slate-600 whitespace-pre-line text-justify">
                   {aiSummary}
                 </p>
               )}
