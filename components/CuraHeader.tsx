@@ -448,8 +448,8 @@ export default function CuraHeader() {
   )
 
   return (
-    <header className="border-b border-[#dce5ef] bg-white">
-      <div className="mx-auto max-w-7xl px-6 py-4 md:px-10 lg:px-12">
+    <header className="sticky top-0 z-50 border-b border-[#dce5ef] bg-white">
+      <div className="mx-auto max-w-7xl px-6 py-2.5 md:px-10 lg:px-12">
         <div className="flex items-center justify-between gap-8">
 
           {/* CURA LOGO */}
@@ -461,7 +461,7 @@ export default function CuraHeader() {
             <img
               src="/cura-logo.png"
               alt="CURA"
-              className="h-20 w-auto object-contain"
+              className="h-14 w-auto object-contain"
             />
           </Link>
 
