@@ -2156,8 +2156,17 @@ export default function AccountingTopicPage() {
         }
 
         loadedBlocks =
-          (blockData ||
-            []) as Block[]
+          ((blockData || []) as Block[]).filter(
+            (block) => {
+              const presentation =
+                block.presentation &&
+                typeof block.presentation === "object"
+                  ? block.presentation as Record<string, unknown>
+                  : {}
+
+              return presentation.cura_deleted !== true
+            }
+          )
       }
 
       const blockIds =
