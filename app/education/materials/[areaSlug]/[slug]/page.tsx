@@ -3190,7 +3190,7 @@ export default function AccountingTopicPage() {
 
                         {/* CURA CONTENT */}
 
-                        <div className="px-7 pt-4 pb-8 md:px-10 md:pt-5 md:pb-10">
+                        <div className="px-7 pt-2 pb-8 md:px-10 md:pt-3 md:pb-10 [&>*:first-child]:mt-0 [&_p:first-child]:mt-0">
                           <div className="space-y-10">
                             {sectionBlocks.map(
                               (
