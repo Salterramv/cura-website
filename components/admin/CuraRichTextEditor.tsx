@@ -1224,6 +1224,7 @@ export default function CuraRichTextEditor({
       move.title = "Drag to move shape; horizontal position follows pointer"
       move.setAttribute("data-cura-editor-ui", "true")
       move.setAttribute("contenteditable", "false")
+      move.draggable = false
       move.className = "cura-shape-move-handle"
       shape.appendChild(move)
 
@@ -3872,15 +3873,26 @@ export default function CuraRichTextEditor({
           position: absolute;
           left: -12px;
           top: -12px;
-          z-index: 101;
-          width: 22px;
-          height: 22px;
-          border: 1px solid #64748b;
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          padding: 0;
+          border: 1px solid #168BC4;
           border-radius: 4px;
           background: white;
-          cursor: move;
+          color: #071B49;
+          cursor: grab;
           touch-action: none;
-          line-height: 18px;
+          user-select: none;
+          pointer-events: auto;
+          line-height: 1;
+        }
+
+        .cura-rich-editor .cura-shape-move-handle:active {
+          cursor: grabbing;
         }
 
         .cura-rich-editor .cura-shape-resize-handle {
