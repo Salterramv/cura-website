@@ -1728,6 +1728,14 @@ export default function CuraRichTextEditor({
         node.remove()
       })
 
+    // Do not persist the editor-only initialization flag.
+    // Shapes must receive fresh move/resize handlers after reload.
+    clone
+      .querySelectorAll(".cura-editor-shape")
+      .forEach((node) => {
+        node.removeAttribute("data-cura-shape-ready")
+      })
+
     clone
       .querySelectorAll(
         ".cura-image-selected, .cura-table-selected, .cura-image-dragging, .cura-table-dragging"
