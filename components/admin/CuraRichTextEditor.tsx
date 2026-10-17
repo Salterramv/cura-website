@@ -151,12 +151,13 @@ export default function CuraRichTextEditor({
 
     editor
       .querySelectorAll(
-        ".cura-image-selected, .cura-table-selected"
+        ".cura-image-selected, .cura-table-selected, .cura-shape-selected"
       )
       .forEach((node) => {
         node.classList.remove(
           "cura-image-selected",
-          "cura-table-selected"
+          "cura-table-selected",
+          "cura-shape-selected"
         )
       })
 
@@ -171,12 +172,13 @@ export default function CuraRichTextEditor({
 
     editor
       .querySelectorAll(
-        ".cura-image-selected, .cura-table-selected"
+        ".cura-image-selected, .cura-table-selected, .cura-shape-selected"
       )
       .forEach((node) => {
         node.classList.remove(
           "cura-image-selected",
-          "cura-table-selected"
+          "cura-table-selected",
+          "cura-shape-selected"
         )
       })
 
@@ -199,6 +201,16 @@ export default function CuraRichTextEditor({
     ) {
       object.classList.add(
         "cura-table-selected"
+      )
+    }
+
+    if (
+      object.classList.contains(
+        "cura-editor-shape"
+      )
+    ) {
+      object.classList.add(
+        "cura-shape-selected"
       )
     }
   }
@@ -1215,6 +1227,20 @@ export default function CuraRichTextEditor({
       if (shape.dataset.curaShapeReady === "true") return
 
       shape.dataset.curaShapeReady = "true"
+
+      shape.addEventListener("click", (event) => {
+        const target = event.target
+        if (
+          target instanceof HTMLElement &&
+          target.closest("[data-cura-editor-ui]")
+        ) {
+          selectEditorObject(shape)
+          return
+        }
+
+        selectEditorObject(shape)
+      })
+
       shape.style.position = "relative"
       shape.style.boxSizing = "border-box"
 
@@ -1528,7 +1554,7 @@ export default function CuraRichTextEditor({
 
         if (
           !target?.closest(
-            ".cura-editor-image, .cura-editor-table-object"
+            ".cura-editor-image, .cura-editor-table-object, .cura-editor-shape"
           )
         ) {
           clearEditorObjectSelection()
@@ -1664,9 +1690,27 @@ export default function CuraRichTextEditor({
         }
 
         /*
-         * Delete the selected object only when the user is
-         * actually operating on the object itself.
+         * When editing text inside a selected shape, preserve
+         * normal Backspace/Delete behavior. The shape itself
+         * is removed only when the shape is selected as an object.
          */
+        if (selected.classList.contains("cura-editor-shape")) {
+          const selection = window.getSelection()
+          const anchor: Node | null = selection?.anchorNode ?? null
+          const focus: Node | null = selection?.focusNode ?? null
+
+          const nodeIsInsideShape = (node: Node | null) =>
+            !!node && (node === selected || selected.contains(node))
+
+          if (
+            nodeIsInsideShape(anchor) ||
+            nodeIsInsideShape(focus) ||
+            (target && selected.contains(target) && target !== selected)
+          ) {
+            return
+          }
+        }
+
         event.preventDefault()
         event.stopPropagation()
 
@@ -1745,6 +1789,7 @@ export default function CuraRichTextEditor({
         node.classList.remove(
           "cura-image-selected",
           "cura-table-selected",
+          "cura-shape-selected",
           "cura-image-dragging",
           "cura-table-dragging"
         )
@@ -3864,7 +3909,12 @@ export default function CuraRichTextEditor({
           user-select: text;
         }
 
-        .cura-rich-editor .cura-editor-shape:focus {
+        .cura-rich-editor .cura-editor-shape.cura-shape-selected {
+  outline: 2px solid #18b8ee;
+  outline-offset: 3px;
+}
+
+.cura-rich-editor .cura-editor-shape:focus {
           outline: 2px solid #18b8ee;
           outline-offset: 2px;
         }
