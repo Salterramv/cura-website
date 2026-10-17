@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 type Section = {
@@ -23,6 +24,7 @@ export default function EducationTopicAdmin({
 }: {
   params: Promise<{ id: string }>
 }) {
+  const router = useRouter()
   const [topicId, setTopicId] = useState("")
   const [topic, setTopic] = useState<Topic | null>(null)
   const [sections, setSections] = useState<Section[]>([])
@@ -390,12 +392,13 @@ export default function EducationTopicAdmin({
       <div className="mx-auto max-w-7xl">
 
         <div className="mb-8">
-          <Link
-            href="/admin/education"
+          <button
+            type="button"
+            onClick={() => router.back()}
             className="text-sm font-semibold text-[#159B78]"
           >
-            ← Education Materials
-          </Link>
+            ← Back
+          </button>
 
           <div className="mt-5">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#159B78]">
