@@ -109,6 +109,7 @@ export default function CuraRichTextEditor({
 
     hydrateImages(editor)
     hydrateTables(editor)
+    hydrateShapes(editor)
   }, [value])
 
   function saveSelection() {
@@ -1207,6 +1208,110 @@ export default function CuraRichTextEditor({
     )
   }
 
+
+  function hydrateShapes(editor: HTMLDivElement) {
+    editor.querySelectorAll(".cura-editor-shape").forEach((node) => {
+      const shape = node as HTMLElement
+      if (shape.dataset.curaShapeReady === "true") return
+      shape.dataset.curaShapeReady = "true"
+      shape.style.position = "relative"
+      shape.style.boxSizing = "border-box"
+
+      const move = document.createElement("button")
+      move.type = "button"
+      move.textContent = "✣"
+      move.title = "Drag to move shape"
+      move.setAttribute("data-cura-editor-ui", "true")
+      move.setAttribute("contenteditable", "false")
+      move.className = "cura-shape-move-handle"
+      shape.appendChild(move)
+
+      const resize = document.createElement("span")
+      resize.title = "Drag to resize shape"
+      resize.setAttribute("data-cura-editor-ui", "true")
+      resize.setAttribute("contenteditable", "false")
+      resize.className = "cura-shape-resize-handle"
+      shape.appendChild(resize)
+
+      move.addEventListener("pointerdown", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+
+        const startX = event.clientX
+        const startY = event.clientY
+        let moved = false
+
+        const onMove = (e: PointerEvent) => {
+          if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 4) {
+            moved = true
+          }
+        }
+
+        const onUp = (e: PointerEvent) => {
+          document.removeEventListener("pointermove", onMove, true)
+          document.removeEventListener("pointerup", onUp, true)
+          if (!moved) return
+
+          const target = document.elementFromPoint(e.clientX, e.clientY)
+          let top: HTMLElement | null =
+            target instanceof HTMLElement ? target : target?.parentElement ?? null
+
+          while (top && top.parentElement !== editor) {
+            top = top.parentElement
+          }
+
+          if (top && top !== shape && top.parentElement === editor) {
+            const rect = top.getBoundingClientRect()
+            if (e.clientY < rect.top + rect.height / 2) {
+              editor.insertBefore(shape, top)
+            } else {
+              editor.insertBefore(shape, top.nextSibling)
+            }
+          } else if (target && editor.contains(target)) {
+            editor.appendChild(shape)
+          }
+
+          update()
+        }
+
+        document.addEventListener("pointermove", onMove, true)
+        document.addEventListener("pointerup", onUp, true)
+      })
+
+      let startX = 0
+      let startY = 0
+      let startWidth = 0
+      let startHeight = 0
+
+      resize.addEventListener("pointerdown", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const rect = shape.getBoundingClientRect()
+        startX = event.clientX
+        startY = event.clientY
+        startWidth = rect.width
+        startHeight = rect.height
+        resize.setPointerCapture?.(event.pointerId)
+      })
+
+      resize.addEventListener("pointermove", (event) => {
+        if (!resize.hasPointerCapture?.(event.pointerId)) return
+        const editorWidth = editor.getBoundingClientRect().width
+        shape.style.width = `${Math.max(100, Math.min(editorWidth - 20, startWidth + event.clientX - startX))}px`
+        shape.style.height = `${Math.max(50, startHeight + event.clientY - startY)}px`
+      })
+
+      const finishResize = (event: PointerEvent) => {
+        if (!resize.hasPointerCapture?.(event.pointerId)) return
+        try { resize.releasePointerCapture(event.pointerId) } catch {}
+        update()
+      }
+
+      resize.addEventListener("pointerup", finishResize)
+      resize.addEventListener("pointercancel", finishResize)
+    })
+  }
+
   function hydrateImages(
     editor: HTMLDivElement
   ) {
@@ -1359,6 +1464,7 @@ export default function CuraRichTextEditor({
 
     hydrateImages(editor)
     hydrateTables(editor)
+    hydrateShapes(editor)
 
     const clearSelection =
       (event: MouseEvent) => {
@@ -3698,6 +3804,34 @@ export default function CuraRichTextEditor({
         .cura-rich-editor .cura-editor-shape:focus {
           outline: 2px solid #18b8ee;
           outline-offset: 2px;
+        }
+
+        .cura-rich-editor .cura-shape-move-handle {
+          position: absolute;
+          left: -12px;
+          top: -12px;
+          z-index: 101;
+          width: 22px;
+          height: 22px;
+          border: 1px solid #64748b;
+          border-radius: 4px;
+          background: white;
+          cursor: move;
+          touch-action: none;
+          line-height: 18px;
+        }
+
+        .cura-rich-editor .cura-shape-resize-handle {
+          position: absolute;
+          right: -6px;
+          bottom: -6px;
+          z-index: 101;
+          width: 14px;
+          height: 14px;
+          border: 1px solid #64748b;
+          background: white;
+          cursor: nwse-resize;
+          touch-action: none;
         }
 
         .cura-rich-editor div {
