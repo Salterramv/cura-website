@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import CuraRichTextEditor from "@/components/admin/CuraRichTextEditor"
 
@@ -63,6 +64,7 @@ export default function SectionEditor({
 }: {
   params: Promise<{ id: string }>
 }) {
+  const router = useRouter()
   const [sectionId, setSectionId] = useState("")
   const [section, setSection] =
     useState<Section | null>(null)
@@ -541,12 +543,13 @@ export default function SectionEditor({
 
       <div className="mx-auto max-w-6xl">
 
-        <Link
-          href="/admin/education"
-          className="text-sm font-semibold text-[#159B78]"
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="text-sm font-semibold text-[#159B78] hover:text-[#071B49]"
         >
-          ← Education Materials
-        </Link>
+          ← Back
+        </button>
 
         <div className="mt-5 mb-8">
           <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#159B78]">
