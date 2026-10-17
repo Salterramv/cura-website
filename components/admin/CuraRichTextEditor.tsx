@@ -1213,6 +1213,7 @@ export default function CuraRichTextEditor({
     editor.querySelectorAll(".cura-editor-shape").forEach((node) => {
       const shape = node as HTMLElement
       if (shape.dataset.curaShapeReady === "true") return
+
       shape.dataset.curaShapeReady = "true"
       shape.style.position = "relative"
       shape.style.boxSizing = "border-box"
@@ -1220,19 +1221,20 @@ export default function CuraRichTextEditor({
       const move = document.createElement("button")
       move.type = "button"
       move.textContent = "✣"
-      move.title = "Drag to move shape"
+      move.title = "Drag to move shape; horizontal position follows pointer"
       move.setAttribute("data-cura-editor-ui", "true")
       move.setAttribute("contenteditable", "false")
       move.className = "cura-shape-move-handle"
       shape.appendChild(move)
 
       const resize = document.createElement("span")
-      resize.title = "Drag to resize shape"
+      resize.title = "Drag to resize horizontally and vertically"
       resize.setAttribute("data-cura-editor-ui", "true")
       resize.setAttribute("contenteditable", "false")
       resize.className = "cura-shape-resize-handle"
       shape.appendChild(resize)
 
+      // Move vertically in the content and horizontally by alignment.
       move.addEventListener("pointerdown", (event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -1240,8 +1242,12 @@ export default function CuraRichTextEditor({
         const startX = event.clientX
         const startY = event.clientY
         let moved = false
+        let latestX = startX
+        let latestY = startY
 
         const onMove = (e: PointerEvent) => {
+          latestX = e.clientX
+          latestY = e.clientY
           if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 4) {
             moved = true
           }
@@ -1250,7 +1256,27 @@ export default function CuraRichTextEditor({
         const onUp = (e: PointerEvent) => {
           document.removeEventListener("pointermove", onMove, true)
           document.removeEventListener("pointerup", onUp, true)
+          document.removeEventListener("pointercancel", onUp, true)
+
           if (!moved) return
+
+          const editorRect = editor.getBoundingClientRect()
+          const relativeX = latestX - editorRect.left
+          const third = editorRect.width / 3
+
+          if (relativeX < third) {
+            shape.style.marginLeft = "0"
+            shape.style.marginRight = "auto"
+            shape.dataset.curaAlignment = "left"
+          } else if (relativeX > third * 2) {
+            shape.style.marginLeft = "auto"
+            shape.style.marginRight = "0"
+            shape.dataset.curaAlignment = "right"
+          } else {
+            shape.style.marginLeft = "auto"
+            shape.style.marginRight = "auto"
+            shape.dataset.curaAlignment = "center"
+          }
 
           const target = document.elementFromPoint(e.clientX, e.clientY)
           let top: HTMLElement | null =
@@ -1262,12 +1288,12 @@ export default function CuraRichTextEditor({
 
           if (top && top !== shape && top.parentElement === editor) {
             const rect = top.getBoundingClientRect()
-            if (e.clientY < rect.top + rect.height / 2) {
-              editor.insertBefore(shape, top)
-            } else {
-              editor.insertBefore(shape, top.nextSibling)
-            }
+            editor.insertBefore(
+              shape,
+              e.clientY < rect.top + rect.height / 2 ? top : top.nextSibling
+            )
           } else if (target && editor.contains(target)) {
+            // If dropped into blank space, place it at the end.
             editor.appendChild(shape)
           }
 
@@ -1276,39 +1302,67 @@ export default function CuraRichTextEditor({
 
         document.addEventListener("pointermove", onMove, true)
         document.addEventListener("pointerup", onUp, true)
+        document.addEventListener("pointercancel", onUp, true)
       })
 
+      // Resize both dimensions using document-level pointer tracking.
+      let resizing = false
+      let pointerId = -1
       let startX = 0
       let startY = 0
       let startWidth = 0
       let startHeight = 0
 
+      const onResizeMove = (event: PointerEvent) => {
+        if (!resizing || event.pointerId !== pointerId) return
+
+        event.preventDefault()
+
+        const editorWidth = editor.clientWidth
+        const maxWidth = Math.max(100, editorWidth - 16)
+        const width = Math.max(
+          100,
+          Math.min(maxWidth, startWidth + event.clientX - startX)
+        )
+        const height = Math.max(
+          50,
+          startHeight + event.clientY - startY
+        )
+
+        shape.style.width = `${width}px`
+        shape.style.height = `${height}px`
+        shape.style.maxWidth = "100%"
+        shape.style.minHeight = "50px"
+        shape.style.flexShrink = "0"
+      }
+
+      const onResizeEnd = (event: PointerEvent) => {
+        if (!resizing || event.pointerId !== pointerId) return
+
+        resizing = false
+        document.removeEventListener("pointermove", onResizeMove, true)
+        document.removeEventListener("pointerup", onResizeEnd, true)
+        document.removeEventListener("pointercancel", onResizeEnd, true)
+
+        update()
+      }
+
       resize.addEventListener("pointerdown", (event) => {
         event.preventDefault()
         event.stopPropagation()
+
         const rect = shape.getBoundingClientRect()
+        resizing = true
+        pointerId = event.pointerId
         startX = event.clientX
         startY = event.clientY
         startWidth = rect.width
         startHeight = rect.height
-        resize.setPointerCapture?.(event.pointerId)
+
+        document.addEventListener("pointermove", onResizeMove, true)
+        document.addEventListener("pointerup", onResizeEnd, true)
+        document.addEventListener("pointercancel", onResizeEnd, true)
       })
-
-      resize.addEventListener("pointermove", (event) => {
-        if (!resize.hasPointerCapture?.(event.pointerId)) return
-        const editorWidth = editor.getBoundingClientRect().width
-        shape.style.width = `${Math.max(100, Math.min(editorWidth - 20, startWidth + event.clientX - startX))}px`
-        shape.style.height = `${Math.max(50, startHeight + event.clientY - startY)}px`
-      })
-
-      const finishResize = (event: PointerEvent) => {
-        if (!resize.hasPointerCapture?.(event.pointerId)) return
-        try { resize.releasePointerCapture(event.pointerId) } catch {}
-        update()
-      }
-
-      resize.addEventListener("pointerup", finishResize)
-      resize.addEventListener("pointercancel", finishResize)
     })
   }
 
@@ -3823,15 +3877,27 @@ export default function CuraRichTextEditor({
 
         .cura-rich-editor .cura-shape-resize-handle {
           position: absolute;
-          right: -6px;
-          bottom: -6px;
+          right: -7px;
+          bottom: -7px;
           z-index: 101;
-          width: 14px;
-          height: 14px;
-          border: 1px solid #64748b;
+          width: 16px;
+          height: 16px;
+          border: 1px solid #168BC4;
+          border-radius: 2px;
           background: white;
           cursor: nwse-resize;
           touch-action: none;
+          user-select: none;
+        }
+
+        .cura-rich-editor .cura-shape-move-handle {
+          touch-action: none;
+          user-select: none;
+        }
+
+        .cura-rich-editor .cura-editor-shape {
+          flex-shrink: 0;
+          overflow: visible;
         }
 
         .cura-rich-editor div {
