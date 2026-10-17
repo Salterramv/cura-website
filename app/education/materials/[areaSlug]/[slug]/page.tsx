@@ -3168,27 +3168,29 @@ export default function AccountingTopicPage() {
                           </div>
                         )}
 
-                        <div className="px-7 pt-7 md:px-10 md:pt-8">
-                          <CuraSectionIllustration
-                            visual={
-                              section.presentation
-                                ?.cura_visual as
-                                | {
-                                    type?: string
-                                    eyebrow?: string
-                                    title?: string
-                                    nodes?: string[]
-                                    note?: string
-                                  }
-                                | null
-                                | undefined
-                            }
-                          />
-                        </div>
+                        {Boolean(section.presentation?.cura_visual) && (
+                          <div className="px-7 pt-5 md:px-10 md:pt-6">
+                            <CuraSectionIllustration
+                              visual={
+                                section.presentation
+                                  ?.cura_visual as
+                                  | {
+                                      type?: string
+                                      eyebrow?: string
+                                      title?: string
+                                      nodes?: string[]
+                                      note?: string
+                                    }
+                                  | null
+                                  | undefined
+                              }
+                            />
+                          </div>
+                        )}
 
                         {/* CURA CONTENT */}
 
-                        <div className="px-7 py-8 md:px-10 md:py-10">
+                        <div className="px-7 pt-4 pb-8 md:px-10 md:pt-5 md:pb-10">
                           <div className="space-y-10">
                             {sectionBlocks.map(
                               (
