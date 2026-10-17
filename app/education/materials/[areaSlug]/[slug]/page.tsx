@@ -1334,6 +1334,13 @@ function RichText({
     )
   }
 
+  // Normalize malformed/empty HTML commonly produced by rich-text editors.
+  // This removes blank leading elements and unwraps lists from paragraphs.
+  const normalizedValue = value
+    .replace(/<p>\s*(?=<(?:ul|ol)\b)/gi, "")
+    .replace(/<\/p>\s*(?=<\/(?:ul|ol)>)/gi, "")
+    .replace(/^(?:\s|&nbsp;|<br\s*\/?>|<p>\s*(?:&nbsp;)?\s*<\/p>|<div>\s*(?:<br\s*\/?>|&nbsp;)*\s*<\/div>)+/gi, "")
+
   return (
     <div
       className={`break-words ${className}
@@ -1355,7 +1362,7 @@ function RichText({
         [&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-[#071B49]
         [&_h3]:mb-3 [&_h3]:mt-5 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-[#071B49]
         [&_a]:font-semibold [&_a]:text-[#168BC4] [&_a]:underline`}
-      dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
+      dangerouslySetInnerHTML={{ __html: sanitizeRichText(normalizedValue) }}
     />
   )
 }
