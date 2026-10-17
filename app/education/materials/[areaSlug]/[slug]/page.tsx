@@ -1337,7 +1337,13 @@ function RichText({
   return (
     <div
       className={`break-words ${className}
-        [&_p]:mb-4
+        [&_p]:mb-3
+        [&_>_*:first-child]:mt-0
+        [&_p:first-child]:mt-0
+        [&_ul:first-child]:mt-0
+        [&_ol:first-child]:mt-0
+        [&_h2:first-child]:mt-0
+        [&_h3:first-child]:mt-0
         [&_strong]:font-bold
         [&_b]:font-bold
         [&_em]:italic
