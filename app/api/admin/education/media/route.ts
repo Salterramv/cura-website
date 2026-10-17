@@ -63,19 +63,12 @@ export async function POST(
       )
     }
 
-    if (
-      typeof blockId !==
-      "string" ||
-      !blockId
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Content block ID is required.",
-        },
-        { status: 400 }
-      )
-    }
+    // block_id is optional for pictures inserted directly
+    // into the rich-text editor. Standalone illustration
+    // blocks still supply block_id and are validated below.
+    const hasBlockId =
+      typeof blockId === "string" &&
+      blockId.trim().length > 0
 
     const allowedTypes = [
       "image/png",
@@ -123,35 +116,38 @@ export async function POST(
      * Confirm that the block really exists
      * before uploading an orphaned file.
      */
-    const { data: block, error: blockError } =
-      await supabase
-        .from("education_content_blocks")
-        .select(
-          "id,section_id,block_type"
+    let sectionFolder = "inline"
+
+    if (hasBlockId) {
+      const { data: block, error: blockError } =
+        await supabase
+          .from("education_content_blocks")
+          .select("id,section_id,block_type")
+          .eq("id", blockId)
+          .single()
+
+      if (blockError) {
+        return NextResponse.json(
+          { error: "Content block was not found." },
+          { status: 404 }
         )
-        .eq("id", blockId)
-        .single()
+      }
 
-    if (blockError) {
-      throw blockError
-    }
+      if (
+        !["illustration", "image", "figure"].includes(
+          block.block_type
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "This content block is not an illustration block.",
+          },
+          { status: 400 }
+        )
+      }
 
-    if (
-      ![
-        "illustration",
-        "image",
-        "figure",
-      ].includes(
-        block.block_type
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "This content block is not an illustration block.",
-        },
-        { status: 400 }
-      )
+      sectionFolder = block.section_id
     }
 
     /*
@@ -170,8 +166,11 @@ export async function POST(
           )
         : ".png"
 
+    const uniqueName =
+      `${Date.now()}-${crypto.randomUUID()}${ext}`
+
     const path =
-      `accounting/${block.section_id}/${block.id}-${Date.now()}${ext}`
+      `accounting/${sectionFolder}/${uniqueName}`
 
     const buffer =
       Buffer.from(
